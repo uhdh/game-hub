@@ -41,6 +41,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case 'RESOLVE_ROUND': {
+      if (state.phase !== 'running') return state;
       const { exit } = action;
       const win = state.selectedExitId === exit.id;
       const payout = win ? state.pendingBet * exit.odds : 0;

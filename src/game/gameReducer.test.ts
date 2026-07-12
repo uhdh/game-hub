@@ -104,6 +104,14 @@ describe('gameReducer', () => {
     expect(state.exitStats[exit.id]).toBe(10);
   });
 
+  it('RESOLVE_ROUND is ignored when not in running phase', () => {
+    const state = createInitialState(15);
+    const next = gameReducer(state, { type: 'RESOLVE_ROUND', exit: EXIT_META[0] });
+    expect(next.phase).toBe('setup');
+    expect(next.coins).toBe(15);
+    expect(next.history).toEqual([]);
+  });
+
   it('NEXT_ROUND returns to setup and preserves the selected exit', () => {
     let state = createInitialState(15);
     state = gameReducer(state, { type: 'SELECT_EXIT', id: 2 });
