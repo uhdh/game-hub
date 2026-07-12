@@ -63,18 +63,25 @@ describe('gameReducer', () => {
   });
 
   it('RESOLVE_ROUND credits the payout on a win and records history/stats', () => {
+    const exit = EXIT_META.find((e) => e.id === 2)!;
     let state = createInitialState(15);
-    state = gameReducer(state, { type: 'SELECT_EXIT', id: 2 }); // odds x2
+    state = gameReducer(state, { type: 'SELECT_EXIT', id: 2 });
     state = gameReducer(state, { type: 'SET_BET_AMOUNT', amount: 4 });
     state = gameReducer(state, { type: 'PLACE_BET' }); // coins 15 -> 11, pendingBet 4
-    const exit = EXIT_META.find((e) => e.id === 2)!;
     const next = gameReducer(state, { type: 'RESOLVE_ROUND', exit });
+    const expectedPayout = 4 * exit.odds;
     expect(next.phase).toBe('result');
-    expect(next.coins).toBe(19); // 11 + 4*2
-    expect(next.lastResult).toEqual({ win: true, payout: 8, exitLabel: '출구2' });
+    expect(next.coins).toBe(11 + expectedPayout);
+    expect(next.lastResult).toEqual({ win: true, payout: expectedPayout, exitLabel: exit.label });
     expect(next.exitStats[2]).toBe(1);
     expect(next.history).toHaveLength(1);
-    expect(next.history[0]).toMatchObject({ betLabel: '출구2', actualLabel: '출구2', win: true, payout: 8, bet: 4 });
+    expect(next.history[0]).toMatchObject({
+      betLabel: exit.label,
+      actualLabel: exit.label,
+      win: true,
+      payout: expectedPayout,
+      bet: 4,
+    });
   });
 
   it('RESOLVE_ROUND keeps the bet lost on a loss and records history/stats', () => {

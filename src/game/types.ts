@@ -10,6 +10,7 @@ export interface ExitMeta {
   id: number;
   side: 'left' | 'right';
   y: number;
+  height: number;
   label: string;
   odds: number;
 }

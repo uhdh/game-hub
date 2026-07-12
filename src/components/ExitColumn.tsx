@@ -17,7 +17,10 @@ export function ExitColumn({ exits, selectedExitId, phase, onSelect }: ExitColum
             key={exit.id}
             type="button"
             className={`exit-chip${selected ? ' exit-chip--selected' : ''}`}
-            style={{ top: `calc(${exit.y} / 1000 * 100% - 24px)` }}
+            style={{
+              top: `calc((${exit.y} - ${exit.height} / 2) / 1000 * 100%)`,
+              height: `calc(${exit.height} / 1000 * 100%)`,
+            }}
             disabled={phase !== 'setup'}
             onClick={() => onSelect(exit.id)}
           >

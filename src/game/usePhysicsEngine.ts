@@ -8,8 +8,20 @@ import {
   PLANK_THICK,
   BOARD_DATA,
   EXIT_META,
-  WALL_RECTS,
+  TOP_BOTTOM_WALL_RECTS,
+  LEFT_WALL_RECTS,
+  RIGHT_WALL_RECTS,
   BUG_SPEED,
+  WOBBLE_TIME_STEP,
+  WOBBLE_AMPLITUDE,
+  WOBBLE_FREQUENCY_RATIO,
+  STUCK_VELOCITY_THRESHOLD,
+  STUCK_TICK_LIMIT,
+  SPEED_VARIANCE,
+  JITTER_CHANCE,
+  JITTER_STRENGTH,
+  ANGULAR_DAMPING,
+  MAX_BUG_VELOCITY,
 } from './constants';
 import { computePivotOffset } from './pivot';
 import { drawBug } from './bugRenderer';
@@ -35,10 +47,13 @@ export function usePhysicsEngine({ containerRef, phase, onEscape }: UsePhysicsEn
   const isPlayingRef = useRef(false);
   const noiseTimeRef = useRef(0);
   const stuckTimerRef = useRef(0);
+  const trailRef = useRef<{ x: number; y: number }[]>([]);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
+    console.log('[physics] engine (re)created', { time: new Date().toISOString() });
 
     const engine = Engine.create({ gravity: { x: 0, y: 0 } });
 
@@ -60,11 +75,12 @@ export function usePhysicsEngine({ containerRef, phase, onEscape }: UsePhysicsEn
       friction: 0,
       restitution: 0.5,
     };
-    const walls = WALL_RECTS.map((w) => Bodies.rectangle(w.x, w.y, w.width, w.height, wallOptions));
+    const wallRects = [...TOP_BOTTOM_WALL_RECTS, ...LEFT_WALL_RECTS, ...RIGHT_WALL_RECTS];
+    const walls = wallRects.map((w) => Bodies.rectangle(w.x, w.y, w.width, w.height, wallOptions));
     Composite.add(engine.world, walls);
 
     const exitSensors = EXIT_META.map((meta) =>
-      Bodies.rectangle(meta.side === 'left' ? -5 : WIDTH + 5, meta.y, 40, 110, {
+      Bodies.rectangle(meta.side === 'left' ? -5 : WIDTH + 5, meta.y, 40, meta.height, {
         isStatic: true,
         isSensor: true,
         render: { fillStyle: '#1a1a1a', strokeStyle: '#ffcc00', lineWidth: 1 },
@@ -97,25 +113,71 @@ export function usePhysicsEngine({ containerRef, phase, onEscape }: UsePhysicsEn
     bugRef.current = bug;
 
     Events.on(render, 'afterRender', () => {
-      drawBug(render.context, bug, noiseTimeRef.current);
+      const ctx = render.context;
+
+      if (trailRef.current.length > 1) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(95, 184, 176, 0.5)';
+        ctx.lineWidth = 3;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(trailRef.current[0].x, trailRef.current[0].y);
+        for (let i = 1; i < trailRef.current.length; i++) {
+          ctx.lineTo(trailRef.current[i].x, trailRef.current[i].y);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      drawBug(ctx, bug, noiseTimeRef.current);
+
+      ctx.save();
+      ctx.fillStyle = '#ffcc66';
+      planks.forEach((plank) => {
+        ctx.beginPath();
+        ctx.arc(plank.position.x, plank.position.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.restore();
     });
 
     Events.on(engine, 'beforeUpdate', () => {
       if (!isPlayingRef.current) return;
 
       const angle = bug.angle;
+      const speedMultiplier = 1 + (Math.random() * 2 - 1) * SPEED_VARIANCE;
+      // Force direction must match the head's facing direction drawn in bugRenderer.ts
+      // (head is drawn at local +x, which after ctx.rotate(angle) faces (cos, sin)).
       Body.applyForce(bug, bug.position, {
-        x: Math.sin(angle) * BUG_SPEED,
-        y: -Math.cos(angle) * BUG_SPEED,
+        x: Math.cos(angle) * BUG_SPEED * speedMultiplier,
+        y: Math.sin(angle) * BUG_SPEED * speedMultiplier,
       });
 
-      noiseTimeRef.current += 0.25;
-      const wobble = Math.sin(noiseTimeRef.current) * Math.cos(noiseTimeRef.current * 0.8) * 0.035;
-      Body.setAngularVelocity(bug, bug.angularVelocity + wobble);
+      noiseTimeRef.current += WOBBLE_TIME_STEP;
+      const wobble =
+        Math.sin(noiseTimeRef.current) * Math.cos(noiseTimeRef.current * WOBBLE_FREQUENCY_RATIO) * WOBBLE_AMPLITUDE;
+      let angularVelocity = bug.angularVelocity * ANGULAR_DAMPING + wobble;
 
-      if (Vector.magnitude(bug.velocity) < 0.5) {
+      if (Math.random() < JITTER_CHANCE) {
+        angularVelocity += (Math.random() * 2 - 1) * JITTER_STRENGTH;
+      }
+
+      Body.setAngularVelocity(bug, angularVelocity);
+
+      trailRef.current.push({ x: bug.position.x, y: bug.position.y });
+
+      // Cap speed: with frictionAir 0 nothing ever decays velocity, so repeated wall
+      // bounces plus SPEED_VARIANCE can otherwise build up enough speed in one tick to
+      // tunnel straight through a wall segment instead of colliding with it.
+      const speed = Vector.magnitude(bug.velocity);
+      if (speed > MAX_BUG_VELOCITY) {
+        const scale = MAX_BUG_VELOCITY / speed;
+        Body.setVelocity(bug, { x: bug.velocity.x * scale, y: bug.velocity.y * scale });
+      }
+
+      if (speed < STUCK_VELOCITY_THRESHOLD) {
         stuckTimerRef.current++;
-        if (stuckTimerRef.current > 40) {
+        if (stuckTimerRef.current > STUCK_TICK_LIMIT) {
           Body.setAngle(bug, bug.angle + Math.PI + (Math.random() - 0.5));
           Body.setVelocity(bug, { x: (Math.random() - 0.5) * 5, y: (Math.random() - 0.5) * 5 });
           stuckTimerRef.current = 0;
@@ -126,6 +188,12 @@ export function usePhysicsEngine({ containerRef, phase, onEscape }: UsePhysicsEn
 
       exitSensors.forEach((sensor, i) => {
         if (Bounds.contains(sensor.bounds, bug.position)) {
+          console.log('[physics] exit sensor hit', {
+            exitIndex: i,
+            exitLabel: EXIT_META[i].label,
+            bugPosition: { x: Math.round(bug.position.x), y: Math.round(bug.position.y) },
+            time: new Date().toISOString(),
+          });
           isPlayingRef.current = false;
           Body.setVelocity(bug, { x: 0, y: 0 });
           onEscapeRef.current(EXIT_META[i]);
@@ -155,6 +223,11 @@ export function usePhysicsEngine({ containerRef, phase, onEscape }: UsePhysicsEn
 
   useEffect(() => {
     if (phase === 'running' && prevPhaseRef.current !== 'running') {
+      console.log('[physics] resetting bug to center', {
+        prevPhase: prevPhaseRef.current,
+        newPhase: phase,
+        time: new Date().toISOString(),
+      });
       const bug = bugRef.current;
       if (bug) {
         Body.setPosition(bug, { x: WIDTH / 2, y: HEIGHT / 2 });
@@ -162,6 +235,7 @@ export function usePhysicsEngine({ containerRef, phase, onEscape }: UsePhysicsEn
         Body.setVelocity(bug, { x: 0, y: 0 });
         noiseTimeRef.current = 0;
         stuckTimerRef.current = 0;
+        trailRef.current = [];
         isPlayingRef.current = true;
       }
     }
