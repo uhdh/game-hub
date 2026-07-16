@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>라쿠카라차 정밀 시뮬레이터</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            background-color: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            font-family: sans-serif;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        #ui-panel {
+            margin-bottom: 15px;
+            text-align: center;
+            z-index: 10;
+        }
+        button {
+            background-color: #ff4500;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: background 0.2s;
+        }
+        button:hover { background-color: #ff5722; }
+        button:disabled { background-color: #555; cursor: not-allowed; }
+        #game-container {
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            width: 1000px;
+            height: 1000px;
+        }
+        #result-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 1000px; height: 1000px;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+            font-weight: bold;
+            color: #fff;
+            display: none;
+            pointer-events: none;
+            z-index: 5;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-panel">
+        <button id="start-btn">벌레 출발 (START)</button>
+        <span id="status-text" style="margin-left: 15px; font-size: 18px; color: #aaa;">버튼을 누르면 시작합니다.</span>
+    </div>
+    
+    <div id="game-container">
+        <div id="result-overlay">좌측 출구 탈출!</div>
+    </div>
+
+<script>
+const { Engine, Render, Runner, Bodies, Composite, Body, Vector, Events } = Matter;
+
+const WIDTH = 1000;
+const HEIGHT = 1000;
+
+const engine = Engine.create({ gravity: { x: 0, y: 0 } });
+const container = document.getElementById('game-container');
+
+const render = Render.create({
+    element: container,
+    engine: engine,
+    options: {
+        width: WIDTH,
+        height: HEIGHT,
+        wireframes: false,
+        background: '#4a3525'
+    }
+});
+Render.run(render);
+const runner = Runner.create();
+Runner.run(runner, engine);
+
+// --- 1. 출구 및 고체 방어벽 정밀 설계 ---
+const wallOptions = { isStatic: true, render: { fillStyle: '#2b1d11' }, friction: 0, restitution: 0.5 };
+const walls = [];
+
+// 상하단 외곽 두꺼운 벽 (절대 뚫지 못함)
+walls.push(Bodies.rectangle(WIDTH/2, 13, WIDTH, 26, wallOptions));
+walls.push(Bodies.rectangle(WIDTH/2, HEIGHT-13, WIDTH, 26, wallOptions));
+
+// 출구가 뚫려있는 Y 좌표 (중심점)와 출구의 높이 크기
+const exitYPositions = [200, 500, 800]; 
+const exitHeight = 110; // 벌레가 쏙 들어갈 수 있는 크기의 틈새
+
+// [물리 버그 방지 고체 벽 배치] 출구 구역을 제외한 나머지 공간을 실제 단단한 벽 블록으로 완전히 채웁니다.
+// 좌측 실제 충돌 벽 조각들
+walls.push(Bodies.rectangle(13, 72, 26, 118, wallOptions));
+walls.push(Bodies.rectangle(13, 350, 26, 188, wallOptions));
+walls.push(Bodies.rectangle(13, 650, 26, 188, wallOptions));
+walls.push(Bodies.rectangle(13, 928, 26, 118, wallOptions));
+
+// 우측 실제 충돌 벽 조각들
+walls.push(Bodies.rectangle(WIDTH-13, 72, 26, 118, wallOptions));
+walls.push(Bodies.rectangle(WIDTH-13, 350, 26, 188, wallOptions));
+walls.push(Bodies.rectangle(WIDTH-13, 650, 26, 188, wallOptions));
+walls.push(Bodies.rectangle(WIDTH-13, 928, 26, 118, wallOptions));
+
+Composite.add(engine.world, walls);
+
+// [출구 센서 구역 생성] 벽의 바깥쪽(화면 끝 유도 구역)에 센서를 배치하여 벌레가 완벽히 출구 홈으로 진입했을 때만 체크합니다.
+const leftExits = [];
+const rightExits = [];
+
+exitYPositions.forEach((y) => {
+    // 좌측 출구 통과 센서 (벽 너머 -5px 지점까지 골인해야 인정)
+    const leftSensor = Bodies.rectangle(-5, y, 40, exitHeight, { 
+        isStatic: true, isSensor: true, render: { fillStyle: '#1a1a1a', strokeStyle: '#ffcc00', lineWidth: 1 } 
+    });
+    leftExits.push(leftSensor);
+    
+    // 우측 출구 통과 센서
+    const rightSensor = Bodies.rectangle(WIDTH + 5, y, 40, exitHeight, { 
+        isStatic: true, isSensor: true, render: { fillStyle: '#1a1a1a', strokeStyle: '#ffcc00', lineWidth: 1 } 
+    });
+    rightExits.push(rightSensor);
+});
+Composite.add(engine.world, [...leftExits, ...rightExits]);
+
+
+// --- 2. 사진 그대로의 15개 판자 데이터 세팅 ---
+const boardData = [
+    { x: 145, y: 122, state: 0 }, { x: 380, y: 122, state: 0 }, { x: 850, y: 122, state: 1 },
+    { x: 380, y: 282, state: 0 }, { x: 850, y: 282, state: 0 },
+    { x: 145, y: 442, state: 0 }, { x: 380, y: 442, state: 0 }, { x: 615, y: 442, state: 1 }, { x: 850, y: 442, state: 1 },
+    { x: 380, y: 602, state: 0 }, { x: 615, y: 602, state: 0 }, { x: 850, y: 602, state: 1 },
+    { x: 145, y: 922, state: 0 }, { x: 615, y: 922, state: 0 }, { x: 850, y: 922, state: 0 }
+];
+
+const planks = [];
+const plankLength = 216;   
+const plankThickness = 38; 
+
+boardData.forEach((data) => {
+    const angle = data.state === 1 ? Math.PI / 2 : 0;
+    const plank = Bodies.rectangle(data.x, data.y, plankThickness, plankLength, {
+        isStatic: true,
+        angle: angle,
+        friction: 0,
+        restitution: 0.4,
+        render: { fillStyle: '#8b7355', strokeStyle: '#5c4033', lineWidth: 2 }
+    });
+    planks.push(plank);
+});
+Composite.add(engine.world, planks);
+
+
+// --- 3. 바퀴벌레(Bug) 생성 ---
+const bug = Bodies.circle(WIDTH / 2, HEIGHT / 2, 14, {
+    friction: 0,
+    frictionAir: 0,
+    restitution: 0.5,
+    render: { fillStyle: '#ff4500', strokeStyle: '#8b0000', lineWidth: 2 }
+});
+Composite.add(engine.world, bug);
+
+
+// --- 4. 게임 물리 루프 ---
+let isPlaying = false;
+let noiseTime = 0;
+let stuckTimer = 0;
+const MOVE_SPEED = 0.006; 
+
+Events.on(engine, 'beforeUpdate', () => {
+    if (!isPlaying) return;
+
+    // 1) 전진 엔진
+    const angle = bug.angle;
+    const forceVector = { x: Math.sin(angle) * MOVE_SPEED, y: -Math.cos(angle) * MOVE_SPEED };
+    Body.applyForce(bug, bug.position, forceVector);
+
+    // 2) 진동 모터 시뮬레이션
+    noiseTime += 0.25;
+    const wobble = Math.sin(noiseTime) * Math.cos(noiseTime * 0.8) * 0.035;
+    Body.setAngularVelocity(bug, bug.angularVelocity + wobble);
+
+    // 3) 구석 끼임 방지 (Anti-Stuck)
+    if (Vector.magnitude(bug.velocity) < 0.5) {
+        stuckTimer++;
+        if (stuckTimer > 40) {
+            Body.setAngle(bug, bug.angle + Math.PI + (Math.random() - 0.5));
+            Body.setVelocity(bug, { x: (Math.random() - 0.5) * 5, y: (Math.random() - 0.5) * 5 });
+            stuckTimer = 0;
+        }
+    } else {
+        stuckTimer = 0;
+    }
+
+    // 4) 정밀 출구 탈출 감지 (완전히 화면 바깥 센서 경계선에 닿았을 때만 작동)
+    leftExits.forEach(sensor => {
+        if (Matter.Bounds.contains(sensor.bounds, bug.position)) {
+            endGame("🔴 좌측 출구로 탈출 성공!");
+        }
+    });
+    rightExits.forEach(sensor => {
+        if (Matter.Bounds.contains(sensor.bounds, bug.position)) {
+            endGame("🔵 우측 출구로 탈출 성공!");
+        }
+    });
+});
+
+
+// --- 5. UI 및 마우스 클릭 이벤트 ---
+const startBtn = document.getElementById('start-btn');
+const statusText = document.getElementById('status-text');
+const overlay = document.getElementById('result-overlay');
+
+startBtn.addEventListener('click', () => {
+    isPlaying = true;
+    startBtn.disabled = true;
+    statusText.innerText = "벌레가 출구를 찾고 있습니다!";
+    Body.setAngle(bug, Math.random() * Math.PI * 2);
+});
+
+window.addEventListener('click', (event) => {
+    const rect = render.canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    planks.forEach(plank => {
+        if (Matter.Bounds.contains(plank.bounds, { x: mouseX, y: mouseY })) {
+            Body.setAngle(plank, plank.angle + Math.PI / 2);
+        }
+    });
+});
+
+function endGame(message) {
+    isPlaying = false;
+    Body.setVelocity(bug, { x: 0, y: 0 });
+    overlay.innerText = message;
+    overlay.style.display = 'flex';
+    statusText.innerText = "새로고침(F5)을 누르면 다시 시작할 수 있습니다.";
+}
+</script>
+
+</body>
+</html>

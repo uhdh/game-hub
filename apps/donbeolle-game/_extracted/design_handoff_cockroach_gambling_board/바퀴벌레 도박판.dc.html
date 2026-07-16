@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<style>
+  @keyframes gam-pop { 0%{ transform:scale(0.92); opacity:0 } 100%{ transform:scale(1); opacity:1 } }
+  @keyframes gam-pulse { 0%,100%{ opacity:1 } 50%{ opacity:.35 } }
+  body{margin:0;background:#0f0f12}
+  a{color:#5fb8b0}
+  a:hover{color:#7cc9c2}
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:#0f0f12;color:#e7ebee;font-family:'Pretendard',-apple-system,'Segoe UI',sans-serif;padding:28px 20px 60px;display:flex;flex-direction:column;align-items:center;gap:20px">
+
+  <div style="width:100%;max-width:1180px;display:flex;justify-content:space-between;align-items:center;gap:16px;background:#15181c;border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:16px 22px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <span style="font-size:19px;font-weight:800;letter-spacing:-0.02em">바퀴벌레 도박판</span>
+      <span style="font-size:12px;color:#8992a0">출구를 골라 베팅하고, 벌레를 출발시키세요</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:600;padding:6px 12px;border-radius:999px;background:#242a30;color:#5fb8b0;border:1px solid rgba(255,255,255,.07)">{{ phaseLabel }}</span>
+      <div style="display:flex;align-items:center;gap:8px;background:#242a30;border:1px solid rgba(255,255,255,.08);border-radius:999px;padding:7px 16px">
+        <span style="font-size:13px;color:#8992a0">코인</span>
+        <span style="font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;color:#e7ebee">{{ coins }}</span>
+      </div>
+      <button style="font-size:12px;font-weight:600;padding:9px 14px;min-height:36px;border-radius:9px;border:1px solid rgba(255,255,255,.1);background:#1c2024;color:#8992a0;cursor:pointer" onClick="{{ refillCoins }}">코인 리필</button>
+    </div>
+  </div>
+
+  <div style="width:100%;max-width:1180px;display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;justify-content:center">
+
+    <div style="display:flex;align-items:center;gap:6px">
+      <div style="position:relative;width:100px;height:560px">
+        <sc-for list="{{ leftExits }}" as="ex" hint-placeholder-count="3">
+          <div
+            style="position:absolute;top:{{ ex.top }};left:0;width:100px;min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:10px;cursor:{{ ex.cursor }};background:{{ ex.bg }};border:1.5px solid {{ ex.border }};box-shadow:{{ ex.ring }};transition:box-shadow .15s,border-color .15s"
+            onClick="{{ ex.onClick }}"
+          >
+            <span style="font-size:12px;font-weight:700;color:#e7ebee">{{ ex.label }}</span>
+            <span style="font-size:11px;font-weight:600;color:#5fb8b0">x{{ ex.odds }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="position:relative;width:560px;height:560px;border-radius:14px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.06)">
+        <div ref="{{ boardRef }}" style="width:560px;height:560px"></div>
+        <sc-if value="{{ showResultOverlay }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;background:rgba(10,10,14,.72);display:flex;align-items:center;justify-content:center;z-index:5;padding:20px">
+            <div style="background:#1c2024;border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:26px 24px;max-width:280px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);animation:gam-pop .18s ease">
+              <h2 style="margin:0 0 8px;font-size:20px;color:{{ resultTitleColor }}">{{ resultTitle }}</h2>
+              <div style="font-size:13px;color:#8992a0;margin-bottom:6px">벌레가 <b style="color:#e7ebee">{{ resultExitLabel }}</b>(으)로 탈출</div>
+              <div style="font-size:38px;font-weight:800;margin:10px 0;color:{{ resultTitleColor }};font-variant-numeric:tabular-nums">{{ resultPayoutLabel }}</div>
+              <button style="font-size:14px;font-weight:600;padding:12px 24px;min-height:44px;border-radius:10px;border:none;background:linear-gradient(90deg,#5fb8b0,#5b8fc4);color:#0f1214;cursor:pointer;width:100%" onClick="{{ closeResult }}">다음 라운드</button>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isRunning }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;top:10px;left:50%;transform:translateX(-50%);font-size:12px;font-weight:600;padding:5px 12px;border-radius:999px;background:rgba(0,0,0,.55);color:#ffcc66;animation:gam-pulse 1s infinite">벌레 이동 중...</div>
+        </sc-if>
+      </div>
+
+      <div style="position:relative;width:100px;height:560px">
+        <sc-for list="{{ rightExits }}" as="ex" hint-placeholder-count="3">
+          <div
+            style="position:absolute;top:{{ ex.top }};left:0;width:100px;min-height:48px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border-radius:10px;cursor:{{ ex.cursor }};background:{{ ex.bg }};border:1.5px solid {{ ex.border }};box-shadow:{{ ex.ring }};transition:box-shadow .15s,border-color .15s"
+            onClick="{{ ex.onClick }}"
+          >
+            <span style="font-size:12px;font-weight:700;color:#e7ebee">{{ ex.label }}</span>
+            <span style="font-size:11px;font-weight:600;color:#5fb8b0">x{{ ex.odds }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="width:320px;display:flex;flex-direction:column;gap:16px">
+
+      <div style="background:#15181c;border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:18px">
+        <div style="font-size:13px;font-weight:700;color:#8992a0;margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em">베팅</div>
+        <div style="font-size:13px;color:#e7ebee;margin-bottom:10px">
+          선택한 출구:
+          <sc-if value="{{ hasSelection }}" hint-placeholder-val="{{ false }}">
+            <b style="color:#5fb8b0">{{ selectedLabel }} (x{{ selectedOdds }})</b>
+          </sc-if>
+          <sc-if value="{{ hasSelection }}" hint-placeholder-val="{{ false }}">
+          </sc-if>
+        </div>
+        <sc-if value="{{ noSelection }}" hint-placeholder-val="{{ true }}">
+          <div style="font-size:12.5px;color:#66707c;margin-bottom:10px">판 옆의 출구를 클릭해 선택하세요</div>
+        </sc-if>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:#1c2024;border:1px solid rgba(255,255,255,.07);border-radius:10px;padding:10px 12px;margin-bottom:12px">
+          <span style="font-size:12.5px;color:#8992a0">베팅 코인</span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button style="width:32px;height:32px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:#242a30;color:#e7ebee;font-size:16px;cursor:pointer" onClick="{{ decBet }}">−</button>
+            <span style="font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;min-width:24px;text-align:center">{{ betAmount }}</span>
+            <button style="width:32px;height:32px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:#242a30;color:#e7ebee;font-size:16px;cursor:pointer" onClick="{{ incBet }}">+</button>
+          </div>
+        </div>
+
+        <div style="font-size:12px;color:#66707c;margin-bottom:14px">예상 수익: 적중 시 <b style="color:#5fb8b0">{{ potentialWinLabel }}</b> 코인</div>
+
+        <button style="font-size:14.5px;font-weight:700;padding:13px 20px;min-height:46px;border-radius:10px;border:none;width:100%;cursor:{{ betButtonCursor }};background:{{ betButtonBg }};color:{{ betButtonColor }};opacity:{{ betButtonOpacity }}" onClick="{{ placeBet }}" disabled="{{ betDisabled }}">{{ betButtonLabel }}</button>
+
+        <sc-if value="{{ gameOver }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:12px;font-size:12.5px;color:#c96a63;text-align:center">코인이 부족합니다. 상단의 '코인 리필'을 눌러 계속하세요.</div>
+        </sc-if>
+      </div>
+
+      <div style="background:#15181c;border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:18px">
+        <div style="font-size:13px;font-weight:700;color:#8992a0;margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em">출구별 누적 통계</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ statsBars }}" as="s" hint-placeholder-count="6">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:11.5px;color:#8992a0;width:38px;flex-shrink:0">{{ s.label }}</span>
+              <div style="flex:1;height:8px;border-radius:999px;background:#242a30;overflow:hidden">
+                <div style="height:100%;border-radius:999px;background:#5b8fc4;width:{{ s.pct }}"></div>
+              </div>
+              <span style="font-size:11.5px;color:#e7ebee;width:20px;text-align:right;flex-shrink:0">{{ s.count }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="background:#15181c;border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:18px">
+        <div style="font-size:13px;font-weight:700;color:#8992a0;margin-bottom:12px;text-transform:uppercase;letter-spacing:.04em">최근 결과</div>
+        <sc-if value="{{ hasHistory }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto">
+            <sc-for list="{{ historyRows }}" as="h" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;background:{{ h.bg }};border:1px solid {{ h.border }}">
+                <span style="font-size:12px;font-weight:700;color:{{ h.dotColor }}">{{ h.icon }}</span>
+                <span style="flex:1;font-size:12.5px;color:#e7ebee">{{ h.betLabel }} → {{ h.actualLabel }}</span>
+                <span style="font-size:12.5px;font-weight:700;color:{{ h.dotColor }}">{{ h.deltaLabel }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ hasHistory }}" hint-placeholder-val="{{ true }}">
+        </sc-if>
+        <div style="font-size:12.5px;color:#66707c">{{ noHistoryLabel }}</div>
+      </div>
+
+      <div style="font-size:11.5px;color:#4c545e;line-height:1.6;padding:0 4px">판 위의 나무 판자를 클릭하면 가로/세로로 회전합니다 (베팅 전에만 가능).</div>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;startingCoins&quot;: {&quot;editor&quot;: &quot;int&quot;, &quot;default&quot;: 15, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;게임 설정&quot;}, &quot;bugSpeed&quot;: {&quot;editor&quot;: &quot;range&quot;, &quot;default&quot;: 0.0032, &quot;min&quot;: 0.0015, &quot;max&quot;: 0.008, &quot;step&quot;: 0.0005, &quot;tsType&quot;: &quot;number&quot;, &quot;section&quot;: &quot;게임 설정&quot;}, &quot;showStats&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;게임 설정&quot;}}">
+const WIDTH = 1000, HEIGHT = 1000;
+const DISPLAY = 560;
+const PLANK_LENGTH = 169, PLANK_THICK = 56;
+// the crossbar/pivot slot on the real board sits off the bar's geometric middle
+// (measured ~9 units closer to one end, out of a 169-unit bar) - planks swing around that pivot, not their visual center
+const PIVOT_OFFSET = 9;
+
+// plank centers digitized directly from the physical board photo (pixel-grid measured, normalized to 0-1000)
+// x,y = the bar's geometric center in its default (state 0) orientation, exactly as it sits in the photo
+const BOARD_DATA = [
+  { x: 128, y: 110, state: 0 }, { x: 511, y: 107, state: 0 }, { x: 883, y: 105, state: 1 },
+  { x: 408, y: 296, state: 0 }, { x: 787, y: 296, state: 0 },
+  { x: 128, y: 494, state: 0 }, { x: 301, y: 497, state: 0 }, { x: 694, y: 494, state: 1 }, { x: 888, y: 494, state: 1 },
+  { x: 222, y: 705, state: 0 }, { x: 399, y: 705, state: 0 }, { x: 785, y: 702, state: 1 },
+  { x: 128, y: 911, state: 0 }, { x: 701, y: 911, state: 0 }, { x: 888, y: 911, state: 0 }
+];
+
+const EXIT_Y = [200, 500, 800];
+const EXIT_META = [
+  { id: 1, side: 'left', y: 200, label: '출구1', odds: 3 },
+  { id: 2, side: 'left', y: 500, label: '출구2', odds: 2 },
+  { id: 3, side: 'left', y: 800, label: '출구3', odds: 4 },
+  { id: 4, side: 'right', y: 200, label: '출구4', odds: 3 },
+  { id: 5, side: 'right', y: 500, label: '출구5', odds: 2 },
+  { id: 6, side: 'right', y: 800, label: '출구6', odds: 6 },
+];
+
+class Component extends DCLogic {
+  boardRef = React.createRef();
+
+  state = {
+    coins: this.props.startingCoins ?? 15,
+    selectedExitId: null,
+    betAmount: 1,
+    phase: 'setup', // setup | running | result
+    lastResult: null,
+    exitStats: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+    history: [],
+  };
+
+  componentDidMount() {
+    this.setupPhysics();
+  }
+
+  componentWillUnmount() {
+    if (this.render) Matter.Render.stop(this.render);
+    if (this.runner) Matter.Runner.stop(this.runner);
+  }
+
+  setupPhysics() {
+    const M = Matter;
+    const { Engine, Render, Runner, Bodies, Composite, Body, Vector, Events } = M;
+
+    const engine = Engine.create({ gravity: { x: 0, y: 0 } });
+    this.engine = engine;
+
+    const render = Render.create({
+      element: this.boardRef.current,
+      engine,
+      options: { width: WIDTH, height: HEIGHT, wireframes: false, background: '#4a3525' },
+    });
+    this.render = render;
+    Render.run(render);
+    render.canvas.style.width = DISPLAY + 'px';
+    render.canvas.style.height = DISPLAY + 'px';
+
+    const runner = Runner.create();
+    this.runner = runner;
+    Runner.run(runner, engine);
+
+    const wallOptions = { isStatic: true, render: { fillStyle: '#2b1d11' }, friction: 0, restitution: 0.5 };
+    const walls = [];
+    walls.push(Bodies.rectangle(WIDTH / 2, 13, WIDTH, 26, wallOptions));
+    walls.push(Bodies.rectangle(WIDTH / 2, HEIGHT - 13, WIDTH, 26, wallOptions));
+    walls.push(Bodies.rectangle(13, 72, 26, 118, wallOptions));
+    walls.push(Bodies.rectangle(13, 350, 26, 188, wallOptions));
+    walls.push(Bodies.rectangle(13, 650, 26, 188, wallOptions));
+    walls.push(Bodies.rectangle(13, 928, 26, 118, wallOptions));
+    walls.push(Bodies.rectangle(WIDTH - 13, 72, 26, 118, wallOptions));
+    walls.push(Bodies.rectangle(WIDTH - 13, 350, 26, 188, wallOptions));
+    walls.push(Bodies.rectangle(WIDTH - 13, 650, 26, 188, wallOptions));
+    walls.push(Bodies.rectangle(WIDTH - 13, 928, 26, 118, wallOptions));
+    Composite.add(engine.world, walls);
+
+    const exitHeight = 110;
+    const leftExits = [], rightExits = [];
+    EXIT_Y.forEach((y) => {
+      leftExits.push(Bodies.rectangle(-5, y, 40, exitHeight, { isStatic: true, isSensor: true, render: { fillStyle: '#1a1a1a', strokeStyle: '#ffcc00', lineWidth: 1 } }));
+      rightExits.push(Bodies.rectangle(WIDTH + 5, y, 40, exitHeight, { isStatic: true, isSensor: true, render: { fillStyle: '#1a1a1a', strokeStyle: '#ffcc00', lineWidth: 1 } }));
+    });
+    Composite.add(engine.world, [...leftExits, ...rightExits]);
+    this.leftExits = leftExits;
+    this.rightExits = rightExits;
+
+    const planks = BOARD_DATA.map((data) => {
+      const angle = data.state === 1 ? Math.PI / 2 : 0;
+      const plank = Bodies.rectangle(data.x, data.y, PLANK_THICK, PLANK_LENGTH, {
+        isStatic: true,
+        angle,
+        friction: 0,
+        restitution: 0.4,
+        render: { fillStyle: '#8b7355', strokeStyle: '#5c4033', lineWidth: 2 },
+      });
+      // shift the rotation pivot off the visual center to match the board's real off-center hinge slot,
+      // without moving the drawn shape - future Body.setAngle calls then swing around the true pivot
+      const cos = Math.cos(angle), sin = Math.sin(angle);
+      const localOffset = { x: 0, y: -PIVOT_OFFSET };
+      const worldOffset = { x: localOffset.x * cos - localOffset.y * sin, y: localOffset.x * sin + localOffset.y * cos };
+      Body.setCentre(plank, worldOffset, true);
+      return plank;
+    });
+    Composite.add(engine.world, planks);
+    this.planks = planks;
+
+    const bug = Bodies.circle(WIDTH / 2, HEIGHT / 2, 14, {
+      friction: 0,
+      frictionAir: 0,
+      restitution: 0.5,
+      render: { visible: false },
+    });
+    Composite.add(engine.world, bug);
+    this.bug = bug;
+
+    // custom long, many-legged bug drawn on top of the (invisible, physics-only) circle body
+    Events.on(render, 'afterRender', () => {
+      const ctx = render.context;
+      const b = bug;
+      const bodyLength = 58, bodyWidth = 17;
+      ctx.save();
+      ctx.translate(b.position.x, b.position.y);
+      ctx.rotate(b.angle);
+
+      const legPairs = 6;
+      const legLen = 16;
+      ctx.strokeStyle = '#3a1f1a';
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < legPairs; i++) {
+        const t = (i / (legPairs - 1) - 0.5) * (bodyLength * 0.82);
+        const wig = Math.sin(this.noiseTime * 1.5 + i * 1.1) * 5;
+        ctx.beginPath();
+        ctx.moveTo(t, -bodyWidth / 2 + 2);
+        ctx.lineTo(t - 7, -bodyWidth / 2 - legLen + wig);
+        ctx.moveTo(t, bodyWidth / 2 - 2);
+        ctx.lineTo(t - 7, bodyWidth / 2 + legLen - wig);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = '#5c2a1a';
+      ctx.strokeStyle = '#2a1006';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(-bodyLength / 2, -bodyWidth / 2, bodyLength, bodyWidth, bodyWidth / 2);
+      else ctx.rect(-bodyLength / 2, -bodyWidth / 2, bodyLength, bodyWidth);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.fillStyle = '#3a1810';
+      ctx.arc(bodyLength / 2, 0, bodyWidth * 0.42, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#2a1006';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(bodyLength / 2, -3);
+      ctx.lineTo(bodyLength / 2 + 11, -11);
+      ctx.moveTo(bodyLength / 2, 3);
+      ctx.lineTo(bodyLength / 2 + 11, 11);
+      ctx.stroke();
+
+      ctx.restore();
+    });
+
+    this.isPlaying = false;
+    this.noiseTime = 0;
+    this.stuckTimer = 0;
+
+    Events.on(engine, 'beforeUpdate', () => {
+      if (!this.isPlaying) return;
+      const speed = this.props.bugSpeed ?? 0.0032;
+      const angle = bug.angle;
+      Body.applyForce(bug, bug.position, { x: Math.sin(angle) * speed, y: -Math.cos(angle) * speed });
+
+      this.noiseTime += 0.25;
+      const wobble = Math.sin(this.noiseTime) * Math.cos(this.noiseTime * 0.8) * 0.035;
+      Body.setAngularVelocity(bug, bug.angularVelocity + wobble);
+
+      if (Vector.magnitude(bug.velocity) < 0.5) {
+        this.stuckTimer++;
+        if (this.stuckTimer > 40) {
+          Body.setAngle(bug, bug.angle + Math.PI + (Math.random() - 0.5));
+          Body.setVelocity(bug, { x: (Math.random() - 0.5) * 5, y: (Math.random() - 0.5) * 5 });
+          this.stuckTimer = 0;
+        }
+      } else {
+        this.stuckTimer = 0;
+      }
+
+      leftExits.forEach((sensor, i) => {
+        if (M.Bounds.contains(sensor.bounds, bug.position)) this.onEscape(i);
+      });
+      rightExits.forEach((sensor, i) => {
+        if (M.Bounds.contains(sensor.bounds, bug.position)) this.onEscape(3 + i);
+      });
+    });
+
+    render.canvas.addEventListener('click', (e) => {
+      if (this.state.phase !== 'setup') return;
+      const rect = render.canvas.getBoundingClientRect();
+      const mx = (e.clientX - rect.left) * (WIDTH / rect.width);
+      const my = (e.clientY - rect.top) * (HEIGHT / rect.height);
+      this.planks.forEach((plank) => {
+        if (M.Bounds.contains(plank.bounds, { x: mx, y: my })) {
+          Body.setAngle(plank, plank.angle + Math.PI / 2);
+        }
+      });
+    });
+  }
+
+  onEscape(exitIndex) {
+    if (!this.isPlaying) return;
+    this.isPlaying = false;
+    Matter.Body.setVelocity(this.bug, { x: 0, y: 0 });
+    const exit = EXIT_META[exitIndex];
+    const win = this.state.selectedExitId === exit.id;
+    const payout = win ? this.state.pendingBet * exit.odds : 0;
+    const newCoins = this.state.coins + payout;
+    const bettingExit = EXIT_META.find((e) => e.id === this.state.selectedExitId);
+
+    const entry = {
+      id: Date.now(),
+      betLabel: bettingExit ? bettingExit.label : '-',
+      actualLabel: exit.label,
+      win,
+      payout,
+      bet: this.state.pendingBet,
+    };
+
+    this.setState((s) => ({
+      coins: newCoins,
+      phase: 'result',
+      lastResult: { win, payout, exitLabel: exit.label },
+      exitStats: { ...s.exitStats, [exit.id]: (s.exitStats[exit.id] || 0) + 1 },
+      history: [entry, ...s.history].slice(0, 8),
+    }));
+  }
+
+  selectExit = (id) => () => {
+    if (this.state.phase !== 'setup') return;
+    this.setState({ selectedExitId: id });
+  };
+
+  incBet = () => {
+    this.setState((s) => ({ betAmount: Math.min(s.betAmount + 1, s.coins || 1) }));
+  };
+
+  decBet = () => {
+    this.setState((s) => ({ betAmount: Math.max(1, s.betAmount - 1) }));
+  };
+
+  placeBet = () => {
+    const { selectedExitId, betAmount, coins, phase } = this.state;
+    if (phase !== 'setup' || !selectedExitId || betAmount < 1 || betAmount > coins) return;
+    const M = Matter;
+    M.Body.setPosition(this.bug, { x: WIDTH / 2, y: HEIGHT / 2 });
+    M.Body.setAngle(this.bug, Math.random() * Math.PI * 2);
+    M.Body.setVelocity(this.bug, { x: 0, y: 0 });
+    this.noiseTime = 0;
+    this.stuckTimer = 0;
+    this.isPlaying = true;
+    this.setState((s) => ({ coins: s.coins - betAmount, pendingBet: betAmount, phase: 'running' }));
+  };
+
+  closeResult = () => {
+    this.setState({ phase: 'setup' });
+  };
+
+  refillCoins = () => {
+    this.setState({ coins: this.props.startingCoins ?? 15, betAmount: 1 });
+  };
+
+  renderVals() {
+    const { coins, selectedExitId, betAmount, phase, lastResult, exitStats, history } = this.state;
+    const showStats = this.props.showStats ?? true;
+
+    const makeExit = (meta) => {
+      const selected = selectedExitId === meta.id;
+      const topPx = (meta.y / 1000) * DISPLAY - 24;
+      return {
+        label: meta.label,
+        odds: meta.odds,
+        top: topPx + 'px',
+        cursor: phase === 'setup' ? 'pointer' : 'default',
+        bg: selected ? 'rgba(95,184,176,0.16)' : '#1c2024',
+        border: selected ? '#5fb8b0' : 'rgba(255,255,255,.08)',
+        ring: selected ? '0 0 0 2px rgba(95,184,176,.35)' : 'none',
+        onClick: this.selectExit(meta.id),
+      };
+    };
+
+    const leftExits = EXIT_META.filter((e) => e.side === 'left').map(makeExit);
+    const rightExits = EXIT_META.filter((e) => e.side === 'right').map(makeExit);
+
+    const selectedMeta = EXIT_META.find((e) => e.id === selectedExitId);
+    const hasSelection = !!selectedMeta;
+
+    const maxStat = Math.max(1, ...EXIT_META.map((e) => exitStats[e.id] || 0));
+    const statsBars = EXIT_META.map((e) => ({
+      label: e.label,
+      count: exitStats[e.id] || 0,
+      pct: Math.round(((exitStats[e.id] || 0) / maxStat) * 100) + '%',
+    }));
+
+    const historyRows = history.map((h) => ({
+      icon: h.win ? '▲' : '▼',
+      dotColor: h.win ? '#5fb8b0' : '#c96a63',
+      betLabel: h.betLabel,
+      actualLabel: h.actualLabel,
+      deltaLabel: h.win ? `+${h.payout}` : `-${h.bet}`,
+      bg: h.win ? 'rgba(95,184,176,0.1)' : 'rgba(201,106,99,0.08)',
+      border: h.win ? 'rgba(95,184,176,.25)' : 'rgba(201,106,99,.2)',
+    }));
+
+    const betDisabled = phase !== 'setup' || !hasSelection || betAmount < 1 || betAmount > coins || coins < 1;
+    const gameOver = coins < 1 && phase === 'setup';
+
+    return {
+      coins,
+      phaseLabel: phase === 'setup' ? '베팅 대기' : phase === 'running' ? '진행 중' : '결과',
+      isRunning: phase === 'running',
+      showResultOverlay: phase === 'result',
+      resultTitle: lastResult && lastResult.win ? '적중!' : '탈락',
+      resultTitleColor: lastResult && lastResult.win ? '#5fb8b0' : '#c96a63',
+      resultExitLabel: lastResult ? lastResult.exitLabel : '',
+      resultPayoutLabel: lastResult ? (lastResult.win ? `+${lastResult.payout}` : `-${this.state.pendingBet}`) : '',
+      leftExits,
+      rightExits,
+      hasSelection,
+      noSelection: !hasSelection,
+      selectedLabel: selectedMeta ? selectedMeta.label : '',
+      selectedOdds: selectedMeta ? selectedMeta.odds : '',
+      betAmount,
+      potentialWinLabel: selectedMeta ? betAmount * selectedMeta.odds : 0,
+      betButtonLabel: phase === 'running' ? '진행 중...' : phase === 'result' ? '결과 확인 중' : '베팅하고 출발!',
+      betButtonBg: betDisabled ? '#242a30' : 'linear-gradient(90deg,#5fb8b0,#5b8fc4)',
+      betButtonColor: betDisabled ? '#66707c' : '#0f1214',
+      betButtonCursor: betDisabled ? 'not-allowed' : 'pointer',
+      betButtonOpacity: betDisabled ? 0.7 : 1,
+      betDisabled,
+      gameOver,
+      statsBars: showStats ? statsBars : [],
+      hasHistory: history.length > 0,
+      historyRows: showStats ? historyRows : [],
+      noHistoryLabel: history.length > 0 ? '' : '아직 라운드 기록이 없습니다.',
+      boardRef: this.boardRef,
+      selectExit: this.selectExit,
+      incBet: this.incBet,
+      decBet: this.decBet,
+      placeBet: this.placeBet,
+      closeResult: this.closeResult,
+      refillCoins: this.refillCoins,
+    };
+  }
+}
+
+</script>
+</body>
+</html>
