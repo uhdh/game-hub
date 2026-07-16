@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>우승자 예측 · 피의 게임 X 시뮬레이터</title>
+<link rel="icon" type="image/png" href="./assets/favicon.png">
+<style>
+  :root {
+    --bg: #0f0f12;
+    --panel: #15181c;
+    --panel-light: #1c2024;
+    --border: rgba(255,255,255,.08);
+    --text: #e7ebee;
+    --text-dim: #8992a0;
+    --text-dimmer: #5b6270;
+    --accent: #5fb8b0;
+    --accent-hover: #7fcac3;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Pretendard", "Segoe UI", "Malgun Gothic", sans-serif;
+    min-height: 100vh;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { color: var(--accent-hover); }
+
+  #app {
+    max-width: 430px;
+    margin: 0 auto;
+    padding: 24px 16px 60px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .header-text { display: flex; flex-direction: column; gap: 6px; }
+  .title { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+  .subtitle { font-size: 13px; color: var(--text-dim); }
+
+  .btn-ghost {
+    flex: 0 0 auto;
+    background: var(--panel-light);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .btn-ghost:hover { background: #242a30; color: var(--text); }
+
+  .status-banner {
+    display: none;
+    background: rgba(95,184,176,.1);
+    border: 1px solid rgba(95,184,176,.3);
+    border-radius: 14px;
+    padding: 12px 14px;
+    font-size: 13px;
+    color: var(--accent-hover);
+  }
+  .status-banner.show { display: block; }
+  .status-banner.warn {
+    background: rgba(201,106,99,.12);
+    border-color: rgba(201,106,99,.35);
+    color: #e08d86;
+  }
+
+  .section-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-dim);
+    letter-spacing: .02em;
+    padding: 0 2px;
+  }
+
+  .team-block {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .team-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--team-color, var(--accent));
+    padding: 0 2px;
+  }
+  .team-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .pick-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px 12px;
+    cursor: pointer;
+    text-align: left;
+  }
+  .pick-card:hover { border-color: rgba(95,184,176,.35); }
+  .pick-card.selected {
+    border-color: var(--accent);
+    background: rgba(95,184,176,.08);
+  }
+  .pick-card.eliminated {
+    cursor: not-allowed;
+    opacity: .4;
+  }
+  .pick-card.eliminated .pick-name { text-decoration: line-through; }
+
+  .pick-dot {
+    flex: 0 0 auto;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--team-color, var(--accent));
+  }
+  .pick-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .pick-name { font-size: 14px; font-weight: 600; }
+  .pick-meta { font-size: 11px; color: var(--text-dimmer); }
+
+  .results-list { display: flex; flex-direction: column; gap: 8px; }
+  .result-row {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .result-row.mine { border-color: var(--accent); }
+  .result-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+  }
+  .result-name { font-weight: 700; display: flex; align-items: center; gap: 6px; }
+  .result-count { color: var(--text-dim); font-variant-numeric: tabular-nums; }
+  .result-bar-track {
+    height: 6px;
+    border-radius: 4px;
+    background: var(--panel-light);
+    overflow: hidden;
+  }
+  .result-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: var(--accent);
+  }
+  .mine-tag {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--bg);
+    background: var(--accent);
+    border-radius: 6px;
+    padding: 1px 6px;
+  }
+
+  .total-votes {
+    font-size: 12px;
+    color: var(--text-dimmer);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="header-row">
+    <div class="header-text">
+      <span class="title">우승자 예측</span>
+      <span class="subtitle">매주 한 명씩 탈락합니다. 최종 우승자를 예측해보세요.</span>
+    </div>
+    <a class="btn-ghost" href="./index.html">홈</a>
+  </div>
+
+  <div class="status-banner" id="status-banner"></div>
+
+  <div class="section-title">참가자 (팀별)</div>
+  <div id="teams"></div>
+
+  <div class="section-title">실시간 예측 현황</div>
+  <div class="results-list" id="results"></div>
+  <div class="total-votes" id="total-votes"></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const SUPABASE_URL = "https://paktzmofotvwfdxcpmzv.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_jWbstEn2pKJTNDxLTR4Jig_asglvzGW";
+  const SUPABASE_TABLE = "winner_votes";
+  const VOTER_ID_KEY = "bloodGameXVoterId";
+  const MY_PICK_KEY = "bloodGameXMyPick";
+
+  const TEAMS = [
+    { key: "P1", label: "P1팀", color: "#c96a63", members: ["이상민", "박지민", "정근우", "이태균"] },
+    { key: "P2", label: "P2팀", color: "#d3b263", members: ["하승진", "현성주", "윤비", "이진형"] },
+    { key: "P3", label: "P3팀", color: "#5ca892", members: ["홍진호", "서출구", "최혜선", "허성범"] },
+    { key: "C", label: "C팀", color: "#5b8fc4", members: ["김경훈", "김유현", "김남희", "강지후"] },
+    { key: "R", label: "R팀", color: "#5fb8b0", members: ["곽범", "이관희", "신승용", "최연청"] },
+  ];
+
+  // 탈락자 목록 — 매주 갱신: { key: "팀키-이름", week: 탈락 주차 }
+  const ELIMINATED = [];
+
+  const PARTICIPANTS = TEAMS.flatMap(team =>
+    team.members.map(name => ({
+      key: `${team.key}-${name}`,
+      name,
+      teamKey: team.key,
+      teamLabel: team.label,
+      teamColor: team.color,
+    }))
+  );
+  const ELIMINATED_MAP = new Map(ELIMINATED.map(e => [e.key, e.week]));
+
+  function getVoterId() {
+    let id = localStorage.getItem(VOTER_ID_KEY);
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem(VOTER_ID_KEY, id);
+    }
+    return id;
+  }
+
+  function getMyPick() {
+    return localStorage.getItem(MY_PICK_KEY);
+  }
+  function setMyPick(key) {
+    localStorage.setItem(MY_PICK_KEY, key);
+  }
+
+  function showStatus(msg, isWarn) {
+    const el = document.getElementById("status-banner");
+    el.textContent = msg;
+    el.className = "status-banner show" + (isWarn ? " warn" : "");
+  }
+  function hideStatus() {
+    document.getElementById("status-banner").className = "status-banner";
+  }
+
+  async function fetchAllVotes() {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?select=participant_key`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) throw new Error("투표 현황 조회 실패");
+    return res.json();
+  }
+
+  async function submitVote(participantKey) {
+    const voterId = getVoterId();
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?on_conflict=voter_id`,
+      {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          "Content-Type": "application/json",
+          Prefer: "resolution=merge-duplicates,return=representation",
+        },
+        body: JSON.stringify({
+          voter_id: voterId,
+          participant_key: participantKey,
+          updated_at: new Date().toISOString(),
+        }),
+      }
+    );
+    if (!res.ok) throw new Error("예측 등록 실패");
+  }
+
+  function renderTeams(selectedKey) {
+    const wrap = document.getElementById("teams");
+    wrap.innerHTML = "";
+    wrap.style.display = "flex";
+    wrap.style.flexDirection = "column";
+    wrap.style.gap = "14px";
+
+    for (const team of TEAMS) {
+      const block = document.createElement("div");
+      block.className = "team-block";
+
+      const label = document.createElement("div");
+      label.className = "team-label";
+      label.style.setProperty("--team-color", team.color);
+      label.textContent = team.label;
+      block.appendChild(label);
+
+      const grid = document.createElement("div");
+      grid.className = "team-grid";
+
+      for (const name of team.members) {
+        const key = `${team.key}-${name}`;
+        const eliminatedWeek = ELIMINATED_MAP.get(key);
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "pick-card" + (key === selectedKey ? " selected" : "") + (eliminatedWeek ? " eliminated" : "");
+        card.disabled = !!eliminatedWeek;
+        card.style.setProperty("--team-color", team.color);
+        card.innerHTML = `
+          <span class="pick-dot"></span>
+          <span class="pick-info">
+            <span class="pick-name">${name}</span>
+            <span class="pick-meta">${eliminatedWeek ? `${eliminatedWeek}주차 탈락` : team.label}</span>
+          </span>
+        `;
+        if (!eliminatedWeek) {
+          card.addEventListener("click", () => onPick(key, name));
+        }
+        grid.appendChild(card);
+      }
+
+      block.appendChild(grid);
+      wrap.appendChild(block);
+    }
+  }
+
+  function renderResults(votes, selectedKey) {
+    const counts = new Map();
+    for (const p of PARTICIPANTS) counts.set(p.key, 0);
+    for (const v of votes) {
+      if (counts.has(v.participant_key)) counts.set(v.participant_key, counts.get(v.participant_key) + 1);
+    }
+
+    const ranked = PARTICIPANTS
+      .map(p => ({ ...p, count: counts.get(p.key) || 0 }))
+      .sort((a, b) => b.count - a.count);
+
+    const maxCount = Math.max(1, ranked[0] ? ranked[0].count : 0);
+
+    const list = document.getElementById("results");
+    list.innerHTML = "";
+    for (const p of ranked) {
+      const row = document.createElement("div");
+      row.className = "result-row" + (p.key === selectedKey ? " mine" : "");
+      row.innerHTML = `
+        <div class="result-top">
+          <span class="result-name">${p.name}${p.key === selectedKey ? '<span class="mine-tag">내 예측</span>' : ""}</span>
+          <span class="result-count">${p.count}표</span>
+        </div>
+        <div class="result-bar-track">
+          <div class="result-bar-fill" style="width:${(p.count / maxCount) * 100}%;background:${p.color || "var(--accent)"}"></div>
+        </div>
+      `;
+      const fill = row.querySelector(".result-bar-fill");
+      fill.style.background = p.teamColor;
+      list.appendChild(row);
+    }
+
+    document.getElementById("total-votes").textContent = `총 ${votes.length}표 참여`;
+  }
+
+  async function refresh(selectedKey) {
+    const votes = await fetchAllVotes();
+    renderResults(votes, selectedKey);
+  }
+
+  async function onPick(key, name) {
+    let selectedKey = getMyPick();
+    renderTeams(key);
+    try {
+      await submitVote(key);
+      setMyPick(key);
+      showStatus(`${name}님으로 예측을 등록했습니다.`);
+      await refresh(key);
+    } catch (err) {
+      showStatus("예측 등록에 실패했습니다. 잠시 후 다시 시도해주세요.", true);
+      renderTeams(selectedKey);
+    }
+  }
+
+  async function init() {
+    let selectedKey = getMyPick();
+    if (selectedKey && ELIMINATED_MAP.has(selectedKey)) {
+      const p = PARTICIPANTS.find(p => p.key === selectedKey);
+      showStatus(`예측하신 ${p ? p.name : ""}님이 탈락했습니다. 다시 예측해주세요.`, true);
+      selectedKey = null;
+    }
+    renderTeams(selectedKey);
+    try {
+      await refresh(selectedKey);
+    } catch (err) {
+      document.getElementById("total-votes").textContent = "투표 현황을 불러오지 못했습니다.";
+    }
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

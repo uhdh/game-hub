@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<style>
+  @keyframes cc-pop { 0%{ transform:scale(0.9); opacity:0 } 100%{ transform:scale(1); opacity:1 } }
+  body{margin:0;background:#0f0f12}
+</style>
+</helmet>
+<div style="width:390px;margin:24px auto;border-radius:28px;box-shadow:0 20px 50px rgba(0,0,0,.5);overflow:hidden;border:1px solid rgba(255,255,255,.06);background:#15181c">
+  <div style="display:flex;flex-direction:column;color:#e7ebee;font-family:-apple-system,'Pretendard','Segoe UI',sans-serif">
+
+    <div style="position:sticky;top:0;background:#15181c;padding:16px 18px 14px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;gap:10px;z-index:1">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:16px;font-weight:700;letter-spacing:-0.02em">Color Connect Solo</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;font-weight:600;padding:5px 11px;border-radius:999px;background:#242a30;color:#5fb8b0;border:1px solid rgba(255,255,255,.07);white-space:nowrap;flex-shrink:0">{{ stageLabel }}</span>
+<a href="Color Connect - Rearrange.dc.html" style="font-size:11px;font-weight:600;padding:6px 10px;min-height:28px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:#1c2024;color:#8992a0;white-space:nowrap;flex-shrink:0;text-decoration:none;display:inline-flex;align-items:center">피의게임 재배치</a>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px">
+        <span style="font-size:32px;font-weight:800;font-variant-numeric:tabular-nums">{{ total }}</span>
+        <div style="flex:1;display:flex;gap:10px">
+          <sc-for list="{{ scoreRows }}" as="row" hint-placeholder-count="4">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
+              <div style="width:100%;height:8px;border-radius:999px;background:{{ row.hex }};opacity:{{ row.opacity }};transition:opacity .2s"></div>
+              <span style="font-size:15px;font-weight:700;color:#e7ebee;font-variant-numeric:tabular-nums">{{ row.value }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:18px;display:flex;flex-direction:column;gap:16px">
+      <div style="position:relative;width:100%;aspect-ratio:1">
+        <div style="position:relative;width:100%;height:100%;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(4,1fr);gap:8px;background:#1c2024;border:1px solid rgba(255,255,255,.07);border-radius:18px;padding:10px">
+          <sc-for list="{{ boardCells }}" as="cell" hint-placeholder-count="16">
+            <div
+              style="position:relative;border-radius:9px;overflow:hidden;background:{{ cell.bg }};box-shadow:{{ cell.ring }};cursor:{{ cell.cursor }};transition:background .12s,box-shadow .12s"
+              onClick="{{ cell.onClick }}"
+              onDragOver="{{ cell.onDragOver }}"
+              onDragLeave="{{ cell.onDragLeave }}"
+              onDrop="{{ cell.onDrop }}"
+            >
+              <sc-if value="{{ cell.quads }}" hint-placeholder-val="{{ true }}">
+                <div style="position:absolute;inset:2px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:2px;border-radius:6px;overflow:hidden;transition:filter .12s" class="{{ cell.slidable }}">
+                  <sc-for list="{{ cell.quads }}" as="hex" hint-placeholder-count="4">
+                    <div style="background:{{ hex }};border-radius:3px"></div>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;gap:10px;justify-content:center">
+          <sc-for list="{{ front }}" as="m" hint-placeholder-count="3">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;background:#1c2024;border:2px solid {{ m.borderColor }};box-shadow:{{ m.ring }};border-radius:16px;padding:10px 6px;min-height:44px;opacity:{{ m.opacity }};transition:opacity .12s,border-color .12s">
+              <div
+                draggable="true"
+                style="width:64px;height:64px;border-radius:10px;background:#242a30;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:2px;overflow:hidden;padding:2px;cursor:grab"
+                onClick="{{ m.onClick }}"
+                onDragStart="{{ m.onDragStart }}"
+                onDragEnd="{{ m.onDragEnd }}"
+              >
+                <sc-for list="{{ m.quads }}" as="hex" hint-placeholder-count="4">
+                  <div style="background:{{ hex }};border-radius:3px"></div>
+                </sc-for>
+              </div>
+              <button style="font-size:11.5px;font-weight:600;padding:8px 10px;min-height:36px;min-width:44px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:#242a30;color:#e7ebee" onClick="{{ m.onRotate }}">↻</button>
+            </div>
+          </sc-for>
+        </div>
+        <div style="text-align:center;font-size:12px;color:#8992a0">{{ hint }}</div>
+        <div style="display:flex;gap:10px;justify-content:center">
+          <sc-for list="{{ upcoming }}" as="u" hint-placeholder-count="5">
+            <div style="flex:0 0 auto;width:38px;height:38px;border-radius:8px;overflow:hidden;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;opacity:.55;border:1px solid rgba(255,255,255,.08)">
+              <sc-for list="{{ u.quads }}" as="hex" hint-placeholder-count="4">
+                <div style="background:{{ hex }}"></div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:center;gap:10px">
+        <sc-if value="{{ showRegister }}" hint-placeholder-val="{{ false }}">
+          <button style="font-size:14px;font-weight:600;padding:12px 22px;min-height:44px;border-radius:10px;border:none;background:linear-gradient(90deg,#5fb8b0,#5b8fc4);color:#0f1214" onClick="{{ registerScore }}">점수 등록</button>
+        </sc-if>
+        <button style="font-size:13.5px;font-weight:600;padding:12px 20px;min-height:44px;border-radius:10px;border:1px solid rgba(255,255,255,.09);background:#242a30;color:#e7ebee" onClick="{{ restart }}">새 게임</button>
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{ showModal }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;background:rgba(10,10,14,.72);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px">
+      <div style="background:#1c2024;border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:28px 26px;max-width:320px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);animation:cc-pop .18s ease">
+        <h2 style="margin:0 0 6px;font-size:20px;color:#e7ebee">점수 등록 완료!</h2>
+        <div style="font-size:44px;font-weight:800;margin:14px 0;color:#5fb8b0;font-variant-numeric:tabular-nums">{{ modalTotal }}</div>
+        <div style="display:flex;justify-content:center;gap:20px;margin-bottom:18px">
+          <sc-for list="{{ modalTop }}" as="t" hint-placeholder-count="2">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+              <span style="width:12px;height:12px;border-radius:4px;background:{{ t.hex }}"></span>
+              <span style="font-size:14px;font-weight:700;color:#e7ebee">{{ t.value }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="border-top:1px solid rgba(255,255,255,.08);margin:2px 0 16px;padding-top:14px;text-align:left">
+          <div style="font-size:11px;color:#8992a0;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;text-align:center">리더보드</div>
+          <div style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto">
+            <sc-for list="{{ leaderboardRows }}" as="row" hint-placeholder-count="5">
+              <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;background:{{ row.rowBg }};border:1px solid {{ row.rowBorder }}">
+                <span style="font-size:12px;font-weight:700;color:#8992a0;width:18px;text-align:center">{{ row.rank }}</span>
+                <span style="flex:1;font-size:14px;font-weight:700;color:#e7ebee;font-variant-numeric:tabular-nums">{{ row.score }}점</span>
+                <span style="font-size:11px;color:#8992a0">{{ row.dateLabel }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <button style="font-size:14px;font-weight:600;padding:12px 24px;min-height:44px;border-radius:10px;border:none;background:linear-gradient(90deg,#5fb8b0,#5b8fc4);color:#0f1214" onClick="{{ closeModalRestart }}">다시하기</button>
+      </div>
+    </div>
+  </sc-if>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const COLORS = ['R', 'Y', 'G', 'B'];
+const TOTAL_TILES = 15;
+const BOARD_SIZE = 4;
+const PALETTE = { R: '#c96a63', Y: '#d3b263', G: '#5ca892', B: '#5b8fc4' };
+const ACCENT = '#5fb8b0';
+
+class Component extends DCLogic {
+  state = this.makeInitialState();
+
+  makeInitialState() {
+    const queue = this.buildTilePool().map(t => ({ quads: t.quads, rotation: 0 }));
+    return {
+      queue,
+      board: new Array(BOARD_SIZE * BOARD_SIZE).fill(null),
+      selectedMarketIdx: null,
+      draggingIdx: null,
+      dragOverCell: null,
+      placedCount: 0,
+      stage: 'placement',
+      emptyIndex: -1,
+      showModal: false,
+      leaderboard: this.loadLeaderboard(),
+      justAddedTs: null,
+    };
+  }
+
+  loadLeaderboard() {
+    try { return JSON.parse(localStorage.getItem('colorConnectSoloLeaderboard') || '[]'); }
+    catch (e) { return []; }
+  }
+
+  saveLeaderboard(list) {
+    localStorage.setItem('colorConnectSoloLeaderboard', JSON.stringify(list));
+  }
+
+  formatTs(ts) {
+    const d = new Date(ts);
+    const pad = n => String(n).padStart(2, '0');
+    return `${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  buildTilePool() {
+    const MONO_FOCUS_PROBABILITY = 13.5 / TOTAL_TILES;
+    const isMono = [];
+    for (let i = 0; i < TOTAL_TILES; i++) isMono.push(Math.random() < MONO_FOCUS_PROBABILITY);
+    const monoCount = isMono.filter(Boolean).length;
+    let mainCycle = [];
+    for (let i = 0; i < monoCount; i++) mainCycle.push(COLORS[i % 4]);
+    mainCycle = this.shuffle(mainCycle);
+    const tiles = [];
+    let cycleIdx = 0;
+    isMono.forEach(mono => {
+      if (mono) {
+        const mainColor = mainCycle[cycleIdx++];
+        const rest = this.shuffle(COLORS.filter(c => c !== mainColor));
+        const quads = this.shuffle([mainColor, mainColor, rest[0], rest[1]]);
+        tiles.push({ quads });
+      } else {
+        tiles.push({ quads: this.shuffle(COLORS) });
+      }
+    });
+    return this.shuffle(tiles);
+  }
+
+  rotateQuads(quads, times) {
+    let q = quads.slice();
+    for (let t = 0; t < ((times % 4) + 4) % 4; t++) q = [q[2], q[0], q[3], q[1]];
+    return q;
+  }
+
+  restart = () => { this.setState(this.makeInitialState()); };
+
+  selectMarket = (idx) => () => {
+    if (this.state.stage !== 'placement') return;
+    this.setState(s => ({ selectedMarketIdx: s.selectedMarketIdx === idx ? null : idx }));
+  };
+
+  rotateMarket = (idx) => (e) => {
+    e.stopPropagation();
+    this.setState(s => {
+      const queue = s.queue.slice();
+      queue[idx] = { ...queue[idx], rotation: (queue[idx].rotation + 1) % 4 };
+      return { queue };
+    });
+  };
+
+  onDragStart = (idx) => (e) => {
+    e.dataTransfer.setData('text/plain', String(idx));
+    e.dataTransfer.effectAllowed = 'move';
+    this.setState({ draggingIdx: idx });
+  };
+
+  onDragEndMarket = () => { this.setState({ draggingIdx: null, dragOverCell: null }); };
+
+  onCellDragOver = (cellIndex) => (e) => {
+    if (this.state.stage !== 'placement' || this.state.board[cellIndex]) return;
+    e.preventDefault();
+    if (this.state.dragOverCell !== cellIndex) this.setState({ dragOverCell: cellIndex });
+  };
+
+  onCellDragLeave = (cellIndex) => () => {
+    this.setState(s => (s.dragOverCell === cellIndex ? { dragOverCell: null } : null));
+  };
+
+  onCellDrop = (cellIndex) => (e) => {
+    e.preventDefault();
+    const idx = this.state.draggingIdx !== null ? this.state.draggingIdx : this.state.selectedMarketIdx;
+    this.placeTile(idx, cellIndex);
+    this.setState({ draggingIdx: null, dragOverCell: null });
+  };
+
+  onCellClick = (cellIndex) => () => {
+    if (this.state.stage === 'placement') {
+      if (this.state.selectedMarketIdx === null) return;
+      this.placeTile(this.state.selectedMarketIdx, cellIndex);
+    } else if (this.state.stage === 'sliding') {
+      this.slideTile(cellIndex);
+    }
+  };
+
+  placeTile(marketIdx, cellIndex) {
+    if (marketIdx === null || marketIdx === undefined) return;
+    const { queue, board } = this.state;
+    if (board[cellIndex]) return;
+    const tile = queue[marketIdx];
+    if (!tile) return;
+    const rotated = this.rotateQuads(tile.quads, tile.rotation);
+    const newBoard = board.slice();
+    newBoard[cellIndex] = { quads: rotated };
+    const newQueue = queue.slice();
+    newQueue.splice(marketIdx, 1);
+    const placedCount = this.state.placedCount + 1;
+    if (placedCount >= TOTAL_TILES) {
+      const emptyIndex = newBoard.indexOf(null);
+      this.setState({ board: newBoard, queue: newQueue, placedCount, selectedMarketIdx: null, stage: 'sliding', emptyIndex });
+    } else {
+      this.setState({ board: newBoard, queue: newQueue, placedCount, selectedMarketIdx: null });
+    }
+  }
+
+  isAdjacentToEmpty(index) {
+    const { emptyIndex } = this.state;
+    if (emptyIndex < 0) return false;
+    const r = Math.floor(index / BOARD_SIZE), c = index % BOARD_SIZE;
+    const er = Math.floor(emptyIndex / BOARD_SIZE), ec = emptyIndex % BOARD_SIZE;
+    return Math.abs(r - er) + Math.abs(c - ec) === 1;
+  }
+
+  slideTile(index) {
+    if (!this.isAdjacentToEmpty(index)) return;
+    const board = this.state.board.slice();
+    board[this.state.emptyIndex] = board[index];
+    board[index] = null;
+    this.setState({ board, emptyIndex: index });
+  }
+
+  computeScore() {
+    const N = BOARD_SIZE * 2;
+    const grid = new Array(N * N).fill(null);
+    this.state.board.forEach((tile, ti) => {
+      if (!tile) return;
+      const tr = Math.floor(ti / BOARD_SIZE), tc = ti % BOARD_SIZE;
+      const baseR = tr * 2, baseC = tc * 2;
+      const positions = [[baseR, baseC], [baseR, baseC + 1], [baseR + 1, baseC], [baseR + 1, baseC + 1]];
+      positions.forEach(([r, c], qi) => { grid[r * N + c] = tile.quads[qi]; });
+    });
+    const visited = new Array(N * N).fill(false);
+    const bestByColor = { R: 0, Y: 0, G: 0, B: 0 };
+    for (let idx = 0; idx < N * N; idx++) {
+      if (visited[idx] || grid[idx] === null) continue;
+      const color = grid[idx];
+      let size = 0;
+      const stack = [idx];
+      visited[idx] = true;
+      while (stack.length) {
+        const cur = stack.pop();
+        size++;
+        const r = Math.floor(cur / N), c = cur % N;
+        [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]].forEach(([nr, nc]) => {
+          if (nr < 0 || nr >= N || nc < 0 || nc >= N) return;
+          const nIdx = nr * N + nc;
+          if (!visited[nIdx] && grid[nIdx] === color) { visited[nIdx] = true; stack.push(nIdx); }
+        });
+      }
+      if (size > bestByColor[color]) bestByColor[color] = size;
+    }
+    const sorted = COLORS.slice().sort((a, b) => bestByColor[b] - bestByColor[a]);
+    const topTwo = sorted.slice(0, 2);
+    const total = topTwo.reduce((sum, c) => sum + bestByColor[c], 0);
+    return { sizes: bestByColor, topTwo, total };
+  }
+
+  registerScore = () => {
+    const result = this.computeScore();
+    const entry = { score: result.total, ts: Date.now() };
+    let lb = this.loadLeaderboard();
+    lb.push(entry);
+    lb.sort((a, b) => b.score - a.score || a.ts - b.ts);
+    lb = lb.slice(0, 10);
+    this.saveLeaderboard(lb);
+    this.setState({ showModal: true, leaderboard: lb, justAddedTs: entry.ts });
+  };
+
+  closeModalRestart = () => { this.setState(this.makeInitialState()); };
+
+  renderVals() {
+    const { board, queue, selectedMarketIdx, draggingIdx, dragOverCell, placedCount, stage, showModal, leaderboard, justAddedTs } = this.state;
+
+    const boardCells = board.map((cell, i) => {
+      const empty = !cell;
+      const isDropTarget = empty && dragOverCell === i;
+      const isPlaceable = empty && stage === 'placement' && selectedMarketIdx !== null;
+      const slidable = !empty && stage === 'sliding' && this.isAdjacentToEmpty(i);
+      return {
+        empty,
+        quads: cell ? cell.quads.map(l => PALETTE[l]) : null,
+        bg: isDropTarget ? 'rgba(95,184,176,0.25)' : '#242a30',
+        ring: isDropTarget ? `inset 0 0 0 2px ${ACCENT}` : (isPlaceable ? `inset 0 0 0 2px ${ACCENT}88` : 'none'),
+        cursor: (isPlaceable || slidable) ? 'pointer' : 'default',
+        slidable: slidable ? 'slidable' : '',
+        onClick: this.onCellClick(i),
+        onDragOver: this.onCellDragOver(i),
+        onDragLeave: this.onCellDragLeave(i),
+        onDrop: this.onCellDrop(i),
+      };
+    });
+
+    const front = queue.slice(0, 3).map((tile, idx) => {
+      const rotated = this.rotateQuads(tile.quads, tile.rotation);
+      const sel = selectedMarketIdx === idx;
+      return {
+        quads: rotated.map(l => PALETTE[l]),
+        borderColor: sel ? ACCENT : 'rgba(255,255,255,.14)',
+        ring: sel ? `0 0 0 2px ${ACCENT}55` : 'none',
+        opacity: draggingIdx === idx ? 0.35 : 1,
+        onClick: this.selectMarket(idx),
+        onRotate: this.rotateMarket(idx),
+        onDragStart: this.onDragStart(idx),
+        onDragEnd: this.onDragEndMarket,
+      };
+    });
+
+    const upcoming = queue.slice(3).map(t => ({ quads: t.quads.map(l => PALETTE[l]) }));
+
+    const result = this.computeScore();
+    const scoreRows = COLORS.map(l => ({
+      hex: PALETTE[l],
+      value: result.sizes[l],
+      opacity: result.topTwo.includes(l) ? 1 : 0.45,
+    }));
+
+    const stageLabel = stage === 'placement' ? `배치 · ${placedCount}/${TOTAL_TILES}` : (stage === 'sliding' ? '슬라이딩 · 정렬하세요' : '종료');
+    const hint = stage === 'placement'
+      ? (selectedMarketIdx !== null ? '보드의 빈칸을 클릭하거나, 타일을 드래그해서 놓으세요.' : '타일을 클릭해 선택하거나, 바로 드래그해서 보드에 놓으세요.')
+      : (stage === 'sliding' ? '빈칸과 맞닿은 타일을 클릭하면 이동합니다.' : '게임 종료');
+
+    const leaderboardRows = (leaderboard || []).map((e, i) => {
+      const isNew = e.ts === justAddedTs;
+      return {
+        rank: i + 1,
+        score: e.score,
+        dateLabel: this.formatTs(e.ts),
+        rowBg: isNew ? 'rgba(95,184,176,0.16)' : 'rgba(255,255,255,0.03)',
+        rowBorder: isNew ? ACCENT : 'rgba(255,255,255,.06)',
+      };
+    });
+
+    return {
+      boardCells, front, upcoming, scoreRows,
+      total: result.total,
+      stageLabel,
+      hint,
+      showRegister: stage === 'sliding',
+      showModal,
+      modalTotal: result.total,
+      modalTop: result.topTwo.map(l => ({ hex: PALETTE[l], value: result.sizes[l] })),
+      leaderboardRows,
+      restart: this.restart,
+      registerScore: this.registerScore,
+      closeModalRestart: this.closeModalRestart,
+    };
+  }
+}
+
+</script>
+</body>
+</html>
