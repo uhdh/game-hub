@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3단 오목 - 피의 게임 X 시뮬레이터</title>
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #0f0f12;
+    min-height: 100vh;
+  }
+  a { color: #5fb8b0; text-decoration: none; }
+
+  #app {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    background: #0f0f12;
+    padding: 24px 16px 40px;
+    box-sizing: border-box;
+    font-family: -apple-system, "Pretendard", "Segoe UI", "Malgun Gothic", sans-serif;
+    color: #e7ebee;
+  }
+  .col {
+    width: 100%;
+    max-width: 760px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .header-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .header-left { display: flex; flex-direction: column; gap: 2px; }
+  .header-left a { font-size: 12px; font-weight: 600; }
+  .header-left .title { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+  .btn-reset {
+    background: #15181c; border: 1px solid rgba(255,255,255,.1); color: #c7ccd4;
+    font-size: 13px; font-weight: 600; padding: 9px 14px; border-radius: 10px; cursor: pointer;
+  }
+
+  .mode-bar { display: flex; flex-wrap: wrap; gap: 8px; }
+  .mode-group {
+    display: flex; gap: 4px;
+    background: #15181c; border: 1px solid rgba(255,255,255,.06); border-radius: 12px; padding: 4px;
+  }
+  .mode-group.hidden { display: none; }
+  .mode-btn {
+    font-size: 12.5px; font-weight: 700; padding: 7px 13px; border-radius: 8px;
+    border: none; background: transparent; color: #8992a0; cursor: pointer;
+  }
+  .mode-btn.active { background: rgba(95,184,176,.16); color: #e7ebee; }
+  .mode-btn.hidden { display: none; }
+  .rank-toggle-btn {
+    background: #15181c; border: 1px solid rgba(255,255,255,.06); border-radius: 12px; padding: 9px 14px;
+  }
+  .rank-toggle-btn.active { background: rgba(255,209,102,.14); color: #ffd166; border-color: rgba(255,209,102,.35); }
+
+  .rank-panel {
+    display: flex; flex-direction: column; gap: 8px;
+    background: #15181c; border: 1px solid rgba(255,255,255,.06); border-radius: 16px; padding: 14px 16px;
+  }
+  .rank-panel.hidden { display: none; }
+  .rank-panel-title { font-size: 12px; font-weight: 700; color: #ffd166; letter-spacing: .04em; text-transform: uppercase; }
+  .rank-list { display: flex; flex-direction: column; gap: 6px; }
+  .rank-row {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06);
+    border-radius: 10px; padding: 8px 10px;
+  }
+  .rank-row .no { flex: 0 0 auto; width: 20px; text-align: center; font-size: 12px; font-weight: 700; color: #8992a0; }
+  .rank-row .nick { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; color: #e7ebee; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rank-row .rating { flex: 0 0 auto; font-size: 14px; font-weight: 700; color: #ffd166; font-variant-numeric: tabular-nums; }
+  .rank-row .record { flex: 0 0 auto; font-size: 11px; color: #8992a0; }
+  .rank-empty { font-size: 12.5px; color: #8992a0; text-align: center; padding: 4px; }
+
+  .status-bar {
+    display: flex; align-items: center; gap: 10px;
+    background: #15181c; border: 1px solid rgba(255,255,255,.06); border-radius: 16px;
+    padding: 14px 16px; box-shadow: 0 12px 30px rgba(0,0,0,.35);
+  }
+  .turn-dot { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto; border: 1px solid rgba(255,255,255,.25); }
+  .phase-label { font-size: 14px; font-weight: 700; flex: 1; min-width: 0; }
+  .supply-chips { display: flex; gap: 8px; flex: 0 0 auto; }
+  .supply-chip { font-size: 12px; font-weight: 600; color: #c7ccd4; background: #1c2024; border-radius: 20px; padding: 4px 10px; }
+
+  .board-card {
+    display: flex; justify-content: center;
+    background: linear-gradient(160deg,#3a332d,#26211d);
+    border-radius: 20px; padding: 22px;
+    box-shadow: 0 16px 40px rgba(0,0,0,.45);
+    border: 1px solid rgba(255,255,255,.05);
+    transition: opacity .15s ease;
+  }
+  .board-card.thinking { opacity: .78; pointer-events: none; }
+  #board-wrap { position: relative; }
+  .cell-wrap {
+    position: absolute; transform: translate(-50%,-50%);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; border-radius: 50%;
+  }
+  .stone { border-radius: 50%; }
+  .pips-wrap { position: absolute; bottom: -2px; right: -2px; display: flex; flex-direction: column-reverse; gap: 1px; }
+  .pip { width: 6px; height: 6px; border-radius: 1px; }
+
+  .rules-text { font-size: 12px; color: #8992a0; line-height: 1.6; padding: 2px 4px; }
+
+  .win-card {
+    display: flex; flex-direction: column; gap: 8px;
+    background: #15181c; border: 1px solid rgba(255,255,255,.06); border-radius: 16px; padding: 14px 16px;
+  }
+  .win-card .label { font-size: 12px; font-weight: 700; color: #5fb8b0; letter-spacing: .04em; text-transform: uppercase; }
+  .win-card .rows { display: flex; flex-direction: column; gap: 6px; }
+  .win-card .rows span { font-size: 13px; color: #c7ccd4; }
+  .win-card .rows b { color: #e7ebee; }
+
+  #win-overlay {
+    position: fixed; inset: 0; background: rgba(6,7,9,.72);
+    display: none; align-items: center; justify-content: center; padding: 20px; z-index: 50;
+  }
+  #win-overlay.show { display: flex; }
+  #win-box {
+    background: #15181c; border: 1px solid rgba(255,255,255,.1); border-radius: 20px;
+    padding: 28px 26px; max-width: 340px; width: 100%;
+    display: flex; flex-direction: column; gap: 14px; align-items: center; text-align: center;
+    box-shadow: 0 24px 60px rgba(0,0,0,.5);
+  }
+  #win-dot { width: 44px; height: 44px; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); }
+  #win-label { font-size: 19px; font-weight: 800; }
+  #win-reason { font-size: 13px; color: #8992a0; }
+  .btn-restart {
+    margin-top: 6px; background: #5fb8b0; color: #0f1214; font-size: 14px; font-weight: 700;
+    border: none; padding: 11px 22px; border-radius: 10px; cursor: pointer; width: 100%;
+  }
+
+  .rank-register { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+  .rank-register.hidden { display: none; }
+  .rank-register-label { font-size: 12px; font-weight: 700; color: #ffd166; }
+  .rank-register-row { display: flex; gap: 8px; }
+  #rank-nickname-input {
+    flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; padding: 9px 11px;
+    border-radius: 9px; border: 1px solid rgba(255,255,255,.12); background: #1c2024; color: #e7ebee;
+  }
+  #rank-nickname-input::placeholder { color: #565c66; font-weight: 500; }
+  .btn-rank-submit {
+    flex: 0 0 auto; font-size: 13px; font-weight: 700; padding: 9px 16px; border-radius: 9px;
+    border: none; background: #ffd166; color: #14110a; cursor: pointer;
+  }
+  .btn-rank-submit:disabled { opacity: .6; cursor: default; }
+  .rank-register-result { font-size: 12.5px; color: #c7ccd4; text-align: center; }
+  .rank-register-result.hidden { display: none; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="col">
+    <div class="header-row">
+      <div class="header-left">
+        <a href="index.html">← 게임 허브</a>
+        <span class="title">3단 오목</span>
+      </div>
+      <button class="btn-reset" id="reset-btn">새 게임</button>
+    </div>
+
+    <div class="mode-bar">
+      <div class="mode-group" id="mode-group">
+        <button class="mode-btn" data-mode="2p">2인 플레이</button>
+        <button class="mode-btn" data-mode="ai">AI와 대결</button>
+      </div>
+      <div class="mode-group" id="difficulty-group">
+        <button class="mode-btn" data-diff="easy">하</button>
+        <button class="mode-btn" data-diff="medium">중</button>
+        <button class="mode-btn" data-diff="hard">상</button>
+      </div>
+      <button class="mode-btn rank-toggle-btn hidden" id="rank-toggle-btn">🏆 상 난이도 랭킹</button>
+    </div>
+
+    <div class="rank-panel hidden" id="rank-panel">
+      <span class="rank-panel-title">상 난이도 레이팅 TOP 10</span>
+      <div class="rank-list" id="rank-list"></div>
+    </div>
+
+    <div class="status-bar">
+      <div class="turn-dot" id="turn-dot"></div>
+      <span class="phase-label" id="phase-label"></span>
+      <div class="supply-chips">
+        <span class="supply-chip" id="supply-1"></span>
+        <span class="supply-chip" id="supply-2"></span>
+      </div>
+    </div>
+
+    <div class="board-card">
+      <div id="board-wrap"></div>
+    </div>
+
+    <div class="rules-text">
+      기본 배치: 선 플레이어부터 1개 → 2개 → 2개 → 1개 순서로 번갈아 놓습니다 (중앙 칸·자신의 돌과 인접한 칸 금지). 이후 매 턴 새 돌 놓기 또는 자신의 돌을 인접 칸으로 이동(최대 3층까지 쌓기, 원래 칸보다 높이 쌓인 칸으로는 이동 불가)을 선택합니다.
+    </div>
+
+    <div class="win-card">
+      <span class="label">승리 조건 (택 1 충족 시 즉시 승리)</span>
+      <div class="rows">
+        <span><b>1. 오목 완성</b> — 자신의 돌 5개를 일직선으로 연결 (6개 이상 연결되면 인정되지 않음)</span>
+        <span><b>2. 5개 3층 쌓기</b> — 자신의 돌 5개가 어디든 3층에 위치</span>
+        <span><b>3. 인접 3개 3층 쌓기</b> — 서로 인접한 자신의 돌 3개가 모두 3층에 위치</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="win-overlay">
+  <div id="win-box">
+    <div id="win-dot"></div>
+    <span id="win-label"></span>
+    <span id="win-reason"></span>
+
+    <div class="rank-register hidden" id="rank-register">
+      <span class="rank-register-label">상 난이도 레이팅에 등록하기</span>
+      <div class="rank-register-row">
+        <input type="text" id="rank-nickname-input" placeholder="닉네임" maxlength="12">
+        <button class="btn-rank-submit" id="rank-submit-btn">등록</button>
+      </div>
+      <div class="rank-register-result hidden" id="rank-register-result"></div>
+    </div>
+
+    <button class="btn-restart" id="win-restart-btn">새 게임 시작</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const SIZE = 32;
+  const PAD = 30;
+  const HIT = 40;
+
+  const NEIGHBOR_DIRS = [
+    { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
+    { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 },
+  ];
+  const LINE_DIRS = [{ q: 1, r: 0 }, { q: 0, r: 1 }, { q: 1, r: -1 }];
+
+  function toPixel(q, r) {
+    return { x: SIZE * Math.sqrt(3) * (q + r / 2), y: SIZE * 1.5 * r };
+  }
+
+  const RAW_BOARD = [];
+  for (let q = -5; q <= 5; q++) {
+    for (let r = -5; r <= 5; r++) {
+      const s = -q - r;
+      if (Math.abs(s) <= 5) RAW_BOARD.push({ q, r, s });
+    }
+  }
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  RAW_BOARD.forEach(c => {
+    const p = toPixel(c.q, c.r);
+    c.px = p.x; c.py = p.y;
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+  });
+  const OFFX = PAD - minX, OFFY = PAD - minY;
+  const BOARD_W = maxX - minX + PAD * 2;
+  const BOARD_H = maxY - minY + PAD * 2;
+  RAW_BOARD.forEach(c => { c.left = c.px + OFFX; c.top = c.py + OFFY; c.key = c.q + "_" + c.r; });
+
+  const BOARD_MAP = {};
+  RAW_BOARD.forEach(c => { BOARD_MAP[c.key] = c; });
+
+  const GRID_LINES = [];
+  RAW_BOARD.forEach(c => {
+    LINE_DIRS.forEach(d => {
+      const nk = (c.q + d.q) + "_" + (c.r + d.r);
+      const n = BOARD_MAP[nk];
+      if (n) GRID_LINES.push({ x1: c.left, y1: c.top, x2: n.left, y2: n.top });
+    });
+  });
+
+  const INITIAL_STEPS = [
+    { player: 1, count: 1 }, { player: 2, count: 2 },
+    { player: 1, count: 2 }, { player: 2, count: 1 },
+  ];
+
+  const HUMAN_PLAYER = 1;
+  const AI_PLAYER = 2;
+
+  function otherPlayer(p) { return p === 1 ? 2 : 1; }
+  function colorName(p) { return p === 1 ? "흑돌" : "백돌"; }
+  function stoneColor(p) { return p === 1 ? "#1c1c1c" : "#f0ece2"; }
+  function stoneBorder(p) { return p === 1 ? "1px solid #444" : "1px solid #c9c2b4"; }
+  function randomInt(n) { return Math.floor(Math.random() * n); }
+
+  // ---- 순수 로직 (임의의 stacks 스냅샷에 대해 동작 — AI 시뮬레이션에도 재사용) ----
+
+  function neighbors(key) {
+    const c = BOARD_MAP[key];
+    return NEIGHBOR_DIRS.map(d => BOARD_MAP[(c.q + d.q) + "_" + (c.r + d.r)]).filter(Boolean);
+  }
+
+  function topColorOf(stacks, key) {
+    const st = stacks[key];
+    return st && st.length ? st[st.length - 1] : null;
+  }
+
+  function isValidInitialPlacementOf(stacks, key, player) {
+    if (key === "0_0") return false;
+    const st = stacks[key];
+    if (st && st.length) return false;
+    return !neighbors(key).some(n => topColorOf(stacks, n.key) === player);
+  }
+
+  function isValidMoveTargetOf(stacks, originKey, destKey, player) {
+    if (originKey === destKey) return false;
+    const origin = BOARD_MAP[originKey];
+    const dest = BOARD_MAP[destKey];
+    const isAdj = NEIGHBOR_DIRS.some(d => (origin.q + d.q) === dest.q && (origin.r + d.r) === dest.r);
+    if (!isAdj) return false;
+    const originH = (stacks[originKey] || []).length;
+    const destH = (stacks[destKey] || []).length;
+    return destH <= originH && destH + 1 <= 3;
+  }
+
+  function checkFiveInRowOf(stacks, color) {
+    for (const key in BOARD_MAP) {
+      if (topColorOf(stacks, key) !== color) continue;
+      const c = BOARD_MAP[key];
+      for (const dir of LINE_DIRS) {
+        const prevKey = (c.q - dir.q) + "_" + (c.r - dir.r);
+        if (topColorOf(stacks, prevKey) === color) continue;
+        const run = [key];
+        let cq = c.q + dir.q, cr = c.r + dir.r;
+        while (topColorOf(stacks, cq + "_" + cr) === color) { run.push(cq + "_" + cr); cq += dir.q; cr += dir.r; }
+        if (run.length === 5) return run;
+      }
+    }
+    return null;
+  }
+
+  function checkFiveAtTop3Of(stacks, color) {
+    const found = [];
+    for (const key in BOARD_MAP) {
+      const st = stacks[key];
+      if (st && st.length === 3 && st[2] === color) found.push(key);
+    }
+    return found.length >= 5 ? found.slice(0, 5) : null;
+  }
+
+  function checkTriangleTop3Of(stacks, color) {
+    const isTop3 = k => { const st = stacks[k]; return st && st.length === 3 && st[2] === color; };
+    for (const key in BOARD_MAP) {
+      if (!isTop3(key)) continue;
+      const c = BOARD_MAP[key];
+      for (let i = 0; i < 6; i++) {
+        const d1 = NEIGHBOR_DIRS[i], d2 = NEIGHBOR_DIRS[(i + 1) % 6];
+        const n1 = (c.q + d1.q) + "_" + (c.r + d1.r);
+        const n2 = (c.q + d2.q) + "_" + (c.r + d2.r);
+        if (isTop3(n1) && isTop3(n2)) return [key, n1, n2];
+      }
+    }
+    return null;
+  }
+
+  function checkWinOf(stacks, player) {
+    const row = checkFiveInRowOf(stacks, player);
+    if (row) return { cells: row, reason: "오목 완성 (5개 일직선 연결)" };
+    const top5 = checkFiveAtTop3Of(stacks, player);
+    if (top5) return { cells: top5, reason: "돌 5개 3층 쌓기 완성" };
+    const tri = checkTriangleTop3Of(stacks, player);
+    if (tri) return { cells: tri, reason: "인접한 돌 3개 3층 쌓기 완성" };
+    return null;
+  }
+
+  function placeStoneOf(stacks, key, player) {
+    const next = Object.assign({}, stacks);
+    next[key] = (next[key] || []).concat([player]);
+    return next;
+  }
+
+  function moveStoneOf(stacks, originKey, destKey, player) {
+    const next = Object.assign({}, stacks);
+    const originStack = next[originKey].slice();
+    originStack.pop();
+    next[originKey] = originStack;
+    next[destKey] = (next[destKey] || []).concat([player]);
+    return next;
+  }
+
+  function applyMoveToStacks(stacks, move, player) {
+    return move.type === "place" ? placeStoneOf(stacks, move.key, player) : moveStoneOf(stacks, move.origin, move.dest, player);
+  }
+
+  function getAllLegalMainMoves(stacks, player, supply) {
+    const moves = [];
+    if (supply > 0) {
+      RAW_BOARD.forEach(c => {
+        const st = stacks[c.key];
+        if (!st || !st.length) moves.push({ type: "place", key: c.key });
+      });
+    }
+    RAW_BOARD.forEach(c => {
+      if (topColorOf(stacks, c.key) !== player) return;
+      neighbors(c.key).forEach(n => {
+        if (isValidMoveTargetOf(stacks, c.key, n.key, player)) moves.push({ type: "move", origin: c.key, dest: n.key });
+      });
+    });
+    return moves;
+  }
+
+  // ---- AI 평가 함수 ----
+
+  function lineThreatScore(stacks, color) {
+    let score = 0;
+    for (const key in BOARD_MAP) {
+      if (topColorOf(stacks, key) !== color) continue;
+      const c = BOARD_MAP[key];
+      for (const dir of LINE_DIRS) {
+        const prevKey = (c.q - dir.q) + "_" + (c.r - dir.r);
+        if (topColorOf(stacks, prevKey) === color) continue;
+        let length = 1;
+        let cq = c.q + dir.q, cr = c.r + dir.r;
+        while (topColorOf(stacks, cq + "_" + cr) === color) { length++; cq += dir.q; cr += dir.r; }
+        if (length >= 5) continue;
+        const afterKey = cq + "_" + cr;
+        const beforeOpen = !!BOARD_MAP[prevKey] && !topColorOf(stacks, prevKey);
+        const afterOpen = !!BOARD_MAP[afterKey] && !topColorOf(stacks, afterKey);
+        const openEnds = (beforeOpen ? 1 : 0) + (afterOpen ? 1 : 0);
+        const base = [0, 2, 14, 90, 550][length] || 0;
+        score += base * (1 + openEnds);
+      }
+    }
+    return score;
+  }
+
+  function stackThreatScore(stacks, color) {
+    let score = 0;
+    const top3Cells = [];
+    for (const key in BOARD_MAP) {
+      const st = stacks[key];
+      if (!st || !st.length) continue;
+      const h = st.length;
+      if (st[h - 1] !== color) continue;
+      if (h === 3) { top3Cells.push(key); score += 30; }
+      else if (h === 2) score += 9;
+      else score += 1;
+    }
+    const top3Set = new Set(top3Cells);
+    let adjPairs = 0;
+    top3Cells.forEach(k => {
+      const c = BOARD_MAP[k];
+      NEIGHBOR_DIRS.forEach(d => {
+        if (top3Set.has((c.q + d.q) + "_" + (c.r + d.r))) adjPairs++;
+      });
+    });
+    score += adjPairs * 25;
+    return score;
+  }
+
+  function evaluatePosition(stacks, forPlayer) {
+    const opp = otherPlayer(forPlayer);
+    if (checkWinOf(stacks, forPlayer)) return 1e7;
+    if (checkWinOf(stacks, opp)) return -1e7;
+    const mine = lineThreatScore(stacks, forPlayer) + stackThreatScore(stacks, forPlayer);
+    const theirs = lineThreatScore(stacks, opp) + stackThreatScore(stacks, opp);
+    return mine - theirs * 1.15;
+  }
+
+  function computeAIInitialMove() {
+    const candidates = RAW_BOARD.filter(c => isValidInitialPlacementOf(state.stacks, c.key, AI_PLAYER));
+    if (aiDifficulty === "easy") return { type: "place", key: candidates[randomInt(candidates.length)].key };
+    const noiseAmp = aiDifficulty === "medium" ? 3 : 0.6;
+    let best = null, bestScore = -Infinity;
+    candidates.forEach(c => {
+      const score = -Math.max(Math.abs(c.q), Math.abs(c.r), Math.abs(c.s)) + Math.random() * noiseAmp;
+      if (score > bestScore) { bestScore = score; best = c; }
+    });
+    return { type: "place", key: best.key };
+  }
+
+  function computeAIMainMove() {
+    const stacks = state.stacks;
+    const supply = state.supply[AI_PLAYER];
+    const moves = getAllLegalMainMoves(stacks, AI_PLAYER, supply);
+
+    for (const m of moves) {
+      if (checkWinOf(applyMoveToStacks(stacks, m, AI_PLAYER), AI_PLAYER)) return m;
+    }
+
+    if (aiDifficulty === "easy") {
+      return moves[randomInt(moves.length)];
+    }
+
+    if (aiDifficulty === "medium") {
+      const oppMoves = getAllLegalMainMoves(stacks, HUMAN_PLAYER, state.supply[HUMAN_PLAYER]);
+      const threatCells = new Set();
+      oppMoves.forEach(m => {
+        if (checkWinOf(applyMoveToStacks(stacks, m, HUMAN_PLAYER), HUMAN_PLAYER)) threatCells.add(m.type === "place" ? m.key : m.dest);
+      });
+      const blockMoves = moves.filter(m => threatCells.has(m.type === "place" ? m.key : m.dest));
+      const pool = blockMoves.length ? blockMoves : moves;
+      const scored = pool.map(m => ({ m, s: evaluatePosition(applyMoveToStacks(stacks, m, AI_PLAYER), AI_PLAYER) + Math.random() * 20 }));
+      scored.sort((a, b) => b.s - a.s);
+      return scored[0].m;
+    }
+
+    // hard: 상대가 다음 수에 이길 수 없는 "안전한" 수만 우선 고려
+    const safeMoves = moves.filter(m => {
+      const afterAI = applyMoveToStacks(stacks, m, AI_PLAYER);
+      const oppMovesAfter = getAllLegalMainMoves(afterAI, HUMAN_PLAYER, state.supply[HUMAN_PLAYER]);
+      return !oppMovesAfter.some(om => checkWinOf(applyMoveToStacks(afterAI, om, HUMAN_PLAYER), HUMAN_PLAYER));
+    });
+    const pool = safeMoves.length ? safeMoves : moves;
+    const scored = pool.map(m => ({ m, result: applyMoveToStacks(stacks, m, AI_PLAYER) }));
+    scored.forEach(o => { o.s1 = evaluatePosition(o.result, AI_PLAYER); });
+    scored.sort((a, b) => b.s1 - a.s1);
+    const top = scored.slice(0, 8);
+    top.forEach(o => {
+      const opp2 = getAllLegalMainMoves(o.result, HUMAN_PLAYER, state.supply[HUMAN_PLAYER]);
+      let worst = Infinity;
+      opp2.forEach(om => {
+        const s2 = evaluatePosition(applyMoveToStacks(o.result, om, HUMAN_PLAYER), AI_PLAYER);
+        if (s2 < worst) worst = s2;
+      });
+      o.final = opp2.length ? worst : o.s1;
+    });
+    top.sort((a, b) => b.final - a.final);
+    return top[0].m;
+  }
+
+  function computeAIMove() {
+    return state.phase === "initial" ? computeAIInitialMove() : computeAIMainMove();
+  }
+
+  // ---- 게임 상태 ----
+
+  let gameMode = "2p"; // "2p" | "ai"
+  let aiDifficulty = "medium"; // "easy" | "medium" | "hard"
+  let gameEpoch = 0;
+
+  let state = {
+    stacks: {},
+    turn: 1,
+    phase: "initial",
+    stepIndex: 0,
+    placedInStep: 0,
+    supply: { 1: 25, 2: 25 },
+    selected: null,
+    winner: null,
+    winReason: "",
+    winCells: [],
+    aiThinking: false,
+  };
+
+  function setState(patch) {
+    state = Object.assign({}, state, patch);
+    render();
+    scheduleAIIfNeeded();
+  }
+
+  function scheduleAIIfNeeded() {
+    if (gameMode !== "ai") return;
+    if (state.winner) return;
+    if (state.turn !== AI_PLAYER) return;
+    if (state.aiThinking) return;
+    state.aiThinking = true;
+    render();
+    const epoch = gameEpoch;
+    setTimeout(() => {
+      if (epoch !== gameEpoch) return;
+      performAIMove();
+    }, 300 + Math.random() * 350);
+  }
+
+  function performAIMove() {
+    const move = computeAIMove();
+    state.aiThinking = false;
+    applyAIMove(move);
+  }
+
+  function applyAIMove(move) {
+    const player = AI_PLAYER;
+    if (state.phase === "initial") {
+      const stacks = placeStoneOf(state.stacks, move.key, player);
+      const supply = Object.assign({}, state.supply, { [player]: state.supply[player] - 1 });
+      let stepIndex = state.stepIndex, placedInStep = state.placedInStep;
+      placedInStep++;
+      let phase = "initial", turn = player;
+      if (placedInStep >= INITIAL_STEPS[stepIndex].count) {
+        stepIndex++; placedInStep = 0;
+        if (stepIndex >= INITIAL_STEPS.length) {
+          phase = "main";
+          turn = otherPlayer(INITIAL_STEPS[INITIAL_STEPS.length - 1].player);
+        } else {
+          turn = INITIAL_STEPS[stepIndex].player;
+        }
+      }
+      setState({ stacks, supply, stepIndex, placedInStep, phase, turn });
+      return;
+    }
+    const stacks = applyMoveToStacks(state.stacks, move, player);
+    const supply = move.type === "place" ? Object.assign({}, state.supply, { [player]: state.supply[player] - 1 }) : state.supply;
+    const win = checkWinOf(stacks, player);
+    setState({ stacks, supply, selected: null, turn: win ? state.turn : otherPlayer(player), winner: win ? player : null, winReason: win ? win.reason : "", winCells: win ? win.cells : [] });
+  }
+
+  function onCellClick(key) {
+    if (state.winner) return;
+    if (state.aiThinking) return;
+    if (gameMode === "ai" && state.turn === AI_PLAYER) return;
+    const player = state.turn;
+
+    if (state.phase === "initial") {
+      if (!isValidInitialPlacementOf(state.stacks, key, player)) return;
+      const stacks = placeStoneOf(state.stacks, key, player);
+      const supply = Object.assign({}, state.supply, { [player]: state.supply[player] - 1 });
+      let stepIndex = state.stepIndex, placedInStep = state.placedInStep;
+      placedInStep++;
+      let phase = "initial", turn = player;
+      if (placedInStep >= INITIAL_STEPS[stepIndex].count) {
+        stepIndex++; placedInStep = 0;
+        if (stepIndex >= INITIAL_STEPS.length) {
+          phase = "main";
+          turn = otherPlayer(INITIAL_STEPS[INITIAL_STEPS.length - 1].player);
+        } else {
+          turn = INITIAL_STEPS[stepIndex].player;
+        }
+      }
+      setState({ stacks, supply, stepIndex, placedInStep, phase, turn });
+      return;
+    }
+
+    // main phase
+    if (state.selected === key) { setState({ selected: null }); return; }
+    if (state.selected) {
+      const origin = state.selected;
+      if (isValidMoveTargetOf(state.stacks, origin, key, player)) {
+        const stacks = moveStoneOf(state.stacks, origin, key, player);
+        const win = checkWinOf(stacks, player);
+        setState({ stacks, selected: null, turn: win ? state.turn : otherPlayer(player), winner: win ? player : null, winReason: win ? win.reason : "", winCells: win ? win.cells : [] });
+      } else if (topColorOf(state.stacks, key) === player) {
+        setState({ selected: key });
+      } else {
+        setState({ selected: null });
+      }
+      return;
+    }
+    const st = state.stacks[key];
+    if (!st || !st.length) {
+      if (state.supply[player] <= 0) return;
+      const stacks = placeStoneOf(state.stacks, key, player);
+      const supply = Object.assign({}, state.supply, { [player]: state.supply[player] - 1 });
+      const win = checkWinOf(stacks, player);
+      setState({ stacks, supply, turn: win ? state.turn : otherPlayer(player), winner: win ? player : null, winReason: win ? win.reason : "", winCells: win ? win.cells : [] });
+    } else if (topColorOf(state.stacks, key) === player) {
+      setState({ selected: key });
+    }
+  }
+
+  function resetGame() {
+    gameEpoch++;
+    rankSubmittedForThisGame = false;
+    document.getElementById("rank-register-result").classList.add("hidden");
+    document.getElementById("rank-nickname-input").disabled = false;
+    document.getElementById("rank-submit-btn").disabled = false;
+    document.getElementById("rank-submit-btn").textContent = "등록";
+    setState({
+      stacks: {}, turn: 1, phase: "initial", stepIndex: 0, placedInStep: 0,
+      supply: { 1: 25, 2: 25 }, selected: null, winner: null, winReason: "", winCells: [], aiThinking: false,
+    });
+  }
+
+  // ---- 모드/난이도 UI ----
+
+  function updateModeUI() {
+    document.querySelectorAll("#mode-group .mode-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === gameMode));
+    document.querySelectorAll("#difficulty-group .mode-btn").forEach(b => b.classList.toggle("active", b.dataset.diff === aiDifficulty));
+    document.getElementById("difficulty-group").classList.toggle("hidden", gameMode !== "ai");
+    const isHardAI = gameMode === "ai" && aiDifficulty === "hard";
+    const rankToggleBtn = document.getElementById("rank-toggle-btn");
+    rankToggleBtn.classList.toggle("hidden", !isHardAI);
+    if (!isHardAI) {
+      document.getElementById("rank-panel").classList.add("hidden");
+      rankToggleBtn.classList.remove("active");
+    }
+  }
+  document.querySelectorAll("#mode-group .mode-btn").forEach(b => {
+    b.addEventListener("click", () => { gameMode = b.dataset.mode; updateModeUI(); resetGame(); });
+  });
+  document.querySelectorAll("#difficulty-group .mode-btn").forEach(b => {
+    b.addEventListener("click", () => { aiDifficulty = b.dataset.diff; updateModeUI(); resetGame(); });
+  });
+  updateModeUI();
+
+  // ---- 상 난이도 Elo 레이팅 ----
+
+  const RANK_SUPABASE_URL = "https://paktzmofotvwfdxcpmzv.supabase.co";
+  const RANK_SUPABASE_ANON_KEY = "sb_publishable_jWbstEn2pKJTNDxLTR4Jig_asglvzGW";
+  const RANK_TABLE = "gomoku_hard_ranking";
+  const RANK_NICKNAME_KEY = "gomokuHardRankingNickname";
+  const AI_HARD_RATING = 1600;
+  const RANK_K_FACTOR = 32;
+
+  let rankSubmittedForThisGame = false;
+
+  async function fetchPlayerRating(nickname) {
+    const res = await fetch(
+      `${RANK_SUPABASE_URL}/rest/v1/${RANK_TABLE}?select=nickname,rating,wins,losses&nickname=eq.${encodeURIComponent(nickname)}`,
+      { headers: { apikey: RANK_SUPABASE_ANON_KEY, Authorization: `Bearer ${RANK_SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) throw new Error("레이팅 조회 실패");
+    const rows = await res.json();
+    return rows[0] || { nickname, rating: 1000, wins: 0, losses: 0 };
+  }
+
+  async function upsertPlayerRating(nickname, rating, wins, losses) {
+    const res = await fetch(`${RANK_SUPABASE_URL}/rest/v1/${RANK_TABLE}?on_conflict=nickname`, {
+      method: "POST",
+      headers: {
+        apikey: RANK_SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${RANK_SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify({ nickname, rating, wins, losses, updated_at: new Date().toISOString() }),
+    });
+    if (!res.ok) throw new Error("레이팅 등록 실패");
+    const [row] = await res.json();
+    return row;
+  }
+
+  async function fetchTopRanking() {
+    const res = await fetch(
+      `${RANK_SUPABASE_URL}/rest/v1/${RANK_TABLE}?select=nickname,rating,wins,losses&order=rating.desc&limit=10`,
+      { headers: { apikey: RANK_SUPABASE_ANON_KEY, Authorization: `Bearer ${RANK_SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) throw new Error("랭킹 조회 실패");
+    return res.json();
+  }
+
+  function renderRankList(rows) {
+    const list = document.getElementById("rank-list");
+    list.innerHTML = "";
+    if (!rows.length) {
+      const empty = document.createElement("div");
+      empty.className = "rank-empty";
+      empty.textContent = "아직 등록된 레이팅이 없습니다.";
+      list.appendChild(empty);
+      return;
+    }
+    rows.forEach((r, i) => {
+      const row = document.createElement("div");
+      row.className = "rank-row";
+      row.innerHTML = `
+        <span class="no">${i + 1}</span>
+        <span class="nick">${r.nickname}</span>
+        <span class="record">${r.wins}승 ${r.losses}패</span>
+        <span class="rating">${r.rating}</span>
+      `;
+      list.appendChild(row);
+    });
+  }
+
+  document.getElementById("rank-toggle-btn").addEventListener("click", async () => {
+    const btn = document.getElementById("rank-toggle-btn");
+    const panel = document.getElementById("rank-panel");
+    const willShow = panel.classList.contains("hidden");
+    panel.classList.toggle("hidden", !willShow);
+    btn.classList.toggle("active", willShow);
+    if (willShow) {
+      try {
+        renderRankList(await fetchTopRanking());
+      } catch (e) {
+        document.getElementById("rank-list").innerHTML = '<div class="rank-empty">랭킹을 불러오지 못했습니다.</div>';
+      }
+    }
+  });
+
+  document.getElementById("rank-nickname-input").value = localStorage.getItem(RANK_NICKNAME_KEY) || "";
+
+  document.getElementById("rank-submit-btn").addEventListener("click", async () => {
+    if (rankSubmittedForThisGame || !state.winner) return;
+    const input = document.getElementById("rank-nickname-input");
+    const btn = document.getElementById("rank-submit-btn");
+    const resultEl = document.getElementById("rank-register-result");
+    const nickname = input.value.trim() || "익명";
+    btn.disabled = true;
+    input.disabled = true;
+    btn.textContent = "등록 중...";
+    try {
+      localStorage.setItem(RANK_NICKNAME_KEY, nickname);
+      const current = await fetchPlayerRating(nickname);
+      const actual = state.winner === HUMAN_PLAYER ? 1 : 0;
+      const expected = 1 / (1 + Math.pow(10, (AI_HARD_RATING - current.rating) / 400));
+      const newRating = Math.round(current.rating + RANK_K_FACTOR * (actual - expected));
+      const wins = current.wins + (actual === 1 ? 1 : 0);
+      const losses = current.losses + (actual === 0 ? 1 : 0);
+      await upsertPlayerRating(nickname, newRating, wins, losses);
+      rankSubmittedForThisGame = true;
+      const diff = newRating - current.rating;
+      resultEl.textContent = `${nickname}님의 레이팅: ${current.rating} → ${newRating} (${diff >= 0 ? "+" : ""}${diff})`;
+      resultEl.classList.remove("hidden");
+      btn.textContent = "등록 완료";
+      if (!document.getElementById("rank-panel").classList.contains("hidden")) {
+        renderRankList(await fetchTopRanking());
+      }
+    } catch (e) {
+      resultEl.textContent = "레이팅 등록에 실패했습니다. 잠시 후 다시 시도해주세요.";
+      resultEl.classList.remove("hidden");
+      btn.disabled = false;
+      input.disabled = false;
+      btn.textContent = "등록";
+    }
+  });
+
+  // ---- 보드 렌더링 ----
+
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  const boardWrap = document.getElementById("board-wrap");
+  boardWrap.style.width = BOARD_W + "px";
+  boardWrap.style.height = BOARD_H + "px";
+
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("width", BOARD_W);
+  svg.setAttribute("height", BOARD_H);
+  svg.style.position = "absolute";
+  svg.style.inset = "0";
+  GRID_LINES.forEach(ln => {
+    const line = document.createElementNS(SVG_NS, "line");
+    line.setAttribute("x1", ln.x1); line.setAttribute("y1", ln.y1);
+    line.setAttribute("x2", ln.x2); line.setAttribute("y2", ln.y2);
+    line.setAttribute("stroke", "rgba(255,255,255,.16)");
+    line.setAttribute("stroke-width", "1");
+    svg.appendChild(line);
+  });
+  boardWrap.appendChild(svg);
+
+  const cellEls = {};
+  RAW_BOARD.forEach(c => {
+    const wrap = document.createElement("div");
+    wrap.className = "cell-wrap";
+    wrap.style.left = c.left + "px";
+    wrap.style.top = c.top + "px";
+    wrap.style.width = HIT + "px";
+    wrap.style.height = HIT + "px";
+    wrap.addEventListener("click", () => onCellClick(c.key));
+
+    const stone = document.createElement("div");
+    stone.className = "stone";
+    wrap.appendChild(stone);
+
+    const pipsWrap = document.createElement("div");
+    pipsWrap.className = "pips-wrap";
+    pipsWrap.style.display = "none";
+    for (let i = 0; i < 3; i++) {
+      const pip = document.createElement("div");
+      pip.className = "pip";
+      pipsWrap.appendChild(pip);
+    }
+    wrap.appendChild(pipsWrap);
+
+    boardWrap.appendChild(wrap);
+    cellEls[c.key] = { wrap, stone, pipsWrap, pips: Array.from(pipsWrap.children) };
+  });
+
+  const boardCardEl = document.querySelector(".board-card");
+  const phaseLabelEl = document.getElementById("phase-label");
+  const turnDotEl = document.getElementById("turn-dot");
+  const supply1El = document.getElementById("supply-1");
+  const supply2El = document.getElementById("supply-2");
+  const winOverlayEl = document.getElementById("win-overlay");
+  const winDotEl = document.getElementById("win-dot");
+  const winLabelEl = document.getElementById("win-label");
+  const winReasonEl = document.getElementById("win-reason");
+
+  function render() {
+    const { stacks, turn, phase, stepIndex, placedInStep, supply, selected, winner, winReason, winCells, aiThinking } = state;
+
+    let legalTargets = new Set();
+    const aiTurnActive = gameMode === "ai" && turn === AI_PLAYER && !winner;
+    if (!winner && !aiTurnActive) {
+      if (phase === "initial") {
+        RAW_BOARD.forEach(c => { if (isValidInitialPlacementOf(stacks, c.key, turn)) legalTargets.add(c.key); });
+      } else if (selected) {
+        RAW_BOARD.forEach(c => { if (isValidMoveTargetOf(stacks, selected, c.key, turn)) legalTargets.add(c.key); });
+      } else {
+        RAW_BOARD.forEach(c => {
+          const st = stacks[c.key];
+          if (!st || !st.length) { if (supply[turn] > 0) legalTargets.add(c.key); }
+        });
+      }
+    }
+    const winSet = new Set(winCells);
+
+    RAW_BOARD.forEach(c => {
+      const els = cellEls[c.key];
+      const st = stacks[c.key] || [];
+      const height = st.length;
+      const top = height ? st[height - 1] : null;
+      const isSel = selected === c.key;
+      const isLegal = legalTargets.has(c.key);
+      const isWin = winSet.has(c.key);
+
+      let ring = "none";
+      if (isWin) ring = "0 0 0 3px #5fb8b0";
+      else if (isSel) ring = "0 0 0 3px #5fb8b0";
+      else if (isLegal) ring = "0 0 0 2px rgba(95,184,176,.55)";
+
+      els.wrap.style.background = (isLegal && !height) ? "rgba(95,184,176,.14)" : "transparent";
+
+      if (height) {
+        const stoneSize = 24;
+        els.stone.style.display = "block";
+        els.stone.style.width = stoneSize + "px";
+        els.stone.style.height = stoneSize + "px";
+        els.stone.style.background = stoneColor(top);
+        els.stone.style.border = stoneBorder(top);
+        els.stone.style.boxShadow = (ring !== "none" ? ring + ", " : "") + "0 2px 5px rgba(0,0,0,.5)" + (height > 1 ? ", 0 " + (height * 2) + "px 0 -1px rgba(0,0,0,.35)" : "");
+      } else if (isLegal) {
+        els.stone.style.display = "block";
+        els.stone.style.width = "8px";
+        els.stone.style.height = "8px";
+        els.stone.style.background = "rgba(95,184,176,.6)";
+        els.stone.style.border = "none";
+        els.stone.style.boxShadow = "none";
+      } else {
+        els.stone.style.display = "none";
+      }
+
+      if (height > 0) {
+        els.pipsWrap.style.display = "flex";
+        for (let i = 0; i < 3; i++) {
+          const filled = st[i];
+          const pip = els.pips[i];
+          if (filled) {
+            pip.style.background = stoneColor(filled);
+            pip.style.border = "1px solid rgba(255,255,255,.25)";
+          } else {
+            pip.style.background = "transparent";
+            pip.style.border = "1px dashed rgba(255,255,255,.18)";
+          }
+        }
+      } else {
+        els.pipsWrap.style.display = "none";
+      }
+    });
+
+    let phaseLabel;
+    if (aiTurnActive) {
+      phaseLabel = phase === "initial" ? "AI가 배치하는 중..." : "AI가 생각하는 중...";
+    } else if (phase === "initial") {
+      const step = INITIAL_STEPS[stepIndex];
+      phaseLabel = `기본 배치 · ${colorName(step.player)} ${placedInStep + 1}/${step.count}번째 돌 놓는 중`;
+    } else if (winner) {
+      phaseLabel = "게임 종료";
+    } else {
+      phaseLabel = `${colorName(turn)} 차례` + (selected ? " · 이동할 칸을 선택하세요 (다시 누르면 취소)" : " · 돌을 놓거나 자신의 돌을 이동하세요");
+    }
+    phaseLabelEl.textContent = phaseLabel;
+    turnDotEl.style.background = stoneColor(turn);
+    supply1El.textContent = gameMode === "ai" ? `흑(나) ${supply[1]}` : `흑 ${supply[1]}`;
+    supply2El.textContent = gameMode === "ai" ? `백(AI) ${supply[2]}` : `백 ${supply[2]}`;
+
+    boardCardEl.classList.toggle("thinking", aiTurnActive);
+
+    if (winner) {
+      winDotEl.style.background = stoneColor(winner);
+      winLabelEl.textContent = `${colorName(winner)} 승리!`;
+      winReasonEl.textContent = winReason;
+      winOverlayEl.classList.add("show");
+      document.getElementById("rank-register").classList.toggle("hidden", !(gameMode === "ai" && aiDifficulty === "hard"));
+    } else {
+      winOverlayEl.classList.remove("show");
+    }
+  }
+
+  document.getElementById("reset-btn").addEventListener("click", resetGame);
+  document.getElementById("win-restart-btn").addEventListener("click", resetGame);
+
+  render();
+})();
+</script>
+</body>
+</html>
