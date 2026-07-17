@@ -95,7 +95,18 @@
     transition: opacity .15s ease;
   }
   .board-card.thinking { opacity: .78; pointer-events: none; }
-  #board-wrap { position: relative; }
+  #board-scale { position: relative; }
+  #board-wrap { position: relative; transform-origin: top left; }
+
+  @media (max-width: 480px) {
+    #app { padding: 16px 10px 28px; }
+    .col { gap: 12px; }
+    .board-card { padding: 12px; border-radius: 16px; }
+    .header-left .title { font-size: 19px; }
+    .mode-btn { font-size: 11.5px; padding: 6px 10px; }
+    .status-bar { padding: 12px 13px; }
+    .phase-label { font-size: 12.5px; }
+  }
   .cell-wrap {
     position: absolute; transform: translate(-50%,-50%);
     display: flex; align-items: center; justify-content: center;
@@ -192,7 +203,9 @@
     </div>
 
     <div class="board-card">
-      <div id="board-wrap"></div>
+      <div id="board-scale">
+        <div id="board-wrap"></div>
+      </div>
     </div>
 
     <div class="rules-text">
@@ -863,7 +876,24 @@
     cellEls[c.key] = { wrap, stone, pipsWrap, pips: Array.from(pipsWrap.children) };
   });
 
+  const boardScaleEl = document.getElementById("board-scale");
   const boardCardEl = document.querySelector(".board-card");
+
+  function updateBoardScale() {
+    const cardStyle = getComputedStyle(boardCardEl);
+    const padX = parseFloat(cardStyle.paddingLeft) + parseFloat(cardStyle.paddingRight);
+    const available = boardCardEl.parentElement.clientWidth - padX;
+    const scale = Math.min(1, available / BOARD_W);
+    boardWrap.style.transform = `scale(${scale})`;
+    boardScaleEl.style.width = (BOARD_W * scale) + "px";
+    boardScaleEl.style.height = (BOARD_H * scale) + "px";
+  }
+  updateBoardScale();
+  let resizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(updateBoardScale, 100);
+  });
   const phaseLabelEl = document.getElementById("phase-label");
   const turnDotEl = document.getElementById("turn-dot");
   const supply1El = document.getElementById("supply-1");
