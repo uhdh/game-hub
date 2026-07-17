@@ -26,7 +26,7 @@
   }
   .col {
     width: 100%;
-    max-width: 760px;
+    max-width: 1000px;
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -89,7 +89,7 @@
 
   .board-card {
     display: flex; justify-content: center;
-    background: linear-gradient(160deg,#3a332d,#26211d);
+    background: linear-gradient(160deg,#f4e5aa,#ecd996);
     border-radius: 20px; padding: 22px;
     box-shadow: 0 16px 40px rgba(0,0,0,.45);
     border: 1px solid rgba(255,255,255,.05);
@@ -114,8 +114,8 @@
     cursor: pointer; border-radius: 50%;
   }
   .stone { border-radius: 50%; }
-  .pips-wrap { position: absolute; bottom: -2px; right: -2px; display: flex; flex-direction: column-reverse; gap: 1px; }
-  .pip { width: 6px; height: 6px; border-radius: 1px; }
+  .pips-wrap { position: absolute; bottom: -4px; right: -4px; display: flex; flex-direction: column-reverse; gap: 2px; }
+  .pip { width: 13px; height: 13px; border-radius: 2px; }
 
   .rules-text { font-size: 12px; color: #8992a0; line-height: 1.6; padding: 2px 4px; }
 
@@ -171,7 +171,7 @@
     <div class="header-row">
       <div class="header-left">
         <a href="index.html">← 게임 허브</a>
-        <span class="title">3단 오목 <span class="version-tag">v0.1</span></span>
+        <span class="title">3단 오목 <span class="version-tag">v0.2</span></span>
       </div>
       <button class="btn-reset" id="reset-btn">새 게임</button>
     </div>
@@ -239,7 +239,7 @@
       <div class="rank-register-result hidden" id="rank-register-result"></div>
     </div>
 
-    <button class="btn-restart" id="win-restart-btn">새 게임 시작</button>
+    <button class="btn-restart" id="win-close-btn">종료</button>
   </div>
 </div>
 
@@ -247,9 +247,9 @@
 (function () {
   "use strict";
 
-  const SIZE = 32;
-  const PAD = 30;
-  const HIT = 40;
+  const SIZE = 68;
+  const PAD = 44;
+  const HIT = 84;
 
   const NEIGHBOR_DIRS = [
     { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
@@ -302,8 +302,8 @@
 
   function otherPlayer(p) { return p === 1 ? 2 : 1; }
   function colorName(p) { return p === 1 ? "흑돌" : "백돌"; }
-  function stoneColor(p) { return p === 1 ? "#1c1c1c" : "#f0ece2"; }
-  function stoneBorder(p) { return p === 1 ? "1px solid #444" : "1px solid #c9c2b4"; }
+  function stoneColor(p) { return p === 1 ? "#000000" : "#ffffff"; }
+  function stoneBorder(p) { return p === 1 ? "2px solid #f0ece2" : "2px solid #1c1c1c"; }
   function randomInt(n) { return Math.floor(Math.random() * n); }
 
   // ---- 순수 로직 (임의의 stacks 스냅샷에 대해 동작 — AI 시뮬레이션에도 재사용) ----
@@ -582,6 +582,10 @@
     return best;
   }
 
+  function moveIdKey(m) {
+    return m.type === "place" ? "p:" + m.key : "m:" + m.origin + ">" + m.dest;
+  }
+
   function computeAIMainMoveHard() {
     const stacks = state.stacks;
     const supply = state.supply;
@@ -591,7 +595,29 @@
       if (checkWinOf(applyMoveToStacks(stacks, m, AI_PLAYER), AI_PLAYER)) return m;
     }
 
+    // 상대가 다음 수에 이길 수 있는 칸들을 미리 파악해, 그 칸을 막는 수는
+    // 1수 평가 점수가 낮게 나오더라도(=순위 밖으로 밀려도) 반드시 루트 후보에 포함시킨다.
+    // (이걸 안 하면 "내 라인 늘리기"가 점수가 더 높아 보여 방어 수가 빔에서 통째로 잘려나가고,
+    //  정작 탐색 자체가 그 수를 한 번도 못 보는 사고가 난다.)
+    const oppAllMoves = getAllLegalMainMoves(stacks, HUMAN_PLAYER, supply[HUMAN_PLAYER]);
+    const threatCells = new Set();
+    oppAllMoves.forEach(m => {
+      if (checkWinOf(applyMoveToStacks(stacks, m, HUMAN_PLAYER), HUMAN_PLAYER)) {
+        threatCells.add(m.type === "place" ? m.key : m.dest);
+      }
+    });
+
     const rootCandidates = orderedCandidates(stacks, AI_PLAYER, supply, allMoves, true, HARD_ROOT_BEAM);
+    if (threatCells.size) {
+      const included = new Set(rootCandidates.map(moveIdKey));
+      allMoves.forEach(m => {
+        const destKey = m.type === "place" ? m.key : m.dest;
+        if (threatCells.has(destKey) && !included.has(moveIdKey(m))) {
+          rootCandidates.push(m);
+          included.add(moveIdKey(m));
+        }
+      });
+    }
     let bestMove = rootCandidates[0], bestScore = -Infinity;
     let alpha = -Infinity;
     const beta = Infinity;
@@ -943,7 +969,7 @@
     const line = document.createElementNS(SVG_NS, "line");
     line.setAttribute("x1", ln.x1); line.setAttribute("y1", ln.y1);
     line.setAttribute("x2", ln.x2); line.setAttribute("y2", ln.y2);
-    line.setAttribute("stroke", "rgba(255,255,255,.16)");
+    line.setAttribute("stroke", "rgba(120,95,40,.35)");
     line.setAttribute("stroke-width", "1");
     svg.appendChild(line);
   });
@@ -1042,7 +1068,7 @@
       els.wrap.style.background = (isLegal && !height) ? "rgba(95,184,176,.08)" : "transparent";
 
       if (height) {
-        const stoneSize = 24;
+        const stoneSize = 50;
         els.stone.style.display = "block";
         els.stone.style.width = stoneSize + "px";
         els.stone.style.height = stoneSize + "px";
@@ -1051,8 +1077,8 @@
         els.stone.style.boxShadow = (ring !== "none" ? ring + ", " : "") + "0 2px 5px rgba(0,0,0,.5)" + (height > 1 ? ", 0 " + (height * 2) + "px 0 -1px rgba(0,0,0,.35)" : "");
       } else if (isLegal) {
         els.stone.style.display = "block";
-        els.stone.style.width = "8px";
-        els.stone.style.height = "8px";
+        els.stone.style.width = "16px";
+        els.stone.style.height = "16px";
         els.stone.style.background = "rgba(95,184,176,.4)";
         els.stone.style.border = "none";
         els.stone.style.boxShadow = "none";
@@ -1108,7 +1134,9 @@
   }
 
   document.getElementById("reset-btn").addEventListener("click", resetGame);
-  document.getElementById("win-restart-btn").addEventListener("click", resetGame);
+  document.getElementById("win-close-btn").addEventListener("click", () => {
+    winOverlayEl.classList.remove("show");
+  });
 
   render();
 })();
