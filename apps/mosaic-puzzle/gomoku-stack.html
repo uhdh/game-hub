@@ -187,11 +187,11 @@
         <button class="mode-btn" data-diff="hard">상</button>
         <button class="mode-btn" data-diff="extreme">최상</button>
       </div>
-      <button class="mode-btn rank-toggle-btn hidden" id="rank-toggle-btn">🏆 상 난이도 랭킹</button>
+      <button class="mode-btn rank-toggle-btn hidden" id="rank-toggle-btn">🏆 <span id="rank-toggle-label">상</span> 난이도 랭킹</button>
     </div>
 
     <div class="rank-panel hidden" id="rank-panel">
-      <span class="rank-panel-title">상 난이도 레이팅 TOP 10</span>
+      <span class="rank-panel-title"><span id="rank-panel-diff-label">상</span> 난이도 레이팅 TOP 10</span>
       <div class="rank-list" id="rank-list"></div>
     </div>
 
@@ -232,7 +232,7 @@
     <span id="win-reason"></span>
 
     <div class="rank-register hidden" id="rank-register">
-      <span class="rank-register-label">상 난이도 레이팅에 등록하기</span>
+      <span class="rank-register-label"><span id="rank-register-diff-label">상</span> 난이도 레이팅에 등록하기</span>
       <div class="rank-register-row">
         <input type="text" id="rank-nickname-input" placeholder="닉네임" maxlength="12">
         <button class="btn-rank-submit" id="rank-submit-btn">등록</button>
@@ -1160,16 +1160,26 @@
 
   // ---- 모드/난이도 UI ----
 
+  const RANK_CONFIGS = {
+    hard: { table: "gomoku_hard_ranking", nicknameKey: "gomokuHardRankingNickname", aiRating: 1600, label: "상" },
+    extreme: { table: "gomoku_extreme_ranking", nicknameKey: "gomokuExtremeRankingNickname", aiRating: 1900, label: "최상" },
+  };
+
   function updateModeUI() {
     document.querySelectorAll("#mode-group .mode-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === gameMode));
     document.querySelectorAll("#difficulty-group .mode-btn").forEach(b => b.classList.toggle("active", b.dataset.diff === aiDifficulty));
     document.getElementById("difficulty-group").classList.toggle("hidden", gameMode !== "ai");
-    const isHardAI = gameMode === "ai" && aiDifficulty === "hard";
+    const config = gameMode === "ai" ? RANK_CONFIGS[aiDifficulty] : null;
     const rankToggleBtn = document.getElementById("rank-toggle-btn");
-    rankToggleBtn.classList.toggle("hidden", !isHardAI);
-    if (!isHardAI) {
+    rankToggleBtn.classList.toggle("hidden", !config);
+    if (!config) {
       document.getElementById("rank-panel").classList.add("hidden");
       rankToggleBtn.classList.remove("active");
+    } else {
+      document.getElementById("rank-toggle-label").textContent = config.label;
+      document.getElementById("rank-panel-diff-label").textContent = config.label;
+      document.getElementById("rank-register-diff-label").textContent = config.label;
+      document.getElementById("rank-nickname-input").value = localStorage.getItem(config.nicknameKey) || "";
     }
   }
   document.querySelectorAll("#mode-group .mode-btn").forEach(b => {
@@ -1180,20 +1190,21 @@
   });
   updateModeUI();
 
-  // ---- 상 난이도 Elo 레이팅 ----
+  // ---- 상/최상 난이도 Elo 레이팅 ----
 
   const RANK_SUPABASE_URL = "https://paktzmofotvwfdxcpmzv.supabase.co";
   const RANK_SUPABASE_ANON_KEY = "sb_publishable_jWbstEn2pKJTNDxLTR4Jig_asglvzGW";
-  const RANK_TABLE = "gomoku_hard_ranking";
-  const RANK_NICKNAME_KEY = "gomokuHardRankingNickname";
-  const AI_HARD_RATING = 1600;
   const RANK_K_FACTOR = 32;
+
+  function currentRankConfig() {
+    return RANK_CONFIGS[aiDifficulty] || null;
+  }
 
   let rankSubmittedForThisGame = false;
 
-  async function fetchPlayerRating(nickname) {
+  async function fetchPlayerRating(nickname, table) {
     const res = await fetch(
-      `${RANK_SUPABASE_URL}/rest/v1/${RANK_TABLE}?select=nickname,rating,wins,losses&nickname=eq.${encodeURIComponent(nickname)}`,
+      `${RANK_SUPABASE_URL}/rest/v1/${table}?select=nickname,rating,wins,losses&nickname=eq.${encodeURIComponent(nickname)}`,
       { headers: { apikey: RANK_SUPABASE_ANON_KEY, Authorization: `Bearer ${RANK_SUPABASE_ANON_KEY}` } }
     );
     if (!res.ok) throw new Error("레이팅 조회 실패");
@@ -1201,8 +1212,8 @@
     return rows[0] || { nickname, rating: 1000, wins: 0, losses: 0 };
   }
 
-  async function upsertPlayerRating(nickname, rating, wins, losses) {
-    const res = await fetch(`${RANK_SUPABASE_URL}/rest/v1/${RANK_TABLE}?on_conflict=nickname`, {
+  async function upsertPlayerRating(nickname, rating, wins, losses, table) {
+    const res = await fetch(`${RANK_SUPABASE_URL}/rest/v1/${table}?on_conflict=nickname`, {
       method: "POST",
       headers: {
         apikey: RANK_SUPABASE_ANON_KEY,
@@ -1217,9 +1228,9 @@
     return row;
   }
 
-  async function fetchTopRanking() {
+  async function fetchTopRanking(table) {
     const res = await fetch(
-      `${RANK_SUPABASE_URL}/rest/v1/${RANK_TABLE}?select=nickname,rating,wins,losses&order=rating.desc&limit=10`,
+      `${RANK_SUPABASE_URL}/rest/v1/${table}?select=nickname,rating,wins,losses&order=rating.desc&limit=10`,
       { headers: { apikey: RANK_SUPABASE_ANON_KEY, Authorization: `Bearer ${RANK_SUPABASE_ANON_KEY}` } }
     );
     if (!res.ok) throw new Error("랭킹 조회 실패");
@@ -1250,6 +1261,8 @@
   }
 
   document.getElementById("rank-toggle-btn").addEventListener("click", async () => {
+    const config = currentRankConfig();
+    if (!config) return;
     const btn = document.getElementById("rank-toggle-btn");
     const panel = document.getElementById("rank-panel");
     const willShow = panel.classList.contains("hidden");
@@ -1257,17 +1270,16 @@
     btn.classList.toggle("active", willShow);
     if (willShow) {
       try {
-        renderRankList(await fetchTopRanking());
+        renderRankList(await fetchTopRanking(config.table));
       } catch (e) {
         document.getElementById("rank-list").innerHTML = '<div class="rank-empty">랭킹을 불러오지 못했습니다.</div>';
       }
     }
   });
 
-  document.getElementById("rank-nickname-input").value = localStorage.getItem(RANK_NICKNAME_KEY) || "";
-
   async function submitRankResult(nickname) {
-    if (rankSubmittedForThisGame || !state.winner) return;
+    const config = currentRankConfig();
+    if (!config || rankSubmittedForThisGame || !state.winner) return;
     const input = document.getElementById("rank-nickname-input");
     const btn = document.getElementById("rank-submit-btn");
     const resultEl = document.getElementById("rank-register-result");
@@ -1275,21 +1287,21 @@
     input.disabled = true;
     btn.textContent = "등록 중...";
     try {
-      localStorage.setItem(RANK_NICKNAME_KEY, nickname);
-      const current = await fetchPlayerRating(nickname);
+      localStorage.setItem(config.nicknameKey, nickname);
+      const current = await fetchPlayerRating(nickname, config.table);
       const actual = state.winner === HUMAN_PLAYER ? 1 : 0;
-      const expected = 1 / (1 + Math.pow(10, (AI_HARD_RATING - current.rating) / 400));
+      const expected = 1 / (1 + Math.pow(10, (config.aiRating - current.rating) / 400));
       const newRating = Math.round(current.rating + RANK_K_FACTOR * (actual - expected));
       const wins = current.wins + (actual === 1 ? 1 : 0);
       const losses = current.losses + (actual === 0 ? 1 : 0);
-      await upsertPlayerRating(nickname, newRating, wins, losses);
+      await upsertPlayerRating(nickname, newRating, wins, losses, config.table);
       rankSubmittedForThisGame = true;
       const diff = newRating - current.rating;
       resultEl.textContent = `${nickname}님의 레이팅: ${current.rating} → ${newRating} (${diff >= 0 ? "+" : ""}${diff})`;
       resultEl.classList.remove("hidden");
       btn.textContent = "등록 완료";
       if (!document.getElementById("rank-panel").classList.contains("hidden")) {
-        renderRankList(await fetchTopRanking());
+        renderRankList(await fetchTopRanking(config.table));
       }
     } catch (e) {
       resultEl.textContent = "레이팅 등록에 실패했습니다. 잠시 후 다시 시도해주세요.";
@@ -1307,8 +1319,9 @@
 
   // 한 번이라도 등록한 닉네임은 이후 패배(또는 승리)를 건너뛰지 못하도록 게임 종료 시 자동 등록
   function autoSubmitRankIfReturningPlayer() {
-    if (gameMode !== "ai" || aiDifficulty !== "hard" || !state.winner) return;
-    const savedNickname = localStorage.getItem(RANK_NICKNAME_KEY);
+    const config = currentRankConfig();
+    if (gameMode !== "ai" || !config || !state.winner) return;
+    const savedNickname = localStorage.getItem(config.nicknameKey);
     if (!savedNickname) return; // 처음 등록하는 유저는 닉네임 입력을 위해 수동 등록 유지
     submitRankResult(savedNickname);
   }
@@ -1487,7 +1500,7 @@
       winLabelEl.textContent = `${colorName(winner)} 승리!`;
       winReasonEl.textContent = winReason;
       winOverlayEl.classList.add("show");
-      document.getElementById("rank-register").classList.toggle("hidden", !(gameMode === "ai" && aiDifficulty === "hard"));
+      document.getElementById("rank-register").classList.toggle("hidden", !(gameMode === "ai" && !!RANK_CONFIGS[aiDifficulty]));
     } else {
       winOverlayEl.classList.remove("show");
     }
