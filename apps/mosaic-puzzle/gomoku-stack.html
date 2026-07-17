@@ -1036,6 +1036,7 @@
     state = Object.assign({}, state, patch);
     if (gameMode === "ai" && !wasWinner && state.winner) {
       humanIsBlackNext = state.winner === AI_PLAYER; // 패자가 다음 판 흑돌
+      autoSubmitRankIfReturningPlayer();
     }
     render();
     scheduleAIIfNeeded();
@@ -1265,12 +1266,11 @@
 
   document.getElementById("rank-nickname-input").value = localStorage.getItem(RANK_NICKNAME_KEY) || "";
 
-  document.getElementById("rank-submit-btn").addEventListener("click", async () => {
+  async function submitRankResult(nickname) {
     if (rankSubmittedForThisGame || !state.winner) return;
     const input = document.getElementById("rank-nickname-input");
     const btn = document.getElementById("rank-submit-btn");
     const resultEl = document.getElementById("rank-register-result");
-    const nickname = input.value.trim() || "익명";
     btn.disabled = true;
     input.disabled = true;
     btn.textContent = "등록 중...";
@@ -1298,7 +1298,20 @@
       input.disabled = false;
       btn.textContent = "등록";
     }
+  }
+
+  document.getElementById("rank-submit-btn").addEventListener("click", () => {
+    const nickname = document.getElementById("rank-nickname-input").value.trim() || "익명";
+    submitRankResult(nickname);
   });
+
+  // 한 번이라도 등록한 닉네임은 이후 패배(또는 승리)를 건너뛰지 못하도록 게임 종료 시 자동 등록
+  function autoSubmitRankIfReturningPlayer() {
+    if (gameMode !== "ai" || aiDifficulty !== "hard" || !state.winner) return;
+    const savedNickname = localStorage.getItem(RANK_NICKNAME_KEY);
+    if (!savedNickname) return; // 처음 등록하는 유저는 닉네임 입력을 위해 수동 등록 유지
+    submitRankResult(savedNickname);
+  }
 
   // ---- 보드 렌더링 ----
 
