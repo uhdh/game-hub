@@ -20,6 +20,9 @@ export function Header({ phase, coins, onRefill }: HeaderProps) {
         <span className="app-header__subtitle">출구를 골라 베팅하고, 벌레를 출발시키세요</span>
       </div>
       <div className="app-header__controls">
+        <a href="https://game-hub-three-neon.vercel.app/" className="home-btn">
+          홈으로
+        </a>
         <span className="phase-pill">{PHASE_LABEL[phase]}</span>
         <div className="coin-pill">
           <span className="coin-pill__label">코인</span>

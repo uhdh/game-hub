@@ -94,6 +94,21 @@ body {
   cursor: pointer;
 }
 
+.home-btn {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 9px 14px;
+  min-height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-input);
+  color: var(--color-text-muted);
+  text-decoration: none;
+  cursor: pointer;
+}
+
 .app-body {
   width: 100%;
   max-width: 1180px;
@@ -108,19 +123,20 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  --exit-col-width: clamp(50px, 16vw, 100px);
 }
 
 .exit-column {
   position: relative;
-  width: 100px;
-  height: clamp(280px, 90vw, 560px);
+  width: var(--exit-col-width);
+  height: clamp(140px, calc(100vw - 2 * var(--exit-col-width) - 52px), 560px);
   flex-shrink: 0;
 }
 
 .exit-chip {
   position: absolute;
   left: 0;
-  width: 100px;
+  width: var(--exit-col-width);
   min-height: 48px;
   display: flex;
   flex-direction: column;
@@ -155,8 +171,8 @@ body {
 
 .board-stage {
   position: relative;
-  width: clamp(280px, 90vw, 560px);
-  height: clamp(280px, 90vw, 560px);
+  width: clamp(140px, calc(100vw - 2 * var(--exit-col-width) - 52px), 560px);
+  height: clamp(140px, calc(100vw - 2 * var(--exit-col-width) - 52px), 560px);
   border-radius: var(--radius-md);
   overflow: hidden;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
