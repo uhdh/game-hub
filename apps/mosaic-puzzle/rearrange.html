@@ -75,6 +75,13 @@
   #hint { text-align: center; font-size: 12px; color: #8992a0; }
   #optimal-path { text-align: center; font-size: 12.5px; color: #e7ebee; min-height: 16px; word-break: break-all; }
 
+  #nickname-row { display: flex; align-items: center; gap: 8px; }
+  #nickname-row label { font-size: 12.5px; color: #8992a0; flex-shrink: 0; }
+  #nickname-input {
+    flex: 1; min-width: 0; font-size: 14px; font-weight: 600; padding: 10px 12px; min-height: 40px;
+    border-radius: 10px; border: 1px solid rgba(255,255,255,.12); background: #1c2024; color: #e7ebee;
+  }
+  #nickname-input::placeholder { color: #565c66; font-weight: 500; }
   #action-row { display: flex; justify-content: center; gap: 10px; }
   .btn {
     font-size: 14px; font-weight: 600; padding: 12px 22px; min-height: 44px;
@@ -104,9 +111,10 @@
   #leaderboard-list { display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto; }
   .lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06); }
   .lb-row.new { background: rgba(95,184,176,.16); border-color: #5fb8b0; }
-  .lb-rank { font-size: 12px; font-weight: 700; color: #8992a0; width: 18px; text-align: center; }
-  .lb-score { flex: 1; font-size: 14px; font-weight: 700; color: #e7ebee; font-variant-numeric: tabular-nums; }
-  .lb-date { font-size: 11px; color: #8992a0; }
+  .lb-rank { font-size: 12px; font-weight: 700; color: #8992a0; width: 18px; text-align: center; flex-shrink: 0; }
+  .lb-nickname { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; color: #e7ebee; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb-score { flex-shrink: 0; font-size: 14px; font-weight: 700; color: #e7ebee; font-variant-numeric: tabular-nums; }
+  .lb-date { flex-shrink: 0; font-size: 11px; color: #8992a0; }
 </style>
 </head>
 <body>
@@ -127,6 +135,11 @@
     <div id="board-wrap"><div id="board"></div></div>
     <div id="hint">빈칸과 상하좌우로 맞닿은 타일을 클릭하면 그 자리로 이동합니다.</div>
     <div id="optimal-path"></div>
+
+    <div id="nickname-row">
+      <label for="nickname-input">닉네임</label>
+      <input id="nickname-input" type="text" placeholder="리더보드에 표시할 이름" maxlength="12">
+    </div>
 
     <div id="action-row">
       <button class="btn btn-primary" id="register-btn">점수 등록</button>
@@ -159,6 +172,7 @@
   const SUPABASE_URL = "https://paktzmofotvwfdxcpmzv.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_jWbstEn2pKJTNDxLTR4Jig_asglvzGW";
   const SUPABASE_TABLE = "rearrange_leaderboard";
+  const NICKNAME_KEY = "rearrangeNickname";
 
   const BOARDS = {
     "최연청": [
@@ -211,14 +225,14 @@
 
   async function fetchLeaderboard() {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?select=id,score,created_at&board=eq.${encodeURIComponent(currentBoardName)}&order=score.desc,created_at.asc&limit=10`,
+      `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?select=id,score,nickname,created_at&board=eq.${encodeURIComponent(currentBoardName)}&order=score.desc,created_at.asc&limit=10`,
       { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
     );
     if (!res.ok) throw new Error("리더보드 조회 실패");
     const rows = await res.json();
-    return rows.map(r => ({ id: r.id, score: r.score, ts: new Date(r.created_at).getTime() }));
+    return rows.map(r => ({ id: r.id, score: r.score, nickname: r.nickname, ts: new Date(r.created_at).getTime() }));
   }
-  async function submitScore(score) {
+  async function submitScore(score, nickname) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}`, {
       method: "POST",
       headers: {
@@ -227,11 +241,11 @@
         "Content-Type": "application/json",
         Prefer: "return=representation"
       },
-      body: JSON.stringify({ score, board: currentBoardName })
+      body: JSON.stringify({ score, board: currentBoardName, nickname })
     });
     if (!res.ok) throw new Error("점수 등록 실패");
     const [row] = await res.json();
-    return { id: row.id, score: row.score, ts: new Date(row.created_at).getTime() };
+    return { id: row.id, score: row.score, nickname: row.nickname, ts: new Date(row.created_at).getTime() };
   }
   function formatTs(ts) {
     const d = new Date(ts);
@@ -436,11 +450,14 @@
 
   async function registerScore() {
     const result = computeScore();
+    const nicknameInput = document.getElementById("nickname-input");
+    const nickname = nicknameInput.value.trim() || "익명";
+    localStorage.setItem(NICKNAME_KEY, nickname);
     const btn = document.getElementById("register-btn");
     btn.disabled = true;
     btn.textContent = "등록 중...";
     try {
-      const entry = await submitScore(result.total);
+      const entry = await submitScore(result.total, nickname);
       justAddedId = entry.id;
       const lb = await fetchLeaderboard();
       renderModal(result, lb);
@@ -549,6 +566,9 @@
       const rank = document.createElement("span");
       rank.className = "lb-rank";
       rank.textContent = i + 1;
+      const nickname = document.createElement("span");
+      nickname.className = "lb-nickname";
+      nickname.textContent = e.nickname || "익명";
       const score = document.createElement("span");
       score.className = "lb-score";
       score.textContent = e.score + "점";
@@ -556,6 +576,7 @@
       date.className = "lb-date";
       date.textContent = formatTs(e.ts);
       row.appendChild(rank);
+      row.appendChild(nickname);
       row.appendChild(score);
       row.appendChild(date);
       list.appendChild(row);
@@ -572,6 +593,8 @@
   document.getElementById("optimal-btn").addEventListener("click", showOptimal);
   document.getElementById("restart-btn").addEventListener("click", resetGame);
   document.getElementById("modal-restart-btn").addEventListener("click", resetGame);
+
+  document.getElementById("nickname-input").value = localStorage.getItem(NICKNAME_KEY) || "";
 
   resetGame();
 })();
