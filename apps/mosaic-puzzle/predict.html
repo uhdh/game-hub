@@ -129,20 +129,21 @@
   }
   .team-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 9px;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 7px;
   }
 
   .pick-card {
     display: flex;
-    align-items: center;
-    gap: 11px;
+    flex-direction: column;
+    align-items: stretch;
     background: var(--panel);
     border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 13px 14px;
+    border-radius: 12px;
+    padding: 0;
+    overflow: hidden;
     cursor: pointer;
-    text-align: left;
+    text-align: center;
     transition: border-color .12s ease, background .12s ease, transform .12s ease;
   }
   .pick-card:hover { border-color: rgba(95,184,176,.5); transform: translateY(-1px); }
@@ -153,25 +154,62 @@
   }
   .pick-card.eliminated {
     cursor: not-allowed;
-    opacity: .45;
+    opacity: .55;
   }
   .pick-card.eliminated:hover { transform: none; border-color: var(--border); }
   .pick-card.eliminated .pick-name { text-decoration: line-through; }
 
-  .pick-dot {
+  .avatar {
+    position: relative;
     flex: 0 0 auto;
-    width: 10px; height: 10px;
-    border-radius: 50%;
-    background: var(--team-color, var(--accent));
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--team-color, var(--accent)) 22%, transparent);
+    overflow: hidden;
+    background: var(--panel-light);
+    border: 1px solid var(--border-strong);
   }
-  .pick-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-  .pick-name { font-size: 15px; font-weight: 700; color: var(--text); }
-  .pick-meta { font-size: 11.5px; font-weight: 600; color: #f0a89f; }
+  .pick-card .avatar {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    border-radius: 0;
+    border: none;
+    border-bottom: 2px solid color-mix(in srgb, var(--team-color, var(--accent)) 55%, var(--border-strong));
+  }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .avatar-46 { width: 46px; height: 46px; border-radius: 12px; }
+  .avatar-x {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(10,6,6,.45);
+  }
+  .avatar-x::before, .avatar-x::after {
+    content: "";
+    position: absolute;
+    width: 130%; height: 3px;
+    background: #ff4d4d;
+    box-shadow: 0 0 4px rgba(255,77,77,.7);
+    top: 50%; left: 50%;
+  }
+  .avatar-x::before { transform: translate(-50%,-50%) rotate(45deg); }
+  .avatar-x::after { transform: translate(-50%,-50%) rotate(-45deg); }
+
+  .pick-info {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 7px 4px 9px;
+  }
+  .pick-name { font-size: 12.5px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .pick-meta { font-size: 10px; font-weight: 600; color: #f0a89f; }
   .selected-check {
-    flex: 0 0 auto;
-    color: var(--accent);
-    font-size: 16px;
+    position: absolute;
+    top: 5px; right: 5px;
+    width: 20px; height: 20px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #0b0c0f;
+    font-size: 12px;
     font-weight: 900;
   }
 
@@ -197,6 +235,29 @@
   .result-rank.gold { color: var(--gold); font-size: 18px; }
   .result-rank.silver { color: var(--silver); font-size: 18px; }
   .result-rank.bronze { color: var(--bronze); font-size: 18px; }
+
+  .avatar-54 { width: 54px; height: 54px; border-radius: 12px; }
+  .avatar-badge {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 0;
+    padding: 3px 2px 4px;
+    background: linear-gradient(180deg, rgba(11,12,15,0) 0%, rgba(11,12,15,.92) 45%);
+    text-align: center;
+  }
+  .avatar-badge .odds {
+    font-size: 11.5px;
+    font-weight: 800;
+    color: #ffd166;
+    line-height: 1.15;
+  }
+  .avatar-badge .pct {
+    font-size: 9px;
+    font-weight: 700;
+    color: #f7f9fb;
+    line-height: 1.15;
+  }
+
   .result-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
   .result-top {
     display: flex;
@@ -285,6 +346,10 @@
       teamColor: team.color,
     }))
   );
+
+  function photoUrl(name) {
+    return `./assets/contestants/${encodeURIComponent(name)}.jpg`;
+  }
 
   // 탈락자 목록은 admin.html에서 관리하는 eliminations 테이블에서 매번 불러옴
   let ELIMINATED_MAP = new Map();
@@ -385,12 +450,15 @@
         card.disabled = !!eliminatedWeek;
         card.style.setProperty("--team-color", team.color);
         card.innerHTML = `
-          <span class="pick-dot"></span>
+          <div class="avatar">
+            <img src="${photoUrl(name)}" alt="${name}" loading="lazy">
+            ${eliminatedWeek ? '<div class="avatar-x"></div>' : ""}
+            ${isSelected ? '<span class="selected-check">✓</span>' : ""}
+          </div>
           <span class="pick-info">
             <span class="pick-name">${name}</span>
             ${eliminatedWeek ? `<span class="pick-meta">${eliminatedWeek}주차 탈락</span>` : ""}
           </span>
-          ${isSelected ? '<span class="selected-check">✓</span>' : ""}
         `;
         if (!eliminatedWeek) {
           card.addEventListener("click", () => onPick(key, name));
@@ -417,15 +485,28 @@
       .sort((a, b) => b.count - a.count);
 
     const maxCount = Math.max(1, ranked[0] ? ranked[0].count : 0);
+    const totalVotes = votes.length;
 
     const list = document.getElementById("results");
     list.innerHTML = "";
     ranked.forEach((p, idx) => {
       const medal = idx < 3 && p.count > 0 ? RANK_MEDAL[idx] : "";
+      const pct = totalVotes > 0 ? (p.count / totalVotes) * 100 : 0;
+      const odds = totalVotes > 0 && p.count > 0 ? totalVotes / p.count : null;
+      const pctText = totalVotes > 0 ? `${pct.toFixed(0)}%` : "-%";
+      const oddsText = odds !== null ? `${odds.toFixed(1)}배` : "-배";
       const row = document.createElement("div");
       row.className = "result-row" + (p.key === selectedKey ? " mine" : "");
       row.innerHTML = `
         <span class="result-rank${medal ? ` ${medal}` : ""}">${medal ? "●" : idx + 1}</span>
+        <div class="avatar avatar-54">
+          <img src="${photoUrl(p.name)}" alt="${p.name}" loading="lazy">
+          ${ELIMINATED_MAP.has(p.key) ? '<div class="avatar-x"></div>' : ""}
+          <div class="avatar-badge">
+            <span class="odds">${oddsText}</span>
+            <span class="pct">${p.count}표 · ${pctText}</span>
+          </div>
+        </div>
         <div class="result-main">
           <div class="result-top">
             <span class="result-name">${p.name}${p.key === selectedKey ? '<span class="mine-tag">내 예측</span>' : ""}</span>
