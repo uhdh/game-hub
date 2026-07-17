@@ -264,6 +264,7 @@
   const SUPABASE_URL = "https://paktzmofotvwfdxcpmzv.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_jWbstEn2pKJTNDxLTR4Jig_asglvzGW";
   const SUPABASE_TABLE = "winner_votes";
+  const ELIMINATIONS_TABLE = "eliminations";
   const VOTER_ID_KEY = "bloodGameXVoterId";
   const MY_PICK_KEY = "bloodGameXMyPick";
 
@@ -275,9 +276,6 @@
     { key: "R", label: "R팀", color: "#cc5de8", members: ["곽범", "이관희", "신승용", "최연청"] },
   ];
 
-  // 탈락자 목록 — 매주 갱신: { key: "팀키-이름", week: 탈락 주차 }
-  const ELIMINATED = [];
-
   const PARTICIPANTS = TEAMS.flatMap(team =>
     team.members.map(name => ({
       key: `${team.key}-${name}`,
@@ -287,7 +285,19 @@
       teamColor: team.color,
     }))
   );
-  const ELIMINATED_MAP = new Map(ELIMINATED.map(e => [e.key, e.week]));
+
+  // 탈락자 목록은 admin.html에서 관리하는 eliminations 테이블에서 매번 불러옴
+  let ELIMINATED_MAP = new Map();
+
+  async function fetchEliminations() {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${ELIMINATIONS_TABLE}?select=participant_key,week`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) throw new Error("탈락자 목록 조회 실패");
+    const rows = await res.json();
+    ELIMINATED_MAP = new Map(rows.map(r => [r.participant_key, r.week]));
+  }
 
   function getVoterId() {
     let id = localStorage.getItem(VOTER_ID_KEY);
@@ -452,6 +462,11 @@
   }
 
   async function init() {
+    try {
+      await fetchEliminations();
+    } catch (err) {
+      // 탈락자 목록을 못 불러와도 투표 자체는 계속 가능하게 둠
+    }
     let selectedKey = getMyPick();
     if (selectedKey && ELIMINATED_MAP.has(selectedKey)) {
       const p = PARTICIPANTS.find(p => p.key === selectedKey);
