@@ -563,6 +563,7 @@
     winReason: "",
     winCells: [],
     aiThinking: false,
+    lastCell: null,
   };
 
   function setState(patch) {
@@ -608,13 +609,14 @@
           turn = INITIAL_STEPS[stepIndex].player;
         }
       }
-      setState({ stacks, supply, stepIndex, placedInStep, phase, turn });
+      setState({ stacks, supply, stepIndex, placedInStep, phase, turn, lastCell: move.key });
       return;
     }
     const stacks = applyMoveToStacks(state.stacks, move, player);
     const supply = move.type === "place" ? Object.assign({}, state.supply, { [player]: state.supply[player] - 1 }) : state.supply;
     const win = checkWinOf(stacks, player);
-    setState({ stacks, supply, selected: null, turn: win ? state.turn : otherPlayer(player), winner: win ? player : null, winReason: win ? win.reason : "", winCells: win ? win.cells : [] });
+    const lastCell = move.type === "place" ? move.key : move.dest;
+    setState({ stacks, supply, selected: null, turn: win ? state.turn : otherPlayer(player), winner: win ? player : null, winReason: win ? win.reason : "", winCells: win ? win.cells : [], lastCell });
   }
 
   function onCellClick(key) {
@@ -639,7 +641,7 @@
           turn = INITIAL_STEPS[stepIndex].player;
         }
       }
-      setState({ stacks, supply, stepIndex, placedInStep, phase, turn });
+      setState({ stacks, supply, stepIndex, placedInStep, phase, turn, lastCell: key });
       return;
     }
 
@@ -650,7 +652,7 @@
       if (isValidMoveTargetOf(state.stacks, origin, key, player)) {
         const stacks = moveStoneOf(state.stacks, origin, key, player);
         const win = checkWinOf(stacks, player);
-        setState({ stacks, selected: null, turn: win ? state.turn : otherPlayer(player), winner: win ? player : null, winReason: win ? win.reason : "", winCells: win ? win.cells : [] });
+        setState({ stacks, selected: null, turn: win ? state.turn : otherPlayer(player), winner: win ? player : null, winReason: win ? win.reason : "", winCells: win ? win.cells : [], lastCell: key });
       } else if (topColorOf(state.stacks, key) === player) {
         setState({ selected: key });
       } else {
@@ -664,7 +666,7 @@
       const stacks = placeStoneOf(state.stacks, key, player);
       const supply = Object.assign({}, state.supply, { [player]: state.supply[player] - 1 });
       const win = checkWinOf(stacks, player);
-      setState({ stacks, supply, turn: win ? state.turn : otherPlayer(player), winner: win ? player : null, winReason: win ? win.reason : "", winCells: win ? win.cells : [] });
+      setState({ stacks, supply, turn: win ? state.turn : otherPlayer(player), winner: win ? player : null, winReason: win ? win.reason : "", winCells: win ? win.cells : [], lastCell: key });
     } else if (topColorOf(state.stacks, key) === player) {
       setState({ selected: key });
     }
@@ -679,7 +681,7 @@
     document.getElementById("rank-submit-btn").textContent = "등록";
     setState({
       stacks: {}, turn: 1, phase: "initial", stepIndex: 0, placedInStep: 0,
-      supply: { 1: 25, 2: 25 }, selected: null, winner: null, winReason: "", winCells: [], aiThinking: false,
+      supply: { 1: 25, 2: 25 }, selected: null, winner: null, winReason: "", winCells: [], aiThinking: false, lastCell: null,
     });
   }
 
@@ -904,7 +906,7 @@
   const winReasonEl = document.getElementById("win-reason");
 
   function render() {
-    const { stacks, turn, phase, stepIndex, placedInStep, supply, selected, winner, winReason, winCells, aiThinking } = state;
+    const { stacks, turn, phase, stepIndex, placedInStep, supply, selected, winner, winReason, winCells, aiThinking, lastCell } = state;
 
     let legalTargets = new Set();
     const aiTurnActive = gameMode === "ai" && turn === AI_PLAYER && !winner;
@@ -930,13 +932,15 @@
       const isSel = selected === c.key;
       const isLegal = legalTargets.has(c.key);
       const isWin = winSet.has(c.key);
+      const isLast = lastCell === c.key;
 
       let ring = "none";
       if (isWin) ring = "0 0 0 3px #5fb8b0";
       else if (isSel) ring = "0 0 0 3px #5fb8b0";
-      else if (isLegal) ring = "0 0 0 2px rgba(95,184,176,.55)";
+      else if (isLast) ring = "0 0 0 2px #ffd166";
+      else if (isLegal) ring = "0 0 0 2px rgba(95,184,176,.32)";
 
-      els.wrap.style.background = (isLegal && !height) ? "rgba(95,184,176,.14)" : "transparent";
+      els.wrap.style.background = (isLegal && !height) ? "rgba(95,184,176,.08)" : "transparent";
 
       if (height) {
         const stoneSize = 24;
@@ -950,7 +954,7 @@
         els.stone.style.display = "block";
         els.stone.style.width = "8px";
         els.stone.style.height = "8px";
-        els.stone.style.background = "rgba(95,184,176,.6)";
+        els.stone.style.background = "rgba(95,184,176,.4)";
         els.stone.style.border = "none";
         els.stone.style.boxShadow = "none";
       } else {
