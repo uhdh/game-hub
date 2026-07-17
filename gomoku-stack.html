@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>3단 오목 - 피의 게임 X 시뮬레이터</title>
-<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="icon" type="image/png" href="assets/gomoku-favicon.png">
 <style>
   * { box-sizing: border-box; }
   html, body {
@@ -36,6 +36,7 @@
   .header-left { display: flex; flex-direction: column; gap: 2px; }
   .header-left a { font-size: 12px; font-weight: 600; }
   .header-left .title { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+  .version-tag { font-size: 11px; font-weight: 700; color: #8992a0; vertical-align: middle; }
   .btn-reset {
     background: #15181c; border: 1px solid rgba(255,255,255,.1); color: #c7ccd4;
     font-size: 13px; font-weight: 600; padding: 9px 14px; border-radius: 10px; cursor: pointer;
@@ -170,7 +171,7 @@
     <div class="header-row">
       <div class="header-left">
         <a href="index.html">← 게임 허브</a>
-        <span class="title">3단 오목</span>
+        <span class="title">3단 오목 <span class="version-tag">v0.1</span></span>
       </div>
       <button class="btn-reset" id="reset-btn">새 게임</button>
     </div>
@@ -296,8 +297,8 @@
     { player: 1, count: 2 }, { player: 2, count: 1 },
   ];
 
-  const HUMAN_PLAYER = 1;
-  const AI_PLAYER = 2;
+  let HUMAN_PLAYER = 1;
+  let AI_PLAYER = 2;
 
   function otherPlayer(p) { return p === 1 ? 2 : 1; }
   function colorName(p) { return p === 1 ? "흑돌" : "백돌"; }
@@ -482,13 +483,125 @@
   function computeAIInitialMove() {
     const candidates = RAW_BOARD.filter(c => isValidInitialPlacementOf(state.stacks, c.key, AI_PLAYER));
     if (aiDifficulty === "easy") return { type: "place", key: candidates[randomInt(candidates.length)].key };
-    const noiseAmp = aiDifficulty === "medium" ? 3 : 0.6;
+    if (aiDifficulty === "hard") {
+      let best = candidates[0], bestScore = -Infinity;
+      candidates.forEach(c => {
+        const result = placeStoneOf(state.stacks, c.key, AI_PLAYER);
+        const centerBias = -Math.max(Math.abs(c.q), Math.abs(c.r), Math.abs(c.s)) * 0.5;
+        const score = evaluatePosition(result, AI_PLAYER) + centerBias;
+        if (score > bestScore) { bestScore = score; best = c; }
+      });
+      return { type: "place", key: best.key };
+    }
+    const noiseAmp = 3;
     let best = null, bestScore = -Infinity;
     candidates.forEach(c => {
       const score = -Math.max(Math.abs(c.q), Math.abs(c.r), Math.abs(c.s)) + Math.random() * noiseAmp;
       if (score > bestScore) { bestScore = score; best = c; }
     });
     return { type: "place", key: best.key };
+  }
+
+  // ---- 상 난이도: 알파-베타 미니맥스 탐색 ----
+
+  const HARD_ROOT_BEAM = 16;   // 루트에서 검토하는 후보 수 (전체 합법수 기준 1수 평가로 추림)
+  const HARD_INNER_BEAM = 8;   // 탐색 도중 각 노드에서 검토하는 후보 수
+  const HARD_SEARCH_PLIES = 3; // 루트 수 이후 추가로 내다보는 수 (상대→나→상대)
+  const HARD_NEAR_RADIUS = 2;  // 탐색용 후보 수를 기존 돌 주변으로 제한하는 반경
+
+  function isNearAnyStone(stacks, key, radius) {
+    const c = BOARD_MAP[key];
+    for (const k in stacks) {
+      if (!stacks[k] || !stacks[k].length) continue;
+      const c2 = BOARD_MAP[k];
+      if (Math.max(Math.abs(c.q - c2.q), Math.abs(c.r - c2.r), Math.abs(c.s - c2.s)) <= radius) return true;
+    }
+    return false;
+  }
+
+  // 탐색 내부용: 관련 없는(기존 돌과 멀리 떨어진) 배치 후보는 제외해 비용을 줄인다
+  function getSearchMoves(stacks, player, supply) {
+    const moves = [];
+    if (supply > 0) {
+      RAW_BOARD.forEach(c => {
+        const st = stacks[c.key];
+        if (st && st.length) return;
+        if (isNearAnyStone(stacks, c.key, HARD_NEAR_RADIUS)) moves.push({ type: "place", key: c.key });
+      });
+    }
+    RAW_BOARD.forEach(c => {
+      if (topColorOf(stacks, c.key) !== player) return;
+      neighbors(c.key).forEach(n => {
+        if (isValidMoveTargetOf(stacks, c.key, n.key, player)) moves.push({ type: "move", origin: c.key, dest: n.key });
+      });
+    });
+    return moves;
+  }
+
+  function applyMoveWithSupply(stacks, supply, move, player) {
+    const nextStacks = applyMoveToStacks(stacks, move, player);
+    const nextSupply = move.type === "place" ? Object.assign({}, supply, { [player]: supply[player] - 1 }) : supply;
+    return { stacks: nextStacks, supply: nextSupply };
+  }
+
+  function orderedCandidates(stacks, player, supply, moves, isMaximizing, limit) {
+    const scored = moves.map(m => ({ m, s: evaluatePosition(applyMoveToStacks(stacks, m, player), AI_PLAYER) }));
+    scored.sort((a, b) => (isMaximizing ? b.s - a.s : a.s - b.s));
+    return scored.slice(0, limit).map(o => o.m);
+  }
+
+  function minimax(stacks, supply, ply, isMaximizing, alpha, beta) {
+    if (checkWinOf(stacks, AI_PLAYER)) return 1e7 + ply;
+    if (checkWinOf(stacks, HUMAN_PLAYER)) return -1e7 - ply;
+    if (ply === 0) return evaluatePosition(stacks, AI_PLAYER);
+
+    const player = isMaximizing ? AI_PLAYER : HUMAN_PLAYER;
+    const rawMoves = getSearchMoves(stacks, player, supply[player]);
+    if (!rawMoves.length) return evaluatePosition(stacks, AI_PLAYER);
+    const moves = orderedCandidates(stacks, player, supply, rawMoves, isMaximizing, HARD_INNER_BEAM);
+
+    if (isMaximizing) {
+      let best = -Infinity;
+      for (const m of moves) {
+        const { stacks: ns, supply: nsup } = applyMoveWithSupply(stacks, supply, m, player);
+        const val = minimax(ns, nsup, ply - 1, false, alpha, beta);
+        if (val > best) best = val;
+        if (best > alpha) alpha = best;
+        if (alpha >= beta) break;
+      }
+      return best;
+    }
+    let best = Infinity;
+    for (const m of moves) {
+      const { stacks: ns, supply: nsup } = applyMoveWithSupply(stacks, supply, m, player);
+      const val = minimax(ns, nsup, ply - 1, true, alpha, beta);
+      if (val < best) best = val;
+      if (best < beta) beta = best;
+      if (alpha >= beta) break;
+    }
+    return best;
+  }
+
+  function computeAIMainMoveHard() {
+    const stacks = state.stacks;
+    const supply = state.supply;
+    const allMoves = getAllLegalMainMoves(stacks, AI_PLAYER, supply[AI_PLAYER]);
+
+    for (const m of allMoves) {
+      if (checkWinOf(applyMoveToStacks(stacks, m, AI_PLAYER), AI_PLAYER)) return m;
+    }
+
+    const rootCandidates = orderedCandidates(stacks, AI_PLAYER, supply, allMoves, true, HARD_ROOT_BEAM);
+    let bestMove = rootCandidates[0], bestScore = -Infinity;
+    let alpha = -Infinity;
+    const beta = Infinity;
+    for (const m of rootCandidates) {
+      const { stacks: ns, supply: nsup } = applyMoveWithSupply(stacks, supply, m, AI_PLAYER);
+      const val = minimax(ns, nsup, HARD_SEARCH_PLIES, false, alpha, beta);
+      if (val > bestScore) { bestScore = val; bestMove = m; }
+      if (bestScore > alpha) alpha = bestScore;
+    }
+    return bestMove;
   }
 
   function computeAIMainMove() {
@@ -517,28 +630,7 @@
       return scored[0].m;
     }
 
-    // hard: 상대가 다음 수에 이길 수 없는 "안전한" 수만 우선 고려
-    const safeMoves = moves.filter(m => {
-      const afterAI = applyMoveToStacks(stacks, m, AI_PLAYER);
-      const oppMovesAfter = getAllLegalMainMoves(afterAI, HUMAN_PLAYER, state.supply[HUMAN_PLAYER]);
-      return !oppMovesAfter.some(om => checkWinOf(applyMoveToStacks(afterAI, om, HUMAN_PLAYER), HUMAN_PLAYER));
-    });
-    const pool = safeMoves.length ? safeMoves : moves;
-    const scored = pool.map(m => ({ m, result: applyMoveToStacks(stacks, m, AI_PLAYER) }));
-    scored.forEach(o => { o.s1 = evaluatePosition(o.result, AI_PLAYER); });
-    scored.sort((a, b) => b.s1 - a.s1);
-    const top = scored.slice(0, 8);
-    top.forEach(o => {
-      const opp2 = getAllLegalMainMoves(o.result, HUMAN_PLAYER, state.supply[HUMAN_PLAYER]);
-      let worst = Infinity;
-      opp2.forEach(om => {
-        const s2 = evaluatePosition(applyMoveToStacks(o.result, om, HUMAN_PLAYER), AI_PLAYER);
-        if (s2 < worst) worst = s2;
-      });
-      o.final = opp2.length ? worst : o.s1;
-    });
-    top.sort((a, b) => b.final - a.final);
-    return top[0].m;
+    return computeAIMainMoveHard();
   }
 
   function computeAIMove() {
@@ -547,9 +639,10 @@
 
   // ---- 게임 상태 ----
 
-  let gameMode = "2p"; // "2p" | "ai"
-  let aiDifficulty = "medium"; // "easy" | "medium" | "hard"
+  let gameMode = "ai"; // "2p" | "ai"
+  let aiDifficulty = "hard"; // "easy" | "medium" | "hard"
   let gameEpoch = 0;
+  let humanIsBlackNext = true; // AI 대결: 첫 판은 유저가 흑돌, 이후엔 진 사람이 흑돌
 
   let state = {
     stacks: {},
@@ -567,7 +660,11 @@
   };
 
   function setState(patch) {
+    const wasWinner = state.winner;
     state = Object.assign({}, state, patch);
+    if (gameMode === "ai" && !wasWinner && state.winner) {
+      humanIsBlackNext = state.winner === AI_PLAYER; // 패자가 다음 판 흑돌
+    }
     render();
     scheduleAIIfNeeded();
   }
@@ -679,6 +776,8 @@
     document.getElementById("rank-nickname-input").disabled = false;
     document.getElementById("rank-submit-btn").disabled = false;
     document.getElementById("rank-submit-btn").textContent = "등록";
+    HUMAN_PLAYER = humanIsBlackNext ? 1 : 2;
+    AI_PLAYER = otherPlayer(HUMAN_PLAYER);
     setState({
       stacks: {}, turn: 1, phase: "initial", stepIndex: 0, placedInStep: 0,
       supply: { 1: 25, 2: 25 }, selected: null, winner: null, winReason: "", winCells: [], aiThinking: false, lastCell: null,
@@ -992,8 +1091,8 @@
     }
     phaseLabelEl.textContent = phaseLabel;
     turnDotEl.style.background = stoneColor(turn);
-    supply1El.textContent = gameMode === "ai" ? `흑(나) ${supply[1]}` : `흑 ${supply[1]}`;
-    supply2El.textContent = gameMode === "ai" ? `백(AI) ${supply[2]}` : `백 ${supply[2]}`;
+    supply1El.textContent = gameMode === "ai" ? `흑${HUMAN_PLAYER === 1 ? "(나)" : "(AI)"} ${supply[1]}` : `흑 ${supply[1]}`;
+    supply2El.textContent = gameMode === "ai" ? `백${HUMAN_PLAYER === 2 ? "(나)" : "(AI)"} ${supply[2]}` : `백 ${supply[2]}`;
 
     boardCardEl.classList.toggle("thinking", aiTurnActive);
 
