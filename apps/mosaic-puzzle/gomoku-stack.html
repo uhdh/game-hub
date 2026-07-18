@@ -65,6 +65,7 @@
   }
   .mode-btn.active { background: rgba(95,184,176,.16); color: #e7ebee; }
   .mode-btn.hidden { display: none; }
+  .mode-btn:disabled { opacity: .35; cursor: default; }
   .rank-toggle-btn {
     background: #15181c; border: 1px solid rgba(255,255,255,.06); border-radius: 12px; padding: 9px 14px;
   }
@@ -161,6 +162,9 @@
     margin-top: 6px; background: #5fb8b0; color: #0f1214; font-size: 14px; font-weight: 700;
     border: none; padding: 11px 22px; border-radius: 10px; cursor: pointer; width: 100%;
   }
+  .btn-restart.hidden { display: none; }
+  .btn-restart.secondary { background: #15181c; color: #c7ccd4; border: 1px solid rgba(255,255,255,.1); }
+  #ai-vs-ai-controls.hidden { display: none; }
 
   .rank-register { width: 100%; display: flex; flex-direction: column; gap: 8px; }
   .rank-register.hidden { display: none; }
@@ -207,6 +211,14 @@
         <button class="mode-btn" data-diff="extreme">최상</button>
       </div>
       <button class="mode-btn rank-toggle-btn hidden" id="rank-toggle-btn">🏆 <span id="rank-toggle-label">상</span> 난이도 랭킹</button>
+    </div>
+
+    <div class="mode-bar hidden" id="ai-vs-ai-controls">
+      <div class="mode-group">
+        <button class="mode-btn" id="aivsai-rewind-btn">◀ 되감기</button>
+        <button class="mode-btn" id="aivsai-autoplay-btn">⏸ 자동재생</button>
+        <button class="mode-btn" id="aivsai-step-btn">재생 ▶</button>
+      </div>
     </div>
 
     <div class="rank-panel hidden" id="rank-panel">
@@ -263,6 +275,7 @@
 
     <span class="undo-rank-note hidden" id="undo-rank-note">무르기를 사용해 이번 판 결과는 랭킹에 등록할 수 없습니다.</span>
 
+    <button class="btn-restart secondary hidden" id="win-replay-btn">처음부터 다시보기</button>
     <button class="btn-restart" id="win-close-btn">종료</button>
   </div>
 </div>
@@ -1121,6 +1134,12 @@
   let moveLog = []; // 기보 기록용: history와 항상 1:1로 push/pop되는 수순 목록
   let winOverlayReady = false; // 승리 직후 마지막 수를 잠깐 보여준 뒤에만 true가 됨(승리 팝업 표시 여부)
 
+  // ---- AI vs AI 재생 컨트롤 ----
+  // history/undoMove와 달리 되감기해도 아무것도 지우지 않는다(스크러빙 전용).
+  let aiVsAiSnapshots = []; // 매 수 직후 전체 state 스냅샷, append-only
+  let aiVsAiCursor = 0;     // 지금 화면에 표시 중인 스냅샷 인덱스
+  let aiVsAiAutoplay = true; // 자동재생 ON/OFF
+
   let state = {
     stacks: {},
     turn: 1,
@@ -1166,16 +1185,35 @@
   }
 
   function scheduleAIIfNeeded() {
-    if (gameMode !== "ai" && gameMode !== "ai_vs_ai") return;
+    if (gameMode === "ai") {
+      if (state.winner) return;
+      if (state.turn !== AI_PLAYER) return;
+      if (state.aiThinking) return;
+      state.aiThinking = true;
+      render();
+      const epoch = gameEpoch;
+      setTimeout(() => {
+        if (epoch !== gameEpoch) return;
+        performAIMove(epoch);
+      }, 300 + Math.random() * 350);
+      return;
+    }
+    if (gameMode === "ai_vs_ai") {
+      scheduleAiVsAiAutoAdvance();
+    }
+  }
+
+  // 자동재생이 켜져 있을 때만, 그리고 진행 중인 탐색이 없을 때만 다음 한 수를 예약한다.
+  // 실제 "한 수 진행"은 aiVsAiStepForward가 전담한다(이미 아는 미래면 즉시 표시,
+  // 라이브 끝이면 그때만 새로 탐색).
+  function scheduleAiVsAiAutoAdvance() {
+    if (!aiVsAiAutoplay) return;
     if (state.winner) return;
-    if (gameMode === "ai" && state.turn !== AI_PLAYER) return;
     if (state.aiThinking) return;
-    state.aiThinking = true;
-    render();
     const epoch = gameEpoch;
     setTimeout(() => {
       if (epoch !== gameEpoch) return;
-      performAIMove(epoch);
+      aiVsAiStepForward();
     }, 300 + Math.random() * 350);
   }
 
@@ -1192,6 +1230,12 @@
     if (epoch !== gameEpoch) return; // 그 사이 게임이 리셋/전환됐으면 이 결과는 버린다
     state.aiThinking = false;
     applyAIMove(move);
+  }
+
+  function recordAiVsAiSnapshotIfNeeded() {
+    if (gameMode !== "ai_vs_ai") return;
+    aiVsAiSnapshots.push(Object.assign({}, state, { aiThinking: false }));
+    aiVsAiCursor = aiVsAiSnapshots.length - 1;
   }
 
   function applyAIMove(move) {
@@ -1214,6 +1258,7 @@
         }
       }
       setState({ stacks, supply, stepIndex, placedInStep, phase, turn, lastCell: move.key });
+      recordAiVsAiSnapshotIfNeeded();
       return;
     }
     moveLog.push(move.type === "place" ? { player, type: "place", key: move.key } : { player, type: "move", origin: move.origin, dest: move.dest });
@@ -1222,6 +1267,40 @@
     const win = checkWinOf(stacks, player);
     const lastCell = move.type === "place" ? move.key : move.dest;
     setState({ stacks, supply, selected: null, turn: win ? state.turn : otherPlayer(player), winner: win ? player : null, winReason: win ? win.reason : "", winCells: win ? win.cells : [], lastCell });
+    recordAiVsAiSnapshotIfNeeded();
+  }
+
+  function showAiVsAiSnapshot(cursor) {
+    aiVsAiCursor = cursor;
+    state = aiVsAiSnapshots[cursor];
+    render();
+  }
+
+  function aiVsAiStepBack() {
+    if (aiVsAiCursor <= 0 || state.aiThinking) return;
+    aiVsAiAutoplay = false;
+    showAiVsAiSnapshot(aiVsAiCursor - 1);
+  }
+
+  // 이미 아는 미래(스냅샷)가 있으면 그걸 그대로 보여주고, 라이브 끝에 도달했을 때만
+  // 실제로 AI 탐색을 한 번 새로 돌린다. scheduleAiVsAiAutoAdvance(자동재생)와
+  // "재생 ▶" 버튼 둘 다 이 함수 하나로 처리한다.
+  async function aiVsAiStepForward() {
+    if (aiVsAiCursor < aiVsAiSnapshots.length - 1) {
+      showAiVsAiSnapshot(aiVsAiCursor + 1);
+      scheduleAIIfNeeded();
+      return;
+    }
+    if (state.winner || state.aiThinking) return;
+    AI_PLAYER = state.turn;
+    HUMAN_PLAYER = otherPlayer(state.turn);
+    state.aiThinking = true;
+    render();
+    const epoch = gameEpoch;
+    const move = await computeAIMove();
+    if (epoch !== gameEpoch) return;
+    state.aiThinking = false;
+    applyAIMove(move);
   }
 
   function onCellClick(key) {
@@ -1290,6 +1369,9 @@
     history = [];
     usedUndo = false;
     moveLog = [];
+    aiVsAiSnapshots = [];
+    aiVsAiCursor = 0;
+    aiVsAiAutoplay = true;
     document.getElementById("rank-register-result").classList.add("hidden");
     document.getElementById("rank-nickname-input").disabled = false;
     document.getElementById("rank-submit-btn").disabled = false;
@@ -1300,6 +1382,10 @@
       stacks: {}, turn: 1, phase: "initial", stepIndex: 0, placedInStep: 0,
       supply: { 1: 25, 2: 25 }, selected: null, winner: null, winReason: "", winCells: [], aiThinking: false, lastCell: null,
     });
+    if (gameMode === "ai_vs_ai") {
+      aiVsAiSnapshots.push(Object.assign({}, state));
+      aiVsAiCursor = 0;
+    }
   }
 
   // ---- 한 수 무르기 ----
@@ -1367,6 +1453,7 @@
     document.querySelectorAll("#difficulty-group .mode-btn").forEach(b => b.classList.toggle("active", b.dataset.diff === aiDifficulty));
     document.getElementById("difficulty-group").classList.toggle("hidden", gameMode !== "ai");
     document.getElementById("undo-btn").classList.toggle("hidden", gameMode === "ai_vs_ai");
+    document.getElementById("ai-vs-ai-controls").classList.toggle("hidden", gameMode !== "ai_vs_ai");
     const config = gameMode === "ai" ? RANK_CONFIGS[aiDifficulty] : null;
     const rankToggleBtn = document.getElementById("rank-toggle-btn");
     rankToggleBtn.classList.toggle("hidden", !config);
@@ -1735,6 +1822,14 @@
     boardCardEl.classList.toggle("thinking", aiTurnActive);
 
     document.getElementById("undo-btn").disabled = !canUndo();
+    if (gameMode === "ai_vs_ai") {
+      const autoplayBtn = document.getElementById("aivsai-autoplay-btn");
+      autoplayBtn.textContent = aiVsAiAutoplay ? "⏸ 자동재생" : "▶ 자동재생";
+      autoplayBtn.classList.toggle("active", aiVsAiAutoplay);
+      document.getElementById("aivsai-rewind-btn").disabled = aiVsAiCursor <= 0 || aiThinking;
+      const canStepForward = !aiVsAiAutoplay && !aiThinking && (aiVsAiCursor < aiVsAiSnapshots.length - 1 || !winner);
+      document.getElementById("aivsai-step-btn").disabled = !canStepForward;
+    }
     const hasRankConfig = gameMode === "ai" && !!RANK_CONFIGS[aiDifficulty];
     document.getElementById("undo-used-chip").classList.toggle("hidden", !(usedUndo && hasRankConfig));
 
@@ -1746,6 +1841,7 @@
       if (gameMode === "ai") {
         winAiTauntEl.textContent = winner === HUMAN_PLAYER ? "AI say : omok jotgachi doone..." : "AI say : omok gaemothane...";
       }
+      document.getElementById("win-replay-btn").classList.toggle("hidden", gameMode !== "ai_vs_ai");
       winOverlayEl.classList.toggle("show", winOverlayReady);
       document.getElementById("rank-register").classList.toggle("hidden", !(hasRankConfig && !usedUndo));
       document.getElementById("undo-rank-note").classList.toggle("hidden", !(hasRankConfig && usedUndo));
@@ -1758,6 +1854,22 @@
   document.getElementById("undo-btn").addEventListener("click", undoMove);
   document.getElementById("win-close-btn").addEventListener("click", () => {
     winOverlayEl.classList.remove("show");
+  });
+  document.getElementById("aivsai-rewind-btn").addEventListener("click", aiVsAiStepBack);
+  document.getElementById("aivsai-step-btn").addEventListener("click", () => {
+    if (aiVsAiAutoplay) return;
+    aiVsAiStepForward();
+  });
+  document.getElementById("aivsai-autoplay-btn").addEventListener("click", () => {
+    aiVsAiAutoplay = !aiVsAiAutoplay;
+    render();
+    scheduleAIIfNeeded();
+  });
+  document.getElementById("win-replay-btn").addEventListener("click", () => {
+    winOverlayEl.classList.remove("show");
+    aiVsAiAutoplay = true;
+    showAiVsAiSnapshot(0);
+    scheduleAIIfNeeded();
   });
 
   render();
