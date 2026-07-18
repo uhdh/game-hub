@@ -220,6 +220,7 @@
 
     <div id="tab-auction" class="tab-panel hidden">
       <div class="status-banner" id="auction-count-banner"></div>
+      <div class="status-banner" id="auction-action-banner"></div>
 
       <div class="auction-form-card">
         <div class="card-title">단건 등록</div>
@@ -471,7 +472,7 @@
   }
 
   function showAuctionStatus(msg, isErr) {
-    const el = document.getElementById("auction-count-banner");
+    const el = document.getElementById("auction-action-banner");
     el.textContent = msg;
     el.className = "status-banner show " + (isErr ? "err" : "ok");
   }
@@ -525,8 +526,9 @@
       const valueInput = document.getElementById("auction-value-input");
       const memoInput = document.getElementById("auction-memo-input");
       const name = nameInput.value.trim();
-      const value = Number(valueInput.value);
-      if (!name || !Number.isFinite(value) || !Number.isInteger(value)) {
+      const valueRaw = valueInput.value.trim();
+      const value = Number(valueRaw);
+      if (!name || valueRaw === "" || !Number.isFinite(value) || !Number.isInteger(value)) {
         showAuctionStatus("물품명과 정수 가치를 입력해주세요.", true);
         return;
       }
