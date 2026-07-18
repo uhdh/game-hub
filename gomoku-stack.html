@@ -665,38 +665,87 @@
     return m.type === "place" ? "p:" + m.key : "m:" + m.origin + ">" + m.dest;
   }
 
+  // 상대가 이미 "열린 3"(양 끝이 모두 빈 연속 3개)을 갖고 있으면, 막지 않을 경우
+  // 다음 턴에 열린 4(양끝이 다 뚫린 더블 스레트)가 되어 무조건 진다. 이 두 칸 중
+  // 하나를 반환한다(둘 다 막아야 하는 칸 후보).
+  function findOpenThreeBlockCells(stacks, color) {
+    const cells = new Set();
+    for (const key in BOARD_MAP) {
+      if (topColorOf(stacks, key) !== color) continue;
+      const c = BOARD_MAP[key];
+      for (const dir of LINE_DIRS) {
+        const prevKey = (c.q - dir.q) + "_" + (c.r - dir.r);
+        if (topColorOf(stacks, prevKey) === color) continue;
+        let length = 1;
+        let cq = c.q + dir.q, cr = c.r + dir.r;
+        while (topColorOf(stacks, cq + "_" + cr) === color) { length++; cq += dir.q; cr += dir.r; }
+        if (length !== 3) continue;
+        const afterKey = cq + "_" + cr;
+        const beforeOpen = !!BOARD_MAP[prevKey] && !topColorOf(stacks, prevKey);
+        const afterOpen = !!BOARD_MAP[afterKey] && !topColorOf(stacks, afterKey);
+        if (beforeOpen && afterOpen) {
+          cells.add(prevKey);
+          cells.add(afterKey);
+        }
+      }
+    }
+    return cells;
+  }
+
+  // targetCells(반드시 막아야 하는 칸들) 중 하나를 두는 수만 추려서, 그 안에서
+  // 1수 평가로 가장 나은 것을 고른다. 시간 예산에 따라 결과가 흔들리는 탐색에
+  // 맡기지 않고 결정적으로(항상 같은 국면이면 같은 수) 고르기 위한 함수.
+  function pickBestBlock(stacks, allMoves, targetCells) {
+    const blockMoves = allMoves.filter(m => targetCells.has(m.type === "place" ? m.key : m.dest));
+    // 상대의 위협 칸이라도 내가 실제로 둘 수 있는 수(놓기/쌓기)가 하나도 없으면
+    // (서플라이가 바닥났거나 인접 칸이 없는 등) 막을 방법 자체가 없는 것이므로
+    // null을 반환해 호출부가 일반 탐색으로 넘어가게 한다.
+    if (!blockMoves.length) return null;
+    let best = blockMoves[0], bestScore = -Infinity;
+    blockMoves.forEach(m => {
+      const score = evaluatePosition(applyMoveToStacks(stacks, m, AI_PLAYER), AI_PLAYER);
+      if (score > bestScore) { bestScore = score; best = m; }
+    });
+    return best;
+  }
+
   function computeAIMainMoveHard() {
     const stacks = state.stacks;
     const supply = state.supply;
     const allMoves = getAllLegalMainMoves(stacks, AI_PLAYER, supply[AI_PLAYER]);
 
+    // 1. 내가 지금 바로 이길 수 있으면 그걸 둔다.
     for (const m of allMoves) {
       if (checkWinOf(applyMoveToStacks(stacks, m, AI_PLAYER), AI_PLAYER)) return m;
     }
 
-    // 상대가 다음 수에 이길 수 있는 칸들을 미리 파악해, 그 칸을 막는 수는
-    // 1수 평가 점수가 낮게 나오더라도(=순위 밖으로 밀려도) 반드시 루트 후보에 포함시킨다.
-    // (이걸 안 하면 "내 라인 늘리기"가 점수가 더 높아 보여 방어 수가 빔에서 통째로 잘려나가고,
-    //  정작 탐색 자체가 그 수를 한 번도 못 보는 사고가 난다.)
+    // 2. 상대가 다음 수에 바로 이길 수 있는 칸이 있으면 반드시 막는다. 예전에는 이
+    //    칸을 탐색 후보에 "포함만" 시키고 실제 선택은 시간 예산 안에서 도는 탐색에
+    //    맡겼는데, 실전 기보 분석 결과 타이밍에 따라 탐색이 이 칸을 놓치고 다른 수를
+    //    두는 사고가 실제로 발생했다(2026-07-18, 통통통송송송 기보). 그래서 탐색에
+    //    맡기지 않고 여기서 직접, 결정적으로 막는다.
     const oppAllMoves = getAllLegalMainMoves(stacks, HUMAN_PLAYER, supply[HUMAN_PLAYER]);
-    const threatCells = new Set();
+    const immediateThreatCells = new Set();
     oppAllMoves.forEach(m => {
       if (checkWinOf(applyMoveToStacks(stacks, m, HUMAN_PLAYER), HUMAN_PLAYER)) {
-        threatCells.add(m.type === "place" ? m.key : m.dest);
+        immediateThreatCells.add(m.type === "place" ? m.key : m.dest);
       }
     });
-
-    const rootCandidates = orderedCandidates(stacks, AI_PLAYER, supply, allMoves, true, HARD_ROOT_BEAM);
-    if (threatCells.size) {
-      const included = new Set(rootCandidates.map(moveIdKey));
-      allMoves.forEach(m => {
-        const destKey = m.type === "place" ? m.key : m.dest;
-        if (threatCells.has(destKey) && !included.has(moveIdKey(m))) {
-          rootCandidates.push(m);
-          included.add(moveIdKey(m));
-        }
-      });
+    if (immediateThreatCells.size) {
+      const block = pickBestBlock(stacks, allMoves, immediateThreatCells);
+      if (block) return block;
     }
+
+    // 3. 상대가 "열린 3"을 갖고 있으면(2번과 같은 이유로) 탐색에 맡기지 않고
+    //    직접 막는다.
+    const openThreeCells = findOpenThreeBlockCells(stacks, HUMAN_PLAYER);
+    if (openThreeCells.size) {
+      const block = pickBestBlock(stacks, allMoves, openThreeCells);
+      if (block) return block;
+    }
+
+    // 4. 급한 위협이 없거나(또는 막을 방법이 없어서) 기존 탐색으로 결정한다.
+    const rootCandidates = orderedCandidates(stacks, AI_PLAYER, supply, allMoves, true, HARD_ROOT_BEAM);
     let bestMove = rootCandidates[0], bestScore = -Infinity;
     let alpha = -Infinity;
     const beta = Infinity;
@@ -992,6 +1041,43 @@
     function moveIdKey(m) {
       return m.type === "place" ? "p:" + m.key : "m:" + m.origin + ">" + m.dest;
     }
+    // 상대가 이미 "열린 3"(양 끝이 모두 빈 연속 3개)을 갖고 있으면, 막지 않을 경우
+    // 다음 턴에 열린 4가 되어 무조건 진다.
+    function findOpenThreeBlockCells(stacks, color) {
+      const cells = new Set();
+      for (const key in BOARD_MAP) {
+        if (topColorOf(stacks, key) !== color) continue;
+        const c = BOARD_MAP[key];
+        for (const dir of LINE_DIRS) {
+          const prevKey = (c.q - dir.q) + "_" + (c.r - dir.r);
+          if (topColorOf(stacks, prevKey) === color) continue;
+          let length = 1;
+          let cq = c.q + dir.q, cr = c.r + dir.r;
+          while (topColorOf(stacks, cq + "_" + cr) === color) { length++; cq += dir.q; cr += dir.r; }
+          if (length !== 3) continue;
+          const afterKey = cq + "_" + cr;
+          const beforeOpen = !!BOARD_MAP[prevKey] && !topColorOf(stacks, prevKey);
+          const afterOpen = !!BOARD_MAP[afterKey] && !topColorOf(stacks, afterKey);
+          if (beforeOpen && afterOpen) {
+            cells.add(prevKey);
+            cells.add(afterKey);
+          }
+        }
+      }
+      return cells;
+    }
+    // targetCells 중 하나를 두는 수만 추려서 1수 평가로 가장 나은 것을 결정적으로
+    // 고른다(시간 예산에 따라 흔들리는 탐색에 맡기지 않음).
+    function pickBestBlock(stacks, allMoves, targetCells) {
+      const blockMoves = allMoves.filter(m => targetCells.has(m.type === "place" ? m.key : m.dest));
+      if (!blockMoves.length) return null;
+      let best = blockMoves[0], bestScore = -Infinity;
+      blockMoves.forEach(m => {
+        const score = evaluatePosition(applyMoveToStacks(stacks, m, AI_PLAYER), AI_PLAYER);
+        if (score > bestScore) { bestScore = score; best = m; }
+      });
+      return best;
+    }
     function searchAtDepth(stacks, supply, plies, deadline, allMoves, forceInclude) {
       const rootCandidates = orderedCandidates(stacks, AI_PLAYER, allMoves, true, ROOT_BEAM);
       const included = new Set(rootCandidates.map(moveIdKey));
@@ -1030,14 +1116,35 @@
         }
       }
 
+      // 상대가 다음 수에 바로 이길 수 있는 칸이 있으면 반드시 막는다. 시간 예산 안에서
+      // 도는 반복 심화 탐색에 선택을 맡기면 타이밍에 따라 이 칸을 놓치는 사고가 실전
+      // 기보에서 실제로 확인됐다(2026-07-18, 통통통송송송 기보) — 그래서 탐색 전에
+      // 여기서 직접, 결정적으로 막는다. "열린 3"(막지 않으면 다음 턴 열린 4로 무조건
+      // 지는 모양)도 같은 이유로 탐색에 맡기지 않고 직접 막는다.
       const oppAllMoves = getAllLegalMainMoves(stacks, HUMAN_PLAYER, supply[HUMAN_PLAYER]);
-      const threatCells = {};
+      const immediateThreatCells = new Set();
       oppAllMoves.forEach(m => {
         if (checkWinOf(applyMoveToStacks(stacks, m, HUMAN_PLAYER), HUMAN_PLAYER)) {
-          threatCells[m.type === "place" ? m.key : m.dest] = true;
+          immediateThreatCells.add(m.type === "place" ? m.key : m.dest);
         }
       });
-      const forceInclude = allMoves.filter(m => threatCells[m.type === "place" ? m.key : m.dest]);
+      if (immediateThreatCells.size) {
+        const move = pickBestBlock(stacks, allMoves, immediateThreatCells);
+        if (move) {
+          self.postMessage({ type: "result", requestId: requestId, move: move, depthReached: 0 });
+          return;
+        }
+      }
+      const openThreeCells = findOpenThreeBlockCells(stacks, HUMAN_PLAYER);
+      if (openThreeCells.size) {
+        const move = pickBestBlock(stacks, allMoves, openThreeCells);
+        if (move) {
+          self.postMessage({ type: "result", requestId: requestId, move: move, depthReached: 0 });
+          return;
+        }
+      }
+
+      const forceInclude = [];
 
       let bestMove = null;
       let depthReached = 0;
