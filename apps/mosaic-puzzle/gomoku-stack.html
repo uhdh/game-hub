@@ -1053,6 +1053,7 @@
   let humanIsBlackNext = true; // AI 대결: 첫 판은 유저가 흑돌, 이후엔 진 사람이 흑돌
   let history = []; // 무르기용: 각 수를 두기 직전 state 스냅샷
   let usedUndo = false; // 이번 판에서 무르기를 사용했는지 (사용 시 랭킹 등록 불가)
+  let moveLog = []; // 기보 기록용: history와 항상 1:1로 push/pop되는 수순 목록
 
   let state = {
     stacks: {},
@@ -1075,6 +1076,7 @@
     if (gameMode === "ai" && !wasWinner && state.winner) {
       humanIsBlackNext = state.winner === AI_PLAYER; // 패자가 다음 판 흑돌
       autoSubmitRankIfReturningPlayer();
+      submitGameLog();
     }
     render();
     scheduleAIIfNeeded();
@@ -1105,6 +1107,7 @@
     const player = AI_PLAYER;
     history.push(state);
     if (state.phase === "initial") {
+      moveLog.push({ player, type: "place", key: move.key });
       const stacks = placeStoneOf(state.stacks, move.key, player);
       const supply = Object.assign({}, state.supply, { [player]: state.supply[player] - 1 });
       let stepIndex = state.stepIndex, placedInStep = state.placedInStep;
@@ -1122,6 +1125,7 @@
       setState({ stacks, supply, stepIndex, placedInStep, phase, turn, lastCell: move.key });
       return;
     }
+    moveLog.push(move.type === "place" ? { player, type: "place", key: move.key } : { player, type: "move", origin: move.origin, dest: move.dest });
     const stacks = applyMoveToStacks(state.stacks, move, player);
     const supply = move.type === "place" ? Object.assign({}, state.supply, { [player]: state.supply[player] - 1 }) : state.supply;
     const win = checkWinOf(stacks, player);
@@ -1152,6 +1156,7 @@
         }
       }
       history.push(state);
+      moveLog.push({ player, type: "place", key });
       setState({ stacks, supply, stepIndex, placedInStep, phase, turn, lastCell: key });
       return;
     }
@@ -1164,6 +1169,7 @@
         const stacks = moveStoneOf(state.stacks, origin, key, player);
         const win = checkWinOf(stacks, player);
         history.push(state);
+        moveLog.push({ player, type: "move", origin, dest: key });
         setState({ stacks, selected: null, turn: win ? state.turn : otherPlayer(player), winner: win ? player : null, winReason: win ? win.reason : "", winCells: win ? win.cells : [], lastCell: key });
       } else if (topColorOf(state.stacks, key) === player) {
         setState({ selected: key });
@@ -1179,6 +1185,7 @@
       const supply = Object.assign({}, state.supply, { [player]: state.supply[player] - 1 });
       const win = checkWinOf(stacks, player);
       history.push(state);
+      moveLog.push({ player, type: "place", key });
       setState({ stacks, supply, turn: win ? state.turn : otherPlayer(player), winner: win ? player : null, winReason: win ? win.reason : "", winCells: win ? win.cells : [], lastCell: key });
     } else if (topColorOf(state.stacks, key) === player) {
       setState({ selected: key });
@@ -1190,6 +1197,7 @@
     rankSubmittedForThisGame = false;
     history = [];
     usedUndo = false;
+    moveLog = [];
     document.getElementById("rank-register-result").classList.add("hidden");
     document.getElementById("rank-nickname-input").disabled = false;
     document.getElementById("rank-submit-btn").disabled = false;
@@ -1226,6 +1234,7 @@
       restored = history.pop();
     }
     state = Object.assign({}, restored, { selected: null });
+    moveLog.length = history.length; // history와 1:1 대응이므로 같은 개수만큼 잘라낸다
     usedUndo = true;
     gameEpoch++;
     render();
@@ -1300,6 +1309,36 @@
     if (!res.ok) throw new Error("레이팅 등록 실패");
     const [row] = await res.json();
     return row;
+  }
+
+  // 상/최상 난이도 대국이 끝날 때마다 기보(수순 전체)를 남긴다. 랭킹 등록 여부와 무관하게
+  // 기록하되, 닉네임은 이전에 저장해둔 값이 있으면 그것만 best-effort로 붙인다.
+  async function submitGameLog() {
+    const config = currentRankConfig();
+    if (!config) return;
+    const nickname = localStorage.getItem(config.nicknameKey) || null;
+    try {
+      await fetch(`${RANK_SUPABASE_URL}/rest/v1/gomoku_game_log`, {
+        method: "POST",
+        headers: {
+          apikey: RANK_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${RANK_SUPABASE_ANON_KEY}`,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          difficulty: aiDifficulty,
+          nickname,
+          human_player: HUMAN_PLAYER,
+          winner: state.winner,
+          win_reason: state.winReason,
+          used_undo: usedUndo,
+          moves: moveLog,
+        }),
+      });
+    } catch (e) {
+      // 기보 저장 실패는 게임 진행에 영향을 주지 않도록 조용히 무시한다
+    }
   }
 
   async function fetchTopRanking(table) {
