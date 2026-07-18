@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>블라인드 경매 - 피의 게임 X 시뮬레이터</title>
+<link rel="icon" type="image/png" href="./assets/favicon.png">
+<style>
+  :root {
+    --bg: #0f0f12;
+    --panel: #15181c;
+    --panel-light: #1c2024;
+    --border: rgba(255,255,255,.08);
+    --text: #e7ebee;
+    --text-dim: #8992a0;
+    --accent: #5fb8b0;
+    --accent-hover: #7fcac3;
+    --danger: #e0786f;
+    --gold: #ffd166;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); min-height: 100vh; }
+  a { color: var(--accent); text-decoration: none; }
+  #app {
+    min-height: 100vh; display: flex; justify-content: center;
+    padding: 24px 16px 48px;
+    font-family: -apple-system, "Pretendard", "Segoe UI", "Malgun Gothic", sans-serif;
+    color: var(--text);
+  }
+  .col { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 16px; }
+  .header-row { display: flex; align-items: center; justify-content: space-between; }
+  .home-link { font-size: 12.5px; font-weight: 700; color: var(--text-dim); }
+  .title { font-size: 18px; font-weight: 800; }
+
+  .screen { display: flex; flex-direction: column; gap: 16px; }
+  .screen.hidden { display: none; }
+
+  .rules-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
+  .rules-title { font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .04em; }
+  .rules-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+
+  .status-banner { border-radius: 12px; padding: 10px 14px; font-size: 12.5px; font-weight: 600; display: none; }
+  .status-banner.show { display: block; }
+  .status-banner.ok { background: rgba(95,184,176,.12); border: 1px solid rgba(95,184,176,.35); color: var(--accent-hover); }
+  .status-banner.err { background: rgba(224,120,111,.14); border: 1px solid rgba(224,120,111,.4); color: #f0a89f; }
+
+  .btn-primary { background: var(--accent); color: #0f1214; font-size: 14px; font-weight: 700; border: none; padding: 12px 18px; border-radius: 12px; cursor: pointer; }
+  .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-secondary { background: var(--panel-light); color: var(--text); font-size: 13.5px; font-weight: 700; border: 1px solid var(--border); padding: 11px 16px; border-radius: 12px; cursor: pointer; text-align: center; }
+  .btn-secondary:disabled { opacity: .4; cursor: not-allowed; }
+  .action-row { display: flex; gap: 10px; }
+  .action-row > * { flex: 1; }
+
+  .reveal-card { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 28px; text-align: center; display: flex; flex-direction: column; gap: 6px; }
+  .reveal-label { font-size: 12.5px; color: var(--text-dim); }
+  .reveal-total { font-size: 38px; font-weight: 800; }
+  .reveal-hint { font-size: 12px; color: var(--text-dim); }
+
+  .round-header { display: flex; flex-direction: column; gap: 2px; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; }
+  #round-counter { font-size: 11.5px; color: var(--text-dim); font-weight: 700; }
+  #item-name-label { font-size: 19px; font-weight: 800; }
+
+  .players-bar { display: flex; flex-wrap: wrap; gap: 8px; }
+  .player-chip { flex: 1 1 auto; min-width: 90px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; font-size: 11.5px; }
+  .player-chip.leading { border-color: var(--gold); background: rgba(255,209,102,.1); }
+  .player-chip.passed { opacity: .45; }
+  .player-name { font-weight: 700; font-size: 12.5px; }
+  .player-status { color: var(--text-dim); }
+  .player-cubes { color: var(--text-dim); }
+
+  .highest-card { display: flex; align-items: baseline; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; }
+  .highest-label { font-size: 11.5px; color: var(--text-dim); }
+  .highest-value { font-size: 22px; font-weight: 800; }
+  .highest-bidder { font-size: 12.5px; color: var(--accent); font-weight: 700; }
+
+  .turn-banner { text-align: center; font-size: 13px; font-weight: 700; color: var(--gold); min-height: 18px; }
+
+  .cube-tray { display: flex; flex-wrap: wrap; gap: 8px; }
+  .cube-btn { width: 52px; height: 52px; border-radius: 12px; border: 1px solid var(--border); background: var(--panel-light); color: var(--text); font-size: 15px; font-weight: 700; cursor: pointer; }
+  .cube-btn.selected { background: var(--accent); color: #0f1214; border-color: var(--accent); }
+  .cube-btn.used { opacity: .25; cursor: not-allowed; }
+  .selected-sum { font-size: 12.5px; color: var(--text-dim); text-align: center; }
+
+  .log-card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 10px 14px; max-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+  .log-line { font-size: 12px; color: var(--text-dim); }
+
+  .modal { position: fixed; inset: 0; background: rgba(6,7,9,.75); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 50; }
+  .modal.hidden { display: none; }
+  .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; padding: 28px 24px; max-width: 340px; width: 100%; display: flex; flex-direction: column; gap: 10px; text-align: center; }
+  .modal-item-name { font-size: 19px; font-weight: 800; }
+  .modal-value { font-size: 26px; font-weight: 800; color: var(--gold); }
+  .modal-memo { font-size: 12.5px; color: var(--text-dim); }
+  .modal-winner { font-size: 13.5px; font-weight: 700; color: var(--accent); }
+
+  .results-title { font-size: 19px; font-weight: 800; text-align: center; }
+  .ranking-row { display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; font-size: 12.5px; }
+  .ranking-row.winner { border-color: var(--gold); background: rgba(255,209,102,.08); }
+  .rank-no { width: 18px; font-weight: 800; color: var(--text-dim); }
+  .rank-name { width: 44px; font-weight: 700; }
+  .rank-total { width: 50px; font-weight: 800; color: var(--accent-hover); }
+  .rank-items { flex: 1; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .nickname-row { display: flex; gap: 8px; align-items: center; }
+  .nickname-row label { font-size: 12.5px; color: var(--text-dim); flex-shrink: 0; }
+  #nickname-input { flex: 1; background: var(--panel-light); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 9px 10px; font-size: 13.5px; }
+
+  #leaderboard-section { display: flex; flex-direction: column; gap: 8px; }
+  .leaderboard-title { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .06em; text-align: center; }
+  .leaderboard-row { display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; font-size: 12.5px; }
+  .lb-rank { width: 18px; color: var(--text-dim); font-weight: 700; }
+  .lb-nickname { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb-score { font-weight: 800; color: var(--gold); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="col">
+    <div class="header-row">
+      <a href="./index.html" class="home-link">← 홈</a>
+      <span class="title">블라인드 경매</span>
+    </div>
+
+    <div id="screen-start" class="screen">
+      <div class="rules-card">
+        <div class="rules-title">규칙</div>
+        <ul class="rules-list">
+          <li>물품 22개 중 실제로 경매에 오르는 건 11개뿐입니다.</li>
+          <li>물품의 실제 가치는 낙찰 전까지 비공개입니다.</li>
+          <li>큐브(1,2,3,4,6,8,10,12,15,20,25)를 조합해 입찰하세요.</li>
+          <li>한 번 낸 큐브는 이번 경매가 끝날 때까지 회수할 수 없습니다.</li>
+          <li>11라운드 종료 후 낙찰 물품 가치 합계가 가장 높은 사람이 승리합니다.</li>
+        </ul>
+      </div>
+      <div id="start-status" class="status-banner"></div>
+      <button type="button" class="btn-primary" id="start-btn" disabled>게임 시작</button>
+    </div>
+
+    <div id="screen-reveal" class="screen hidden">
+      <div class="reveal-card">
+        <div class="reveal-label">물품 22개 가치 총합</div>
+        <div class="reveal-total" id="reveal-total-value">0</div>
+        <div class="reveal-hint">이 중 11개만 경매에 오릅니다.</div>
+      </div>
+      <button type="button" class="btn-primary" id="reveal-continue-btn">경매 시작</button>
+    </div>
+
+    <div id="screen-auction" class="screen hidden">
+      <div class="round-header">
+        <span id="round-counter">1 / 11 라운드</span>
+        <span id="item-name-label">?</span>
+      </div>
+
+      <div class="players-bar" id="players-bar"></div>
+
+      <div class="highest-card">
+        <span class="highest-label">현재 최고가</span>
+        <span class="highest-value" id="highest-value">0</span>
+        <span class="highest-bidder" id="highest-bidder">-</span>
+      </div>
+
+      <div class="turn-banner" id="turn-banner"></div>
+
+      <div class="cube-tray" id="cube-tray"></div>
+      <div class="selected-sum" id="selected-sum-label"></div>
+
+      <div class="action-row">
+        <button type="button" class="btn-primary" id="bid-btn" disabled>입찰</button>
+        <button type="button" class="btn-secondary" id="pass-btn" disabled>포기</button>
+      </div>
+
+      <div class="log-card" id="log-list"></div>
+    </div>
+
+    <div id="screen-results" class="screen hidden">
+      <div class="results-title">최종 결과</div>
+      <div id="ranking-list"></div>
+      <div class="nickname-row">
+        <label for="nickname-input">닉네임</label>
+        <input id="nickname-input" type="text" maxlength="12" placeholder="리더보드에 표시할 이름">
+        <button type="button" class="btn-primary" id="submit-score-btn">리더보드 등록</button>
+      </div>
+      <div id="leaderboard-section">
+        <div class="leaderboard-title">리더보드</div>
+        <div id="leaderboard-list"></div>
+      </div>
+      <div class="action-row">
+        <button type="button" class="btn-secondary" id="restart-btn">다시하기</button>
+        <a class="btn-secondary" href="./index.html">홈으로</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="modal-resolve" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-item-name" id="resolve-item-name"></div>
+    <div class="modal-value" id="resolve-value"></div>
+    <div class="modal-memo" id="resolve-memo"></div>
+    <div class="modal-winner" id="resolve-winner"></div>
+    <button type="button" class="btn-primary" id="resolve-next-btn">다음 물품</button>
+  </div>
+</div>
+
+<script src="./blind-auction-logic.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  const SUPABASE_URL = "https://paktzmofotvwfdxcpmzv.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_jWbstEn2pKJTNDxLTR4Jig_asglvzGW";
+  const ITEMS_TABLE = "auction_items";
+
+  const L = window.BlindAuctionLogic;
+  const PLAYER_LABELS = { user: "나", ai1: "AI 1", ai2: "AI 2", ai3: "AI 3", ai4: "AI 4" };
+
+  function showScreen(id) {
+    document.querySelectorAll(".screen").forEach((el) => el.classList.add("hidden"));
+    document.getElementById(id).classList.remove("hidden");
+  }
+
+  let state = null;
+
+  function resetGame() {
+    state = {
+      players: L.createPlayers(),
+      aiProfiles: L.createAiProfiles(),
+      pool: null,
+      poolTotal: 0,
+      playQueue: [],
+      roundIndex: 0,
+      startPlayerId: L.PLAYER_ORDER[Math.floor(Math.random() * L.PLAYER_ORDER.length)],
+      round: null,
+      currentItem: null,
+      selectedCubes: [],
+    };
+  }
+
+  async function fetchAllItems() {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${ITEMS_TABLE}?select=id,item_name,value,memo`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) throw new Error("물품 목록 조회 실패");
+    return res.json();
+  }
+
+  async function initStartScreen() {
+    const statusEl = document.getElementById("start-status");
+    const startBtn = document.getElementById("start-btn");
+    startBtn.disabled = true;
+    try {
+      const items = await fetchAllItems();
+      if (items.length < L.POOL_SIZE) {
+        statusEl.className = "status-banner show err";
+        statusEl.textContent = `등록된 물품이 ${items.length}개뿐입니다. ${L.POOL_SIZE}개 이상 필요합니다. 관리자 페이지에서 등록해주세요.`;
+        return;
+      }
+      statusEl.className = "status-banner show ok";
+      statusEl.textContent = `${items.length}개 등록됨 · 게임 시작 가능`;
+      startBtn.disabled = false;
+      startBtn.onclick = () => beginGame(items);
+    } catch (err) {
+      statusEl.className = "status-banner show err";
+      statusEl.textContent = "물품 목록을 불러오지 못했습니다. 새로고침 해주세요.";
+    }
+  }
+
+  function beginGame(items) {
+    resetGame();
+    const { pool, poolTotal, playQueue } = L.pickGamePool(items);
+    state.pool = pool;
+    state.poolTotal = poolTotal;
+    state.playQueue = playQueue;
+    document.getElementById("reveal-total-value").textContent = poolTotal;
+    showScreen("screen-reveal");
+  }
+
+  function startNextRound() {
+    if (state.roundIndex >= state.playQueue.length) {
+      showResults();
+      return;
+    }
+    state.currentItem = state.playQueue[state.roundIndex];
+    state.round = L.createRound(state.startPlayerId);
+    state.selectedCubes = [];
+    showScreen("screen-auction");
+    renderAuctionScreen();
+    maybeRunAiTurn();
+  }
+
+  function renderPlayersBar() {
+    const wrap = document.getElementById("players-bar");
+    wrap.innerHTML = "";
+    L.PLAYER_ORDER.forEach((id) => {
+      const player = L.findPlayer(state.players, id);
+      const active = state.round.active[id];
+      const isLeader = state.round.highestPlayerId === id;
+      const div = document.createElement("div");
+      div.className = "player-chip" + (active ? "" : " passed") + (isLeader ? " leading" : "");
+      const cubesLabel = id === "user" ? `큐브 ${player.cubes.reduce((a, b) => a + b, 0)}` : "";
+      div.innerHTML = `<span class="player-name">${PLAYER_LABELS[id]}</span><span class="player-status">${active ? (isLeader ? "최고가" : "대기") : "포기"}</span><span class="player-cubes">${cubesLabel}</span>`;
+      wrap.appendChild(div);
+    });
+  }
+
+  function renderCubeTray() {
+    const wrap = document.getElementById("cube-tray");
+    wrap.innerHTML = "";
+    const user = L.findPlayer(state.players, "user");
+    const remaining = L.remainingCubesInRound(user, state.round);
+    L.CUBE_VALUES.forEach((v) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "cube-btn";
+      btn.textContent = v;
+      const held = remaining.includes(v);
+      if (!held) {
+        btn.disabled = true;
+        btn.classList.add("used");
+      }
+      if (state.selectedCubes.includes(v)) {
+        btn.classList.add("selected");
+      }
+      btn.addEventListener("click", () => {
+        const idx = state.selectedCubes.indexOf(v);
+        if (idx === -1) state.selectedCubes.push(v);
+        else state.selectedCubes.splice(idx, 1);
+        renderAuctionScreen();
+      });
+      wrap.appendChild(btn);
+    });
+  }
+
+  function renderLog() {
+    const wrap = document.getElementById("log-list");
+    wrap.innerHTML = "";
+    state.round.log.slice().reverse().forEach((entry) => {
+      const line = document.createElement("div");
+      line.className = "log-line";
+      line.textContent = entry.type === "bid"
+        ? `${PLAYER_LABELS[entry.playerId]} → ${entry.total} (+${entry.cubes.join(",")})`
+        : `${PLAYER_LABELS[entry.playerId]} 포기`;
+      wrap.appendChild(line);
+    });
+  }
+
+  function renderAuctionScreen() {
+    document.getElementById("round-counter").textContent = `${state.roundIndex + 1} / ${L.TOTAL_ROUNDS} 라운드`;
+    document.getElementById("item-name-label").textContent = state.currentItem.item_name;
+    document.getElementById("highest-value").textContent = state.round.highestTotal;
+    document.getElementById("highest-bidder").textContent =
+      state.round.highestPlayerId ? PLAYER_LABELS[state.round.highestPlayerId] : "-";
+
+    renderPlayersBar();
+    renderCubeTray();
+    renderLog();
+
+    const actor = L.currentActor(state.round);
+    const isUserTurn = actor === "user";
+    const selectedSum = state.selectedCubes.reduce((a, b) => a + b, 0);
+    const prospective = state.round.submitted.user + selectedSum;
+
+    document.getElementById("selected-sum-label").textContent =
+      selectedSum > 0 ? `선택한 큐브 합계: ${selectedSum} (누적 ${prospective})` : "큐브를 선택해 입찰액을 만드세요";
+
+    const turnBanner = document.getElementById("turn-banner");
+    turnBanner.textContent = isUserTurn ? "당신의 차례입니다" : (actor ? `${PLAYER_LABELS[actor]} 진행 중...` : "");
+
+    document.getElementById("bid-btn").disabled = !isUserTurn || selectedSum === 0 || prospective <= state.round.highestTotal;
+    document.getElementById("pass-btn").disabled = !isUserTurn;
+  }
+
+  function handleUserBid() {
+    if (state.selectedCubes.length === 0) return;
+    const res = L.applyBid(state.round, state.players, "user", state.selectedCubes.slice());
+    if (!res.ok) return;
+    state.selectedCubes = [];
+    afterAction();
+  }
+
+  function handleUserPass() {
+    L.applyPass(state.round, "user");
+    state.selectedCubes = [];
+    afterAction();
+  }
+
+  function afterAction() {
+    if (L.isRoundOver(state.round)) {
+      resolveRound();
+      return;
+    }
+    renderAuctionScreen();
+    maybeRunAiTurn();
+  }
+
+  function maybeRunAiTurn() {
+    const actor = L.currentActor(state.round);
+    if (!actor || actor === "user") return;
+    setTimeout(() => {
+      const player = L.findPlayer(state.players, actor);
+      const profile = state.aiProfiles[actor];
+      const remainingRounds = L.TOTAL_ROUNDS - state.roundIndex;
+      const decision = L.decideAiAction(player, state.round, profile, state.poolTotal, remainingRounds);
+      if (decision.action === "bid") {
+        L.applyBid(state.round, state.players, actor, decision.cubes);
+      } else {
+        L.applyPass(state.round, actor);
+      }
+      afterAction();
+    }, 550);
+  }
+
+  document.getElementById("bid-btn").addEventListener("click", handleUserBid);
+  document.getElementById("pass-btn").addEventListener("click", handleUserPass);
+  document.getElementById("reveal-continue-btn").addEventListener("click", startNextRound);
+
+  function resolveRound() {
+    const result = L.finalizeRound(state.round, state.players, state.currentItem);
+    const modal = document.getElementById("modal-resolve");
+    document.getElementById("resolve-item-name").textContent = state.currentItem.item_name;
+    document.getElementById("resolve-value").textContent = `실제 가치: ${state.currentItem.value}`;
+    document.getElementById("resolve-memo").textContent = state.currentItem.memo || "";
+    document.getElementById("resolve-winner").textContent =
+      result.type === "won"
+        ? `${PLAYER_LABELS[result.winnerId]}님이 ${result.amount}에 낙찰받았습니다.`
+        : "유찰 — 아무도 낙찰받지 못했습니다.";
+    modal.classList.remove("hidden");
+
+    state.startPlayerId = L.nextStartPlayer(L.PLAYER_ORDER, state.startPlayerId, result);
+    state.roundIndex += 1;
+  }
+
+  document.getElementById("resolve-next-btn").addEventListener("click", () => {
+    document.getElementById("modal-resolve").classList.add("hidden");
+    startNextRound();
+  });
+
+  const LEADERBOARD_TABLE = "blind_auction_leaderboard";
+  const NICKNAME_KEY = "blindAuctionNickname";
+
+  async function fetchLeaderboard() {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${LEADERBOARD_TABLE}?select=id,nickname,score,created_at&order=score.desc,created_at.asc&limit=10`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) throw new Error("리더보드 조회 실패");
+    return res.json();
+  }
+
+  async function submitScore(score, nickname) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${LEADERBOARD_TABLE}`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({ score, nickname }),
+    });
+    if (!res.ok) throw new Error("리더보드 등록 실패");
+    return res.json();
+  }
+
+  function renderLeaderboard(rows) {
+    const wrap = document.getElementById("leaderboard-list");
+    wrap.innerHTML = "";
+    rows.forEach((row, i) => {
+      const line = document.createElement("div");
+      line.className = "leaderboard-row";
+      line.innerHTML = `<span class="lb-rank">${i + 1}</span><span class="lb-nickname">${row.nickname || "익명"}</span><span class="lb-score">${row.score}</span>`;
+      wrap.appendChild(line);
+    });
+  }
+
+  async function showResults() {
+    showScreen("screen-results");
+    const ranking = L.computeFinalRanking(state.players);
+    const wrap = document.getElementById("ranking-list");
+    wrap.innerHTML = "";
+    ranking.forEach((entry, i) => {
+      const row = document.createElement("div");
+      row.className = "ranking-row" + (i === 0 ? " winner" : "");
+      const items = entry.wonItems.map((it) => it.itemName).join(", ") || "낙찰 없음";
+      row.innerHTML = `<span class="rank-no">${i + 1}</span><span class="rank-name">${PLAYER_LABELS[entry.id]}</span><span class="rank-total">${entry.total}</span><span class="rank-items">${items}</span>`;
+      wrap.appendChild(row);
+    });
+
+    const userEntry = ranking.find((r) => r.id === "user");
+    const nicknameInput = document.getElementById("nickname-input");
+    nicknameInput.value = localStorage.getItem(NICKNAME_KEY) || "";
+
+    document.getElementById("submit-score-btn").onclick = async () => {
+      const nickname = nicknameInput.value.trim() || "익명";
+      localStorage.setItem(NICKNAME_KEY, nickname);
+      try {
+        await submitScore(userEntry.total, nickname);
+        const rows = await fetchLeaderboard();
+        renderLeaderboard(rows);
+      } catch (err) {
+        alert("리더보드 등록에 실패했습니다.");
+      }
+    };
+
+    try {
+      const rows = await fetchLeaderboard();
+      renderLeaderboard(rows);
+    } catch (err) {
+      // 리더보드 조회 실패는 결과 화면 표시 자체를 막지 않음
+    }
+  }
+
+  document.getElementById("restart-btn").addEventListener("click", () => {
+    showScreen("screen-start");
+    initStartScreen();
+  });
+
+  initStartScreen();
+})();
+</script>
+</body>
+</html>
