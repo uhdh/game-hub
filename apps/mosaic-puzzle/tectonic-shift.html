@@ -231,10 +231,23 @@
   // 좁힌 "찌그러진" 육각형으로 바꿔 보드 전체 가로 폭을 화면에 맞춘다.
   const IS_MOBILE = window.matchMedia('(max-width: 480px)').matches;
   const SIZE = 24;
-  const HEX_W = IS_MOBILE ? 20 : SIZE * Math.sqrt(3);
+  const MOBILE_BOARD_PAD = 8;
+  // 이 스크립트가 실행되는 시점엔 게임 화면(#screen-game, 그리고 그 안의
+  // .board-wrap)이 아직 "hidden"(display:none) 상태라 .board-wrap의
+  // clientWidth를 바로 재면 0이 나온다. 항상 보이는 .col을 기준으로 재고,
+  // 거기서 .board-wrap 자신의 padding·border만큼만 빼서 계산한다.
+  const MOBILE_WRAP_PADDING = 12; // .board-wrap의 모바일 padding 값(위 CSS)과 일치해야 함
+  const MOBILE_WRAP_BORDER = 1; // .board-wrap의 border-width(위 CSS)와 일치해야 함
+  const MOBILE_SAFETY_MARGIN = 8; // 기기별 서브픽셀 반올림 오차에 대비한 여유
+  const mobileAvailableWidth = IS_MOBILE
+    ? document.querySelector('.col').clientWidth - (MOBILE_WRAP_PADDING + MOBILE_WRAP_BORDER) * 2 - MOBILE_SAFETY_MARGIN
+    : 0;
+  const HEX_W = IS_MOBILE
+    ? Math.max(14, (mobileAvailableWidth - MOBILE_BOARD_PAD * 2) / 13)
+    : SIZE * Math.sqrt(3);
   const HEX_H = SIZE * 2;
   const ROW_SPACING = HEX_H * 0.75;
-  const PAD = IS_MOBILE ? 10 : 26;
+  const PAD = IS_MOBILE ? MOBILE_BOARD_PAD : 26;
 
   const ROW_DEFS = [
     { scores: [1,0,0,0,0,0,1], pieces: { 1:'G',2:'G',3:'G',4:'G',5:'G' } },
