@@ -517,6 +517,17 @@
     beginGame();
   });
 
+  // 처음 페이지를 열면 시작 화면(모드 선택)을 거치지 않고 바로 "1인 vs AI 2명"
+  // 게임 화면으로 진입한다. "새 게임" 버튼으로는 여전히 시작 화면으로 돌아가
+  // 3인 로컬 플레이 등 다른 모드를 고를 수 있다.
+  function autoStartDefaultGame() {
+    mode = 'vs_ai';
+    const nicknames = { R: getOrCreateStoredNickname('tectonicShiftNickR'), G: null, Y: null };
+    resetGame();
+    state.nicknames = nicknames;
+    beginGame();
+  }
+
   function beginGame() {
     showScreen('screen-game');
     buildBoardDom();
@@ -904,6 +915,7 @@
   document.getElementById('modal-newgame-btn').addEventListener('click', backToStart);
 
   renderNicknameForm();
+  autoStartDefaultGame();
 })();
 </script>
 </body>
