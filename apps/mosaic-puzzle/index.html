@@ -115,6 +115,31 @@
     font-size: 26px;
   }
 
+  .icon-hex {
+    flex: 0 0 auto;
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    overflow: hidden;
+    position: relative;
+    background: #1c2024;
+    border: 1px solid rgba(255, 255, 255, .08);
+  }
+  .icon-hex .hex-wrap {
+    position: absolute;
+    width: 32px;
+    height: 37px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .icon-hex .hex-label {
+    position: relative;
+    z-index: 1;
+    font-size: 15px;
+    font-weight: 800;
+  }
+
   .game-info {
     flex: 1;
     min-width: 0;
@@ -191,6 +216,18 @@
       quads: ['#1c1c1c', '#f0ece2', '#1c1c1c', '#f0ece2'],
     },
     {
+      name: '지각변동3인',
+      desc: '무너지는 육각 타일 위에서 점수 높은 땅으로 말을 밀어붙이세요',
+      href: './tectonic-shift.html',
+      target: '_self',
+      hexIcon: [
+        { left: 14, top: -9, bg: '#f0ece2', label: '5', color: '#c97a76' },
+        { left: 28, top: 20, bg: '#f0ece2', label: '1', color: '#a89bc9' },
+        { left: 0, top: 20, bg: '#f0ece2', label: '4', color: '#c9a56b' },
+        { left: -14, top: -6, bg: '#141414', label: '', color: '' },
+      ],
+    },
+    {
       name: '블라인드 경매',
       desc: '가격이 비공개된 물품을 큐브로 낙찰받아 최고가를 노려보세요',
       href: './blind-auction.html',
@@ -222,9 +259,20 @@
     card.target = g.target;
     card.rel = 'noopener';
 
+    const HEX_POLY = '16,0 32,9.25 32,27.75 16,37 0,27.75 0,9.25';
     let iconHtml;
     if (g.quads) {
       iconHtml = `<div class="icon-quads">${g.quads.map(c => `<span style="background:${c}"></span>`).join('')}</div>`;
+    } else if (g.hexIcon) {
+      const hexes = g.hexIcon.map(hx => `
+        <div class="hex-wrap" style="left:${hx.left}px;top:${hx.top}px">
+          <svg width="32" height="37" style="position:absolute;left:0;top:0;pointer-events:none">
+            <polygon points="${HEX_POLY}" fill="${hx.bg}" stroke="#000" stroke-width="1"></polygon>
+          </svg>
+          <span class="hex-label" style="color:${hx.color}">${hx.label}</span>
+        </div>
+      `).join('');
+      iconHtml = `<div class="icon-hex">${hexes}</div>`;
     } else if (g.image) {
       iconHtml = `<div class="icon-image"><img src="${g.image}" alt=""></div>`;
     } else {
