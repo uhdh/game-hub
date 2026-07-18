@@ -1243,6 +1243,27 @@
 
   // ---- 모드/난이도 UI ----
 
+  // ---- 랜덤 닉네임 시작 ----
+  const NICKNAME_POOL = [
+    "이상민", "정근우", "박지민", "이태균", "하승진", "현성주", "윤비", "이진형", "홍진호", "서출구",
+    "최혜선", "허성범", "김경훈", "김유현", "김남희", "강지후", "곽범", "이관희", "신승용", "최연청", "덕후",
+  ];
+
+  function randomNickname() {
+    const word = NICKNAME_POOL[Math.floor(Math.random() * NICKNAME_POOL.length)];
+    const num = Math.floor(Math.random() * 999) + 1;
+    return `${word}#${num}`;
+  }
+
+  function getOrCreateStoredNickname(key) {
+    const saved = localStorage.getItem(key);
+    if (saved) return saved;
+    const generated = randomNickname();
+    localStorage.setItem(key, generated);
+    return generated;
+  }
+  // ---- 랜덤 닉네임 끝 ----
+
   const RANK_CONFIGS = {
     hard: { table: "gomoku_hard_ranking", nicknameKey: "gomokuHardRankingNickname", aiRating: 1600, label: "상" },
     extreme: { table: "gomoku_extreme_ranking", nicknameKey: "gomokuExtremeRankingNickname", aiRating: 1900, label: "최상" },
@@ -1262,7 +1283,7 @@
       document.getElementById("rank-toggle-label").textContent = config.label;
       document.getElementById("rank-panel-diff-label").textContent = config.label;
       document.getElementById("rank-register-diff-label").textContent = config.label;
-      document.getElementById("rank-nickname-input").value = localStorage.getItem(config.nicknameKey) || "";
+      document.getElementById("rank-nickname-input").value = getOrCreateStoredNickname(config.nicknameKey);
     }
   }
   document.querySelectorAll("#mode-group .mode-btn").forEach(b => {
@@ -1426,7 +1447,9 @@
   }
 
   document.getElementById("rank-submit-btn").addEventListener("click", () => {
-    const nickname = document.getElementById("rank-nickname-input").value.trim() || "익명";
+    const config = currentRankConfig();
+    const nickname = document.getElementById("rank-nickname-input").value.trim()
+      || (config ? getOrCreateStoredNickname(config.nicknameKey) : randomNickname());
     submitRankResult(nickname);
   });
 

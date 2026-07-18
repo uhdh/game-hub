@@ -174,6 +174,27 @@
   const SUPABASE_TABLE = "rearrange_leaderboard";
   const NICKNAME_KEY = "rearrangeNickname";
 
+  // ---- 랜덤 닉네임 시작 ----
+  const NICKNAME_POOL = [
+    "이상민", "정근우", "박지민", "이태균", "하승진", "현성주", "윤비", "이진형", "홍진호", "서출구",
+    "최혜선", "허성범", "김경훈", "김유현", "김남희", "강지후", "곽범", "이관희", "신승용", "최연청", "덕후",
+  ];
+
+  function randomNickname() {
+    const word = NICKNAME_POOL[Math.floor(Math.random() * NICKNAME_POOL.length)];
+    const num = Math.floor(Math.random() * 999) + 1;
+    return `${word}#${num}`;
+  }
+
+  function getOrCreateStoredNickname(key) {
+    const saved = localStorage.getItem(key);
+    if (saved) return saved;
+    const generated = randomNickname();
+    localStorage.setItem(key, generated);
+    return generated;
+  }
+  // ---- 랜덤 닉네임 끝 ----
+
   const BOARDS = {
     "최연청": [
       ["R", "B", "R", "B", "E", "E", "B", "G"],
@@ -451,7 +472,7 @@
   async function registerScore() {
     const result = computeScore();
     const nicknameInput = document.getElementById("nickname-input");
-    const nickname = nicknameInput.value.trim() || "익명";
+    const nickname = nicknameInput.value.trim() || getOrCreateStoredNickname(NICKNAME_KEY);
     localStorage.setItem(NICKNAME_KEY, nickname);
     const btn = document.getElementById("register-btn");
     btn.disabled = true;
@@ -594,7 +615,7 @@
   document.getElementById("restart-btn").addEventListener("click", resetGame);
   document.getElementById("modal-restart-btn").addEventListener("click", resetGame);
 
-  document.getElementById("nickname-input").value = localStorage.getItem(NICKNAME_KEY) || "";
+  document.getElementById("nickname-input").value = getOrCreateStoredNickname(NICKNAME_KEY);
 
   resetGame();
 })();
