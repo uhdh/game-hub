@@ -259,7 +259,7 @@
 
   async function fetchAllItems() {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/${ITEMS_TABLE}?select=id,item_name,value,memo,artist,created_year,auction_year,auction_house,image_url`,
+      `${SUPABASE_URL}/rest/v1/${ITEMS_TABLE}?select=id,item_name,value,memo,artist,created_year,auction_year,auction_house,image_url&image_url=not.is.null`,
       { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
     );
     if (!res.ok) throw new Error("물품 목록 조회 실패");
