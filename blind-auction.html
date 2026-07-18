@@ -414,6 +414,102 @@
   document.getElementById("pass-btn").addEventListener("click", handleUserPass);
   document.getElementById("reveal-continue-btn").addEventListener("click", startNextRound);
 
+  function resolveRound() {
+    const result = L.finalizeRound(state.round, state.players, state.currentItem);
+    const modal = document.getElementById("modal-resolve");
+    document.getElementById("resolve-item-name").textContent = state.currentItem.item_name;
+    document.getElementById("resolve-value").textContent = `실제 가치: ${state.currentItem.value}`;
+    document.getElementById("resolve-memo").textContent = state.currentItem.memo || "";
+    document.getElementById("resolve-winner").textContent =
+      result.type === "won"
+        ? `${PLAYER_LABELS[result.winnerId]}님이 ${result.amount}에 낙찰받았습니다.`
+        : "유찰 — 아무도 낙찰받지 못했습니다.";
+    modal.classList.remove("hidden");
+
+    state.startPlayerId = L.nextStartPlayer(L.PLAYER_ORDER, state.startPlayerId, result);
+    state.roundIndex += 1;
+  }
+
+  document.getElementById("resolve-next-btn").addEventListener("click", () => {
+    document.getElementById("modal-resolve").classList.add("hidden");
+    startNextRound();
+  });
+
+  const LEADERBOARD_TABLE = "blind_auction_leaderboard";
+  const NICKNAME_KEY = "blindAuctionNickname";
+
+  async function fetchLeaderboard() {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${LEADERBOARD_TABLE}?select=id,nickname,score,created_at&order=score.desc,created_at.asc&limit=10`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) throw new Error("리더보드 조회 실패");
+    return res.json();
+  }
+
+  async function submitScore(score, nickname) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${LEADERBOARD_TABLE}`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation",
+      },
+      body: JSON.stringify({ score, nickname }),
+    });
+    if (!res.ok) throw new Error("리더보드 등록 실패");
+    return res.json();
+  }
+
+  function renderLeaderboard(rows) {
+    const wrap = document.getElementById("leaderboard-list");
+    wrap.innerHTML = "";
+    rows.forEach((row, i) => {
+      const line = document.createElement("div");
+      line.className = "leaderboard-row";
+      line.innerHTML = `<span class="lb-rank">${i + 1}</span><span class="lb-nickname">${row.nickname || "익명"}</span><span class="lb-score">${row.score}</span>`;
+      wrap.appendChild(line);
+    });
+  }
+
+  async function showResults() {
+    showScreen("screen-results");
+    const ranking = L.computeFinalRanking(state.players);
+    const wrap = document.getElementById("ranking-list");
+    wrap.innerHTML = "";
+    ranking.forEach((entry, i) => {
+      const row = document.createElement("div");
+      row.className = "ranking-row" + (i === 0 ? " winner" : "");
+      const items = entry.wonItems.map((it) => it.itemName).join(", ") || "낙찰 없음";
+      row.innerHTML = `<span class="rank-no">${i + 1}</span><span class="rank-name">${PLAYER_LABELS[entry.id]}</span><span class="rank-total">${entry.total}</span><span class="rank-items">${items}</span>`;
+      wrap.appendChild(row);
+    });
+
+    const userEntry = ranking.find((r) => r.id === "user");
+    const nicknameInput = document.getElementById("nickname-input");
+    nicknameInput.value = localStorage.getItem(NICKNAME_KEY) || "";
+
+    document.getElementById("submit-score-btn").onclick = async () => {
+      const nickname = nicknameInput.value.trim() || "익명";
+      localStorage.setItem(NICKNAME_KEY, nickname);
+      try {
+        await submitScore(userEntry.total, nickname);
+        const rows = await fetchLeaderboard();
+        renderLeaderboard(rows);
+      } catch (err) {
+        alert("리더보드 등록에 실패했습니다.");
+      }
+    };
+
+    try {
+      const rows = await fetchLeaderboard();
+      renderLeaderboard(rows);
+    } catch (err) {
+      // 리더보드 조회 실패는 결과 화면 표시 자체를 막지 않음
+    }
+  }
+
   document.getElementById("restart-btn").addEventListener("click", () => {
     showScreen("screen-start");
     initStartScreen();
