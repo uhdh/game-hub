@@ -97,6 +97,9 @@
     border-radius: 20px; padding: 22px; box-shadow: 0 16px 40px rgba(0,0,0,.45);
     border: 1px solid rgba(255,255,255,.05); overflow: auto;
   }
+  @media (max-width: 480px) {
+    .board-wrap { padding: 12px; }
+  }
   #board { position: relative; }
   .hex-tile { position: absolute; display: flex; align-items: center; justify-content: center; cursor: pointer; }
   .hex-tile .hex-number { position: relative; z-index: 1; font-size: 15px; font-weight: 800; }
@@ -221,11 +224,17 @@
   }
 
   // ---- 보드 정의 (디자인 원본 그대로 이식) ----
+  // 보드 가로 폭(13칸)이 모바일 화면보다 훨씬 넓어서 가로 스크롤이 생기던
+  // 문제 — 게임 로직(인접 판정)은 육각형이 "정육각형"일 필요가 없고 그저
+  // HEX_W/HEX_H로 계산한 좌표끼리 일관되게 이웃을 찾기만 하면 되므로,
+  // 모바일에서는 세로 높이(글자 크기와 직결)는 그대로 두고 가로 폭만
+  // 좁힌 "찌그러진" 육각형으로 바꿔 보드 전체 가로 폭을 화면에 맞춘다.
+  const IS_MOBILE = window.matchMedia('(max-width: 480px)').matches;
   const SIZE = 24;
-  const HEX_W = SIZE * Math.sqrt(3);
+  const HEX_W = IS_MOBILE ? 20 : SIZE * Math.sqrt(3);
   const HEX_H = SIZE * 2;
   const ROW_SPACING = HEX_H * 0.75;
-  const PAD = 26;
+  const PAD = IS_MOBILE ? 10 : 26;
 
   const ROW_DEFS = [
     { scores: [1,0,0,0,0,0,1], pieces: { 1:'G',2:'G',3:'G',4:'G',5:'G' } },
