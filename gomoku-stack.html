@@ -65,6 +65,7 @@
   }
   .mode-btn.active { background: rgba(95,184,176,.16); color: #e7ebee; }
   .mode-btn.hidden { display: none; }
+  .mode-btn:disabled { opacity: .35; cursor: default; }
   .rank-toggle-btn {
     background: #15181c; border: 1px solid rgba(255,255,255,.06); border-radius: 12px; padding: 9px 14px;
   }
@@ -161,6 +162,9 @@
     margin-top: 6px; background: #5fb8b0; color: #0f1214; font-size: 14px; font-weight: 700;
     border: none; padding: 11px 22px; border-radius: 10px; cursor: pointer; width: 100%;
   }
+  .btn-restart.hidden { display: none; }
+  .btn-restart.secondary { background: #15181c; color: #c7ccd4; border: 1px solid rgba(255,255,255,.1); }
+  #ai-vs-ai-controls.hidden { display: none; }
 
   .rank-register { width: 100%; display: flex; flex-direction: column; gap: 8px; }
   .rank-register.hidden { display: none; }
@@ -207,6 +211,14 @@
         <button class="mode-btn" data-diff="extreme">최상</button>
       </div>
       <button class="mode-btn rank-toggle-btn hidden" id="rank-toggle-btn">🏆 <span id="rank-toggle-label">상</span> 난이도 랭킹</button>
+    </div>
+
+    <div class="mode-bar hidden" id="ai-vs-ai-controls">
+      <div class="mode-group">
+        <button class="mode-btn" id="aivsai-rewind-btn">◀ 되감기</button>
+        <button class="mode-btn" id="aivsai-autoplay-btn">⏸ 자동재생</button>
+        <button class="mode-btn" id="aivsai-step-btn">재생 ▶</button>
+      </div>
     </div>
 
     <div class="rank-panel hidden" id="rank-panel">
@@ -263,6 +275,7 @@
 
     <span class="undo-rank-note hidden" id="undo-rank-note">무르기를 사용해 이번 판 결과는 랭킹에 등록할 수 없습니다.</span>
 
+    <button class="btn-restart secondary hidden" id="win-replay-btn">처음부터 다시보기</button>
     <button class="btn-restart" id="win-close-btn">종료</button>
   </div>
 </div>
