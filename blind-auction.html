@@ -500,6 +500,27 @@
   const LEADERBOARD_TABLE = "blind_auction_leaderboard";
   const NICKNAME_KEY = "blindAuctionNickname";
 
+  // ---- 랜덤 닉네임 시작 ----
+  const NICKNAME_POOL = [
+    "이상민", "정근우", "박지민", "이태균", "하승진", "현성주", "윤비", "이진형", "홍진호", "서출구",
+    "최혜선", "허성범", "김경훈", "김유현", "김남희", "강지후", "곽범", "이관희", "신승용", "최연청", "덕후",
+  ];
+
+  function randomNickname() {
+    const word = NICKNAME_POOL[Math.floor(Math.random() * NICKNAME_POOL.length)];
+    const num = Math.floor(Math.random() * 999) + 1;
+    return `${word}#${num}`;
+  }
+
+  function getOrCreateStoredNickname(key) {
+    const saved = localStorage.getItem(key);
+    if (saved) return saved;
+    const generated = randomNickname();
+    localStorage.setItem(key, generated);
+    return generated;
+  }
+  // ---- 랜덤 닉네임 끝 ----
+
   async function fetchLeaderboard() {
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/${LEADERBOARD_TABLE}?select=id,nickname,score,created_at&order=score.desc,created_at.asc&limit=10`,
@@ -550,10 +571,10 @@
 
     const userEntry = ranking.find((r) => r.id === "user");
     const nicknameInput = document.getElementById("nickname-input");
-    nicknameInput.value = localStorage.getItem(NICKNAME_KEY) || "";
+    nicknameInput.value = getOrCreateStoredNickname(NICKNAME_KEY);
 
     document.getElementById("submit-score-btn").onclick = async () => {
-      const nickname = nicknameInput.value.trim() || "익명";
+      const nickname = nicknameInput.value.trim() || getOrCreateStoredNickname(NICKNAME_KEY);
       localStorage.setItem(NICKNAME_KEY, nickname);
       try {
         await submitScore(userEntry.total, nickname);
