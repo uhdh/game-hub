@@ -470,6 +470,22 @@
 
   // ---- AI 평가 함수 ----
 
+  // 상대 돌이 칸을 막고 있어도, 그 돌이 높이 1~2층이고 옆(인접)에 내 돌이
+  // 있어서 "쌓기 이동"으로 그 위에 올라타 색을 뒤집을 수 있다면 진짜 차단이
+  // 아니다. 실전에서 이 "무른 차단"을 방치했다가 상대가 되찾아 오목을
+  // 완성한 사고가 있었음(2026-07-19, 테스트유저 기보) — 평가 함수가 이런
+  // 자리를 계속 "안전"으로 오판하지 않도록 확인한다.
+  function isRestackableBlock(stacks, key, byColor) {
+    const st = stacks[key];
+    if (!st || !st.length) return false;
+    const h = st.length;
+    if (h + 1 > 3) return false;
+    return neighbors(key).some(n => {
+      const os = stacks[n.key];
+      return !!os && os.length > 0 && os[os.length - 1] === byColor && os.length >= h;
+    });
+  }
+
   function lineThreatScore(stacks, color) {
     let score = 0;
     for (const key in BOARD_MAP) {
@@ -483,8 +499,8 @@
         while (topColorOf(stacks, cq + "_" + cr) === color) { length++; cq += dir.q; cr += dir.r; }
         if (length >= 5) continue;
         const afterKey = cq + "_" + cr;
-        const beforeOpen = !!BOARD_MAP[prevKey] && !topColorOf(stacks, prevKey);
-        const afterOpen = !!BOARD_MAP[afterKey] && !topColorOf(stacks, afterKey);
+        const beforeOpen = !!BOARD_MAP[prevKey] && (!topColorOf(stacks, prevKey) || isRestackableBlock(stacks, prevKey, color));
+        const afterOpen = !!BOARD_MAP[afterKey] && (!topColorOf(stacks, afterKey) || isRestackableBlock(stacks, afterKey, color));
         const openEnds = (beforeOpen ? 1 : 0) + (afterOpen ? 1 : 0);
         const base = [0, 2, 14, 90, 550][length] || 0;
         score += base * (1 + openEnds);
@@ -541,7 +557,10 @@
         for (const k of cells) {
           const top = topColorOf(stacks, k);
           if (top === color) mine++;
-          else if (top) { blocked = true; break; }
+          else if (top) {
+            if (isRestackableBlock(stacks, k, color)) mine++;
+            else { blocked = true; break; }
+          }
         }
         if (blocked) continue;
         score += WEIGHTS[mine];
@@ -914,6 +933,16 @@
       });
       return moves;
     }
+    function isRestackableBlock(stacks, key, byColor) {
+      const st = stacks[key];
+      if (!st || !st.length) return false;
+      const h = st.length;
+      if (h + 1 > 3) return false;
+      return neighbors(key).some(n => {
+        const os = stacks[n.key];
+        return !!os && os.length > 0 && os[os.length - 1] === byColor && os.length >= h;
+      });
+    }
     function lineThreatScore(stacks, color) {
       let score = 0;
       for (const key in BOARD_MAP) {
@@ -927,8 +956,8 @@
           while (topColorOf(stacks, cq + "_" + cr) === color) { length++; cq += dir.q; cr += dir.r; }
           if (length >= 5) continue;
           const afterKey = cq + "_" + cr;
-          const beforeOpen = !!BOARD_MAP[prevKey] && !topColorOf(stacks, prevKey);
-          const afterOpen = !!BOARD_MAP[afterKey] && !topColorOf(stacks, afterKey);
+          const beforeOpen = !!BOARD_MAP[prevKey] && (!topColorOf(stacks, prevKey) || isRestackableBlock(stacks, prevKey, color));
+          const afterOpen = !!BOARD_MAP[afterKey] && (!topColorOf(stacks, afterKey) || isRestackableBlock(stacks, afterKey, color));
           const openEnds = (beforeOpen ? 1 : 0) + (afterOpen ? 1 : 0);
           const base = [0, 2, 14, 90, 550][length] || 0;
           score += base * (1 + openEnds);
@@ -978,7 +1007,10 @@
           for (const k of cells) {
             const top = topColorOf(stacks, k);
             if (top === color) mine++;
-            else if (top) { blocked = true; break; }
+            else if (top) {
+              if (isRestackableBlock(stacks, k, color)) mine++;
+              else { blocked = true; break; }
+            }
           }
           if (blocked) continue;
           score += WEIGHTS[mine];
