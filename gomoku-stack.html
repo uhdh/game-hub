@@ -1119,6 +1119,7 @@
   let history = []; // 무르기용: 각 수를 두기 직전 state 스냅샷
   let usedUndo = false; // 이번 판에서 무르기를 사용했는지 (사용 시 랭킹 등록 불가)
   let moveLog = []; // 기보 기록용: history와 항상 1:1로 push/pop되는 수순 목록
+  let winOverlayReady = false; // 승리 직후 마지막 수를 잠깐 보여준 뒤에만 true가 됨(승리 팝업 표시 여부)
 
   let state = {
     stacks: {},
@@ -1135,6 +1136,8 @@
     lastCell: null,
   };
 
+  const WIN_OVERLAY_DELAY_MS = 2000;
+
   function setState(patch) {
     const wasWinner = state.winner;
     state = Object.assign({}, state, patch);
@@ -1144,6 +1147,19 @@
         autoSubmitRankIfReturningPlayer();
       }
       submitGameLog();
+    }
+    if (!wasWinner && state.winner) {
+      // 마지막 수가 놓인 보드를 잠깐 보여준 뒤에 승리 팝업을 띄운다(즉시 뜨면 마지막
+      // 수가 안 보인다는 피드백 반영).
+      winOverlayReady = false;
+      const epoch = gameEpoch;
+      setTimeout(() => {
+        if (epoch !== gameEpoch) return; // 그 사이 새 게임이 시작됐으면 무시
+        winOverlayReady = true;
+        render();
+      }, WIN_OVERLAY_DELAY_MS);
+    } else if (!state.winner) {
+      winOverlayReady = false;
     }
     render();
     scheduleAIIfNeeded();
@@ -1726,8 +1742,11 @@
       winDotEl.style.background = stoneColor(winner);
       winLabelEl.textContent = `${colorName(winner)} 승리!`;
       winReasonEl.textContent = winReason;
-      winAiTauntEl.classList.toggle("hidden", !(gameMode === "ai" && winner === HUMAN_PLAYER));
-      winOverlayEl.classList.add("show");
+      winAiTauntEl.classList.toggle("hidden", gameMode !== "ai");
+      if (gameMode === "ai") {
+        winAiTauntEl.textContent = winner === HUMAN_PLAYER ? "AI say : omok jotgachi doone..." : "AI say : omok gaemothane...";
+      }
+      winOverlayEl.classList.toggle("show", winOverlayReady);
       document.getElementById("rank-register").classList.toggle("hidden", !(hasRankConfig && !usedUndo));
       document.getElementById("undo-rank-note").classList.toggle("hidden", !(hasRankConfig && usedUndo));
     } else {
