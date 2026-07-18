@@ -762,7 +762,7 @@
   // 메인 스레드를 막지 않으면서, 시간 예산 안에서 갈 수 있는 만큼 더 깊이 탐색한다.
   // 워커를 못 띄우는 환경이면 위의 동기 computeAIMainMoveHard()로 자동 폴백한다.
 
-  const HARD_TIME_BUDGET_MS = 1500;
+  const HARD_TIME_BUDGET_MS = 3000;
 
   const AI_WORKER_SOURCE = "(" + function () {
     const NEIGHBOR_DIRS = [
