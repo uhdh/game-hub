@@ -1,0 +1,1660 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3단 오목 - 피의 게임 X 시뮬레이터</title>
+<link rel="icon" type="image/png" href="assets/gomoku-favicon.png">
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #0f0f12;
+    min-height: 100vh;
+  }
+  a { color: #5fb8b0; text-decoration: none; }
+
+  #app {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    background: #0f0f12;
+    padding: 24px 16px 40px;
+    box-sizing: border-box;
+    font-family: -apple-system, "Pretendard", "Segoe UI", "Malgun Gothic", sans-serif;
+    color: #e7ebee;
+  }
+  .col {
+    width: 100%;
+    max-width: 1000px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .header-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .header-left { display: flex; flex-direction: column; gap: 2px; }
+  .header-left a { font-size: 12px; font-weight: 600; }
+  .header-left .title { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+  .version-tag { font-size: 11px; font-weight: 700; color: #8992a0; vertical-align: middle; }
+  .header-actions { display: flex; gap: 8px; flex: 0 0 auto; }
+  .btn-reset {
+    background: #15181c; border: 1px solid rgba(255,255,255,.1); color: #c7ccd4;
+    font-size: 13px; font-weight: 600; padding: 9px 14px; border-radius: 10px; cursor: pointer;
+  }
+  .btn-undo {
+    background: #15181c; border: 1px solid rgba(255,255,255,.1); color: #c7ccd4;
+    font-size: 13px; font-weight: 600; padding: 9px 14px; border-radius: 10px; cursor: pointer;
+  }
+  .btn-undo:disabled { opacity: .4; cursor: default; }
+  .undo-rank-note {
+    font-size: 12px; color: #8992a0; text-align: center;
+  }
+  .undo-rank-note.hidden { display: none; }
+
+  .mode-bar { display: flex; flex-wrap: wrap; gap: 8px; }
+  .mode-group {
+    display: flex; gap: 4px;
+    background: #15181c; border: 1px solid rgba(255,255,255,.06); border-radius: 12px; padding: 4px;
+  }
+  .mode-group.hidden { display: none; }
+  .mode-btn {
+    font-size: 12.5px; font-weight: 700; padding: 7px 13px; border-radius: 8px;
+    border: none; background: transparent; color: #8992a0; cursor: pointer;
+  }
+  .mode-btn.active { background: rgba(95,184,176,.16); color: #e7ebee; }
+  .mode-btn.hidden { display: none; }
+  .rank-toggle-btn {
+    background: #15181c; border: 1px solid rgba(255,255,255,.06); border-radius: 12px; padding: 9px 14px;
+  }
+  .rank-toggle-btn.active { background: rgba(255,209,102,.14); color: #ffd166; border-color: rgba(255,209,102,.35); }
+
+  .rank-panel {
+    display: flex; flex-direction: column; gap: 8px;
+    background: #15181c; border: 1px solid rgba(255,255,255,.06); border-radius: 16px; padding: 14px 16px;
+  }
+  .rank-panel.hidden { display: none; }
+  .rank-panel-title { font-size: 12px; font-weight: 700; color: #ffd166; letter-spacing: .04em; text-transform: uppercase; }
+  .rank-list { display: flex; flex-direction: column; gap: 6px; }
+  .rank-row {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06);
+    border-radius: 10px; padding: 8px 10px;
+  }
+  .rank-row .no { flex: 0 0 auto; width: 20px; text-align: center; font-size: 12px; font-weight: 700; color: #8992a0; }
+  .rank-row .nick { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; color: #e7ebee; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rank-row .rating { flex: 0 0 auto; font-size: 14px; font-weight: 700; color: #ffd166; font-variant-numeric: tabular-nums; }
+  .rank-row .record { flex: 0 0 auto; font-size: 11px; color: #8992a0; }
+  .rank-empty { font-size: 12.5px; color: #8992a0; text-align: center; padding: 4px; }
+
+  .status-bar {
+    display: flex; align-items: center; gap: 10px;
+    background: #15181c; border: 1px solid rgba(255,255,255,.06); border-radius: 16px;
+    padding: 14px 16px; box-shadow: 0 12px 30px rgba(0,0,0,.35);
+  }
+  .turn-dot { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto; border: 1px solid rgba(255,255,255,.25); }
+  .phase-label { font-size: 14px; font-weight: 700; flex: 1; min-width: 0; }
+  .supply-chips { display: flex; gap: 8px; flex: 0 0 auto; }
+  .supply-chip { font-size: 12px; font-weight: 600; color: #c7ccd4; background: #1c2024; border-radius: 20px; padding: 4px 10px; }
+  .undo-used-chip { font-size: 12px; font-weight: 600; color: #ffd166; background: #1c2024; border-radius: 20px; padding: 4px 10px; }
+  .undo-used-chip.hidden { display: none; }
+
+  .board-card {
+    display: flex; justify-content: center;
+    background: linear-gradient(160deg,#f4e5aa,#ecd996);
+    border-radius: 20px; padding: 22px;
+    box-shadow: 0 16px 40px rgba(0,0,0,.45);
+    border: 1px solid rgba(255,255,255,.05);
+    transition: opacity .15s ease;
+  }
+  .board-card.thinking { opacity: .78; pointer-events: none; }
+  #board-scale { position: relative; }
+  #board-wrap { position: relative; transform-origin: top left; }
+
+  @media (max-width: 480px) {
+    #app { padding: 16px 10px 28px; }
+    .col { gap: 12px; }
+    .board-card { padding: 12px; border-radius: 16px; }
+    .header-left .title { font-size: 19px; }
+    .mode-btn { font-size: 11.5px; padding: 6px 10px; }
+    .status-bar { padding: 12px 13px; }
+    .phase-label { font-size: 12.5px; }
+  }
+  .cell-wrap {
+    position: absolute; transform: translate(-50%,-50%);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; border-radius: 50%;
+  }
+  .stone { border-radius: 50%; }
+  .pips-wrap { position: absolute; bottom: -4px; right: -4px; display: flex; flex-direction: column-reverse; gap: 2px; }
+  .pip { width: 13px; height: 13px; border-radius: 2px; }
+
+  .rules-text { font-size: 12px; color: #8992a0; line-height: 1.6; padding: 2px 4px; }
+
+  .win-card {
+    display: flex; flex-direction: column; gap: 8px;
+    background: #15181c; border: 1px solid rgba(255,255,255,.06); border-radius: 16px; padding: 14px 16px;
+  }
+  .win-card .label { font-size: 12px; font-weight: 700; color: #5fb8b0; letter-spacing: .04em; text-transform: uppercase; }
+  .win-card .rows { display: flex; flex-direction: column; gap: 6px; }
+  .win-card .rows span { font-size: 13px; color: #c7ccd4; }
+  .win-card .rows b { color: #e7ebee; }
+
+  #win-overlay {
+    position: fixed; inset: 0; background: rgba(6,7,9,.72);
+    display: none; align-items: center; justify-content: center; padding: 20px; z-index: 50;
+  }
+  #win-overlay.show { display: flex; }
+  #win-box {
+    background: #15181c; border: 1px solid rgba(255,255,255,.1); border-radius: 20px;
+    padding: 28px 26px; max-width: 340px; width: 100%;
+    display: flex; flex-direction: column; gap: 14px; align-items: center; text-align: center;
+    box-shadow: 0 24px 60px rgba(0,0,0,.5);
+  }
+  #win-dot { width: 44px; height: 44px; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); }
+  #win-label { font-size: 19px; font-weight: 800; }
+  #win-reason { font-size: 13px; color: #8992a0; }
+  .btn-restart {
+    margin-top: 6px; background: #5fb8b0; color: #0f1214; font-size: 14px; font-weight: 700;
+    border: none; padding: 11px 22px; border-radius: 10px; cursor: pointer; width: 100%;
+  }
+
+  .rank-register { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+  .rank-register.hidden { display: none; }
+  .rank-register-label { font-size: 12px; font-weight: 700; color: #ffd166; }
+  .rank-register-row { display: flex; gap: 8px; }
+  #rank-nickname-input {
+    flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; padding: 9px 11px;
+    border-radius: 9px; border: 1px solid rgba(255,255,255,.12); background: #1c2024; color: #e7ebee;
+  }
+  #rank-nickname-input::placeholder { color: #565c66; font-weight: 500; }
+  .btn-rank-submit {
+    flex: 0 0 auto; font-size: 13px; font-weight: 700; padding: 9px 16px; border-radius: 9px;
+    border: none; background: #ffd166; color: #14110a; cursor: pointer;
+  }
+  .btn-rank-submit:disabled { opacity: .6; cursor: default; }
+  .rank-register-result { font-size: 12.5px; color: #c7ccd4; text-align: center; }
+  .rank-register-result.hidden { display: none; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="col">
+    <div class="header-row">
+      <div class="header-left">
+        <a href="index.html">← 게임 허브</a>
+        <span class="title">3단 오목 <span class="version-tag">v0.4</span></span>
+      </div>
+      <div class="header-actions">
+        <button class="btn-undo" id="undo-btn">한 수 무르기</button>
+        <button class="btn-reset" id="reset-btn">새 게임</button>
+      </div>
+    </div>
+
+    <div class="mode-bar">
+      <div class="mode-group" id="mode-group">
+        <button class="mode-btn" data-mode="2p">2인 플레이</button>
+        <button class="mode-btn" data-mode="ai">AI와 대결</button>
+      </div>
+      <div class="mode-group" id="difficulty-group">
+        <button class="mode-btn" data-diff="easy">하</button>
+        <button class="mode-btn" data-diff="medium">중</button>
+        <button class="mode-btn" data-diff="hard">상</button>
+        <button class="mode-btn" data-diff="extreme">최상</button>
+      </div>
+      <button class="mode-btn rank-toggle-btn hidden" id="rank-toggle-btn">🏆 <span id="rank-toggle-label">상</span> 난이도 랭킹</button>
+    </div>
+
+    <div class="rank-panel hidden" id="rank-panel">
+      <span class="rank-panel-title"><span id="rank-panel-diff-label">상</span> 난이도 레이팅 TOP 10</span>
+      <div class="rank-list" id="rank-list"></div>
+    </div>
+
+    <div class="status-bar">
+      <div class="turn-dot" id="turn-dot"></div>
+      <span class="phase-label" id="phase-label"></span>
+      <span class="undo-used-chip hidden" id="undo-used-chip">무르기 사용 · 랭킹 미등록</span>
+      <div class="supply-chips">
+        <span class="supply-chip" id="supply-1"></span>
+        <span class="supply-chip" id="supply-2"></span>
+      </div>
+    </div>
+
+    <div class="board-card">
+      <div id="board-scale">
+        <div id="board-wrap"></div>
+      </div>
+    </div>
+
+    <div class="rules-text">
+      기본 배치: 선 플레이어부터 1개 → 2개 → 2개 → 1개 순서로 번갈아 놓습니다 (중앙 칸·자신의 돌과 인접한 칸 금지). 이후 매 턴 새 돌 놓기 또는 자신의 돌을 인접 칸으로 이동(최대 3층까지 쌓기, 원래 칸보다 높이 쌓인 칸으로는 이동 불가)을 선택합니다.
+    </div>
+
+    <div class="win-card">
+      <span class="label">승리 조건 (택 1 충족 시 즉시 승리)</span>
+      <div class="rows">
+        <span><b>1. 오목 완성</b> — 자신의 돌 5개를 일직선으로 연결 (6개 이상 연결되면 인정되지 않음)</span>
+        <span><b>2. 5개 3층 쌓기</b> — 자신의 돌 5개가 어디든 3층에 위치</span>
+        <span><b>3. 인접 3개 3층 쌓기</b> — 서로 인접한 자신의 돌 3개가 모두 3층에 위치</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="win-overlay">
+  <div id="win-box">
+    <div id="win-dot"></div>
+    <span id="win-label"></span>
+    <span id="win-reason"></span>
+
+    <div class="rank-register hidden" id="rank-register">
+      <span class="rank-register-label"><span id="rank-register-diff-label">상</span> 난이도 레이팅에 등록하기</span>
+      <div class="rank-register-row">
+        <input type="text" id="rank-nickname-input" placeholder="닉네임" maxlength="12">
+        <button class="btn-rank-submit" id="rank-submit-btn">등록</button>
+      </div>
+      <div class="rank-register-result hidden" id="rank-register-result"></div>
+    </div>
+
+    <span class="undo-rank-note hidden" id="undo-rank-note">무르기를 사용해 이번 판 결과는 랭킹에 등록할 수 없습니다.</span>
+
+    <button class="btn-restart" id="win-close-btn">종료</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const SIZE = 68;
+  const PAD = 44;
+  const HIT = 84;
+
+  const NEIGHBOR_DIRS = [
+    { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
+    { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 },
+  ];
+  const LINE_DIRS = [{ q: 1, r: 0 }, { q: 0, r: 1 }, { q: 1, r: -1 }];
+
+  function toPixel(q, r) {
+    return { x: SIZE * 1.5 * q, y: SIZE * Math.sqrt(3) * (r + q / 2) };
+  }
+
+  const RAW_BOARD = [];
+  for (let q = -5; q <= 5; q++) {
+    for (let r = -5; r <= 5; r++) {
+      const s = -q - r;
+      if (Math.abs(s) > 5) continue;
+      const isCorner = [Math.abs(q), Math.abs(r), Math.abs(s)].filter(v => v === 5).length >= 2;
+      if (isCorner) continue;
+      RAW_BOARD.push({ q, r, s });
+    }
+  }
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  RAW_BOARD.forEach(c => {
+    const p = toPixel(c.q, c.r);
+    c.px = p.x; c.py = p.y;
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+  });
+  const OFFX = PAD - minX, OFFY = PAD - minY;
+  const BOARD_W = maxX - minX + PAD * 2;
+  const BOARD_H = maxY - minY + PAD * 2;
+  RAW_BOARD.forEach(c => { c.left = c.px + OFFX; c.top = c.py + OFFY; c.key = c.q + "_" + c.r; });
+
+  const BOARD_MAP = {};
+  RAW_BOARD.forEach(c => { BOARD_MAP[c.key] = c; });
+
+  const GRID_LINES = [];
+  RAW_BOARD.forEach(c => {
+    LINE_DIRS.forEach(d => {
+      const nk = (c.q + d.q) + "_" + (c.r + d.r);
+      const n = BOARD_MAP[nk];
+      if (n) GRID_LINES.push({ x1: c.left, y1: c.top, x2: n.left, y2: n.top });
+    });
+  });
+
+  const INITIAL_STEPS = [
+    { player: 1, count: 1 }, { player: 2, count: 2 },
+    { player: 1, count: 2 }, { player: 2, count: 1 },
+  ];
+
+  let HUMAN_PLAYER = 1;
+  let AI_PLAYER = 2;
+
+  function otherPlayer(p) { return p === 1 ? 2 : 1; }
+  function colorName(p) { return p === 1 ? "흑돌" : "백돌"; }
+  function stoneColor(p) { return p === 1 ? "#000000" : "#ffffff"; }
+  function stoneBorder(p) { return p === 1 ? "2px solid #f0ece2" : "2px solid #1c1c1c"; }
+  function randomInt(n) { return Math.floor(Math.random() * n); }
+
+  // ---- 순수 로직 (임의의 stacks 스냅샷에 대해 동작 — AI 시뮬레이션에도 재사용) ----
+
+  function neighbors(key) {
+    const c = BOARD_MAP[key];
+    return NEIGHBOR_DIRS.map(d => BOARD_MAP[(c.q + d.q) + "_" + (c.r + d.r)]).filter(Boolean);
+  }
+
+  function topColorOf(stacks, key) {
+    const st = stacks[key];
+    return st && st.length ? st[st.length - 1] : null;
+  }
+
+  function isValidInitialPlacementOf(stacks, key, player) {
+    if (key === "0_0") return false;
+    const st = stacks[key];
+    if (st && st.length) return false;
+    return !neighbors(key).some(n => topColorOf(stacks, n.key) === player);
+  }
+
+  function isValidMoveTargetOf(stacks, originKey, destKey, player) {
+    if (originKey === destKey) return false;
+    const origin = BOARD_MAP[originKey];
+    const dest = BOARD_MAP[destKey];
+    const isAdj = NEIGHBOR_DIRS.some(d => (origin.q + d.q) === dest.q && (origin.r + d.r) === dest.r);
+    if (!isAdj) return false;
+    const originH = (stacks[originKey] || []).length;
+    const destH = (stacks[destKey] || []).length;
+    return destH <= originH && destH + 1 <= 3;
+  }
+
+  function checkFiveInRowOf(stacks, color) {
+    for (const key in BOARD_MAP) {
+      if (topColorOf(stacks, key) !== color) continue;
+      const c = BOARD_MAP[key];
+      for (const dir of LINE_DIRS) {
+        const prevKey = (c.q - dir.q) + "_" + (c.r - dir.r);
+        if (topColorOf(stacks, prevKey) === color) continue;
+        const run = [key];
+        let cq = c.q + dir.q, cr = c.r + dir.r;
+        while (topColorOf(stacks, cq + "_" + cr) === color) { run.push(cq + "_" + cr); cq += dir.q; cr += dir.r; }
+        if (run.length === 5) return run;
+      }
+    }
+    return null;
+  }
+
+  function checkFiveAtTop3Of(stacks, color) {
+    const found = [];
+    for (const key in BOARD_MAP) {
+      const st = stacks[key];
+      if (st && st.length === 3 && st[2] === color) found.push(key);
+    }
+    return found.length >= 5 ? found.slice(0, 5) : null;
+  }
+
+  function checkTriangleTop3Of(stacks, color) {
+    const isTop3 = k => { const st = stacks[k]; return st && st.length === 3 && st[2] === color; };
+    for (const key in BOARD_MAP) {
+      if (!isTop3(key)) continue;
+      const c = BOARD_MAP[key];
+      for (let i = 0; i < 6; i++) {
+        const d1 = NEIGHBOR_DIRS[i];
+        const n1Key = (c.q + d1.q) + "_" + (c.r + d1.r);
+        if (!isTop3(n1Key)) continue;
+        const n1 = BOARD_MAP[n1Key];
+        for (let j = 0; j < 6; j++) {
+          const d2 = NEIGHBOR_DIRS[j];
+          const n2Key = (n1.q + d2.q) + "_" + (n1.r + d2.r);
+          if (n2Key === key) continue;
+          if (isTop3(n2Key)) return [key, n1Key, n2Key];
+        }
+      }
+    }
+    return null;
+  }
+
+  function checkWinOf(stacks, player) {
+    const row = checkFiveInRowOf(stacks, player);
+    if (row) return { cells: row, reason: "오목 완성 (5개 일직선 연결)" };
+    const top5 = checkFiveAtTop3Of(stacks, player);
+    if (top5) return { cells: top5, reason: "돌 5개 3층 쌓기 완성" };
+    const tri = checkTriangleTop3Of(stacks, player);
+    if (tri) return { cells: tri, reason: "인접한 돌 3개 3층 쌓기 완성" };
+    return null;
+  }
+
+  function placeStoneOf(stacks, key, player) {
+    const next = Object.assign({}, stacks);
+    next[key] = (next[key] || []).concat([player]);
+    return next;
+  }
+
+  function moveStoneOf(stacks, originKey, destKey, player) {
+    const next = Object.assign({}, stacks);
+    const originStack = next[originKey].slice();
+    originStack.pop();
+    next[originKey] = originStack;
+    next[destKey] = (next[destKey] || []).concat([player]);
+    return next;
+  }
+
+  function applyMoveToStacks(stacks, move, player) {
+    return move.type === "place" ? placeStoneOf(stacks, move.key, player) : moveStoneOf(stacks, move.origin, move.dest, player);
+  }
+
+  function getAllLegalMainMoves(stacks, player, supply) {
+    const moves = [];
+    if (supply > 0) {
+      RAW_BOARD.forEach(c => {
+        const st = stacks[c.key];
+        if (!st || !st.length) moves.push({ type: "place", key: c.key });
+      });
+    }
+    RAW_BOARD.forEach(c => {
+      if (topColorOf(stacks, c.key) !== player) return;
+      neighbors(c.key).forEach(n => {
+        if (isValidMoveTargetOf(stacks, c.key, n.key, player)) moves.push({ type: "move", origin: c.key, dest: n.key });
+      });
+    });
+    return moves;
+  }
+
+  // ---- AI 평가 함수 ----
+
+  function lineThreatScore(stacks, color) {
+    let score = 0;
+    for (const key in BOARD_MAP) {
+      if (topColorOf(stacks, key) !== color) continue;
+      const c = BOARD_MAP[key];
+      for (const dir of LINE_DIRS) {
+        const prevKey = (c.q - dir.q) + "_" + (c.r - dir.r);
+        if (topColorOf(stacks, prevKey) === color) continue;
+        let length = 1;
+        let cq = c.q + dir.q, cr = c.r + dir.r;
+        while (topColorOf(stacks, cq + "_" + cr) === color) { length++; cq += dir.q; cr += dir.r; }
+        if (length >= 5) continue;
+        const afterKey = cq + "_" + cr;
+        const beforeOpen = !!BOARD_MAP[prevKey] && !topColorOf(stacks, prevKey);
+        const afterOpen = !!BOARD_MAP[afterKey] && !topColorOf(stacks, afterKey);
+        const openEnds = (beforeOpen ? 1 : 0) + (afterOpen ? 1 : 0);
+        const base = [0, 2, 14, 90, 550][length] || 0;
+        score += base * (1 + openEnds);
+      }
+    }
+    return score;
+  }
+
+  function stackThreatScore(stacks, color) {
+    let score = 0;
+    const top3Cells = [];
+    for (const key in BOARD_MAP) {
+      const st = stacks[key];
+      if (!st || !st.length) continue;
+      const h = st.length;
+      if (st[h - 1] !== color) continue;
+      if (h === 3) { top3Cells.push(key); score += 30; }
+      else if (h === 2) score += 9;
+      else score += 1;
+    }
+    const top3Set = new Set(top3Cells);
+    let adjPairs = 0;
+    top3Cells.forEach(k => {
+      const c = BOARD_MAP[k];
+      NEIGHBOR_DIRS.forEach(d => {
+        if (top3Set.has((c.q + d.q) + "_" + (c.r + d.r))) adjPairs++;
+      });
+    });
+    score += adjPairs * 25;
+    return score;
+  }
+
+  function evaluatePosition(stacks, forPlayer) {
+    const opp = otherPlayer(forPlayer);
+    if (checkWinOf(stacks, forPlayer)) return 1e7;
+    if (checkWinOf(stacks, opp)) return -1e7;
+    const mine = lineThreatScore(stacks, forPlayer) + stackThreatScore(stacks, forPlayer);
+    const theirs = lineThreatScore(stacks, opp) + stackThreatScore(stacks, opp);
+    return mine - theirs * 1.15;
+  }
+
+  function computeAIInitialMove() {
+    const candidates = RAW_BOARD.filter(c => isValidInitialPlacementOf(state.stacks, c.key, AI_PLAYER));
+    if (aiDifficulty === "easy") return { type: "place", key: candidates[randomInt(candidates.length)].key };
+    if (aiDifficulty === "hard" || aiDifficulty === "extreme") {
+      let best = candidates[0], bestScore = -Infinity;
+      candidates.forEach(c => {
+        const result = placeStoneOf(state.stacks, c.key, AI_PLAYER);
+        const centerBias = -Math.max(Math.abs(c.q), Math.abs(c.r), Math.abs(c.s)) * 0.5;
+        const score = evaluatePosition(result, AI_PLAYER) + centerBias;
+        if (score > bestScore) { bestScore = score; best = c; }
+      });
+      return { type: "place", key: best.key };
+    }
+    const noiseAmp = 3;
+    let best = null, bestScore = -Infinity;
+    candidates.forEach(c => {
+      const score = -Math.max(Math.abs(c.q), Math.abs(c.r), Math.abs(c.s)) + Math.random() * noiseAmp;
+      if (score > bestScore) { bestScore = score; best = c; }
+    });
+    return { type: "place", key: best.key };
+  }
+
+  // ---- 상 난이도: 알파-베타 미니맥스 탐색 ----
+
+  const HARD_ROOT_BEAM = 16;   // 루트에서 검토하는 후보 수 (전체 합법수 기준 1수 평가로 추림)
+  const HARD_INNER_BEAM = 8;   // 탐색 도중 각 노드에서 검토하는 후보 수
+  const HARD_SEARCH_PLIES = 3; // 루트 수 이후 추가로 내다보는 수 (상대→나→상대)
+  const HARD_NEAR_RADIUS = 2;  // 탐색용 후보 수를 기존 돌 주변으로 제한하는 반경
+
+  function isNearAnyStone(stacks, key, radius) {
+    const c = BOARD_MAP[key];
+    for (const k in stacks) {
+      if (!stacks[k] || !stacks[k].length) continue;
+      const c2 = BOARD_MAP[k];
+      if (Math.max(Math.abs(c.q - c2.q), Math.abs(c.r - c2.r), Math.abs(c.s - c2.s)) <= radius) return true;
+    }
+    return false;
+  }
+
+  // 탐색 내부용: 관련 없는(기존 돌과 멀리 떨어진) 배치 후보는 제외해 비용을 줄인다
+  function getSearchMoves(stacks, player, supply) {
+    const moves = [];
+    if (supply > 0) {
+      RAW_BOARD.forEach(c => {
+        const st = stacks[c.key];
+        if (st && st.length) return;
+        if (isNearAnyStone(stacks, c.key, HARD_NEAR_RADIUS)) moves.push({ type: "place", key: c.key });
+      });
+    }
+    RAW_BOARD.forEach(c => {
+      if (topColorOf(stacks, c.key) !== player) return;
+      neighbors(c.key).forEach(n => {
+        if (isValidMoveTargetOf(stacks, c.key, n.key, player)) moves.push({ type: "move", origin: c.key, dest: n.key });
+      });
+    });
+    return moves;
+  }
+
+  function applyMoveWithSupply(stacks, supply, move, player) {
+    const nextStacks = applyMoveToStacks(stacks, move, player);
+    const nextSupply = move.type === "place" ? Object.assign({}, supply, { [player]: supply[player] - 1 }) : supply;
+    return { stacks: nextStacks, supply: nextSupply };
+  }
+
+  function orderedCandidates(stacks, player, supply, moves, isMaximizing, limit) {
+    const scored = moves.map(m => ({ m, s: evaluatePosition(applyMoveToStacks(stacks, m, player), AI_PLAYER) }));
+    scored.sort((a, b) => (isMaximizing ? b.s - a.s : a.s - b.s));
+    return scored.slice(0, limit).map(o => o.m);
+  }
+
+  function minimax(stacks, supply, ply, isMaximizing, alpha, beta) {
+    if (checkWinOf(stacks, AI_PLAYER)) return 1e7 + ply;
+    if (checkWinOf(stacks, HUMAN_PLAYER)) return -1e7 - ply;
+    if (ply === 0) return evaluatePosition(stacks, AI_PLAYER);
+
+    const player = isMaximizing ? AI_PLAYER : HUMAN_PLAYER;
+    const rawMoves = getSearchMoves(stacks, player, supply[player]);
+    if (!rawMoves.length) return evaluatePosition(stacks, AI_PLAYER);
+    const moves = orderedCandidates(stacks, player, supply, rawMoves, isMaximizing, HARD_INNER_BEAM);
+
+    if (isMaximizing) {
+      let best = -Infinity;
+      for (const m of moves) {
+        const { stacks: ns, supply: nsup } = applyMoveWithSupply(stacks, supply, m, player);
+        const val = minimax(ns, nsup, ply - 1, false, alpha, beta);
+        if (val > best) best = val;
+        if (best > alpha) alpha = best;
+        if (alpha >= beta) break;
+      }
+      return best;
+    }
+    let best = Infinity;
+    for (const m of moves) {
+      const { stacks: ns, supply: nsup } = applyMoveWithSupply(stacks, supply, m, player);
+      const val = minimax(ns, nsup, ply - 1, true, alpha, beta);
+      if (val < best) best = val;
+      if (best < beta) beta = best;
+      if (alpha >= beta) break;
+    }
+    return best;
+  }
+
+  function moveIdKey(m) {
+    return m.type === "place" ? "p:" + m.key : "m:" + m.origin + ">" + m.dest;
+  }
+
+  function computeAIMainMoveHard() {
+    const stacks = state.stacks;
+    const supply = state.supply;
+    const allMoves = getAllLegalMainMoves(stacks, AI_PLAYER, supply[AI_PLAYER]);
+
+    for (const m of allMoves) {
+      if (checkWinOf(applyMoveToStacks(stacks, m, AI_PLAYER), AI_PLAYER)) return m;
+    }
+
+    // 상대가 다음 수에 이길 수 있는 칸들을 미리 파악해, 그 칸을 막는 수는
+    // 1수 평가 점수가 낮게 나오더라도(=순위 밖으로 밀려도) 반드시 루트 후보에 포함시킨다.
+    // (이걸 안 하면 "내 라인 늘리기"가 점수가 더 높아 보여 방어 수가 빔에서 통째로 잘려나가고,
+    //  정작 탐색 자체가 그 수를 한 번도 못 보는 사고가 난다.)
+    const oppAllMoves = getAllLegalMainMoves(stacks, HUMAN_PLAYER, supply[HUMAN_PLAYER]);
+    const threatCells = new Set();
+    oppAllMoves.forEach(m => {
+      if (checkWinOf(applyMoveToStacks(stacks, m, HUMAN_PLAYER), HUMAN_PLAYER)) {
+        threatCells.add(m.type === "place" ? m.key : m.dest);
+      }
+    });
+
+    const rootCandidates = orderedCandidates(stacks, AI_PLAYER, supply, allMoves, true, HARD_ROOT_BEAM);
+    if (threatCells.size) {
+      const included = new Set(rootCandidates.map(moveIdKey));
+      allMoves.forEach(m => {
+        const destKey = m.type === "place" ? m.key : m.dest;
+        if (threatCells.has(destKey) && !included.has(moveIdKey(m))) {
+          rootCandidates.push(m);
+          included.add(moveIdKey(m));
+        }
+      });
+    }
+    let bestMove = rootCandidates[0], bestScore = -Infinity;
+    let alpha = -Infinity;
+    const beta = Infinity;
+    for (const m of rootCandidates) {
+      const { stacks: ns, supply: nsup } = applyMoveWithSupply(stacks, supply, m, AI_PLAYER);
+      const val = minimax(ns, nsup, HARD_SEARCH_PLIES, false, alpha, beta);
+      if (val > bestScore) { bestScore = val; bestMove = m; }
+      if (bestScore > alpha) alpha = bestScore;
+    }
+    return bestMove;
+  }
+
+  // ---- 상 난이도: 웹 워커 + 반복 심화(iterative deepening) ----
+  // 메인 스레드를 막지 않으면서, 시간 예산 안에서 갈 수 있는 만큼 더 깊이 탐색한다.
+  // 워커를 못 띄우는 환경이면 위의 동기 computeAIMainMoveHard()로 자동 폴백한다.
+
+  const HARD_TIME_BUDGET_MS = 1500;
+
+  const AI_WORKER_SOURCE = "(" + function () {
+    const NEIGHBOR_DIRS = [
+      { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
+      { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 },
+    ];
+    const LINE_DIRS = [{ q: 1, r: 0 }, { q: 0, r: 1 }, { q: 1, r: -1 }];
+    const HARD_NEAR_RADIUS = 2;
+    const HARD_INNER_BEAM = 8;
+    const ROOT_BEAM = 16;
+    const MAX_PLIES = 12;
+
+    const RAW_BOARD = [];
+    for (let q = -5; q <= 5; q++) {
+      for (let r = -5; r <= 5; r++) {
+        const s = -q - r;
+        if (Math.abs(s) > 5) continue;
+        const isCorner = [Math.abs(q), Math.abs(r), Math.abs(s)].filter(v => v === 5).length >= 2;
+        if (isCorner) continue;
+        RAW_BOARD.push({ q, r, s, key: q + "_" + r });
+      }
+    }
+    const BOARD_MAP = {};
+    RAW_BOARD.forEach(c => { BOARD_MAP[c.key] = c; });
+
+    function otherPlayer(p) { return p === 1 ? 2 : 1; }
+    function neighbors(key) {
+      const c = BOARD_MAP[key];
+      return NEIGHBOR_DIRS.map(d => BOARD_MAP[(c.q + d.q) + "_" + (c.r + d.r)]).filter(Boolean);
+    }
+    function topColorOf(stacks, key) {
+      const st = stacks[key];
+      return st && st.length ? st[st.length - 1] : null;
+    }
+    function isValidMoveTargetOf(stacks, originKey, destKey, player) {
+      if (originKey === destKey) return false;
+      const origin = BOARD_MAP[originKey];
+      const dest = BOARD_MAP[destKey];
+      const isAdj = NEIGHBOR_DIRS.some(d => (origin.q + d.q) === dest.q && (origin.r + d.r) === dest.r);
+      if (!isAdj) return false;
+      const originH = (stacks[originKey] || []).length;
+      const destH = (stacks[destKey] || []).length;
+      return destH <= originH && destH + 1 <= 3;
+    }
+    function checkFiveInRowOf(stacks, color) {
+      for (const key in BOARD_MAP) {
+        if (topColorOf(stacks, key) !== color) continue;
+        const c = BOARD_MAP[key];
+        for (const dir of LINE_DIRS) {
+          const prevKey = (c.q - dir.q) + "_" + (c.r - dir.r);
+          if (topColorOf(stacks, prevKey) === color) continue;
+          const run = [key];
+          let cq = c.q + dir.q, cr = c.r + dir.r;
+          while (topColorOf(stacks, cq + "_" + cr) === color) { run.push(cq + "_" + cr); cq += dir.q; cr += dir.r; }
+          if (run.length === 5) return run;
+        }
+      }
+      return null;
+    }
+    function checkFiveAtTop3Of(stacks, color) {
+      const found = [];
+      for (const key in BOARD_MAP) {
+        const st = stacks[key];
+        if (st && st.length === 3 && st[2] === color) found.push(key);
+      }
+      return found.length >= 5 ? found.slice(0, 5) : null;
+    }
+    function checkTriangleTop3Of(stacks, color) {
+      const isTop3 = k => { const st = stacks[k]; return st && st.length === 3 && st[2] === color; };
+      for (const key in BOARD_MAP) {
+        if (!isTop3(key)) continue;
+        const c = BOARD_MAP[key];
+        for (let i = 0; i < 6; i++) {
+          const d1 = NEIGHBOR_DIRS[i];
+          const n1Key = (c.q + d1.q) + "_" + (c.r + d1.r);
+          if (!isTop3(n1Key)) continue;
+          const n1 = BOARD_MAP[n1Key];
+          for (let j = 0; j < 6; j++) {
+            const d2 = NEIGHBOR_DIRS[j];
+            const n2Key = (n1.q + d2.q) + "_" + (n1.r + d2.r);
+            if (n2Key === key) continue;
+            if (isTop3(n2Key)) return [key, n1Key, n2Key];
+          }
+        }
+      }
+      return null;
+    }
+    function checkWinOf(stacks, player) {
+      if (checkFiveInRowOf(stacks, player)) return true;
+      if (checkFiveAtTop3Of(stacks, player)) return true;
+      if (checkTriangleTop3Of(stacks, player)) return true;
+      return false;
+    }
+    function placeStoneOf(stacks, key, player) {
+      const next = Object.assign({}, stacks);
+      next[key] = (next[key] || []).concat([player]);
+      return next;
+    }
+    function moveStoneOf(stacks, originKey, destKey, player) {
+      const next = Object.assign({}, stacks);
+      const originStack = next[originKey].slice();
+      originStack.pop();
+      next[originKey] = originStack;
+      next[destKey] = (next[destKey] || []).concat([player]);
+      return next;
+    }
+    function applyMoveToStacks(stacks, move, player) {
+      return move.type === "place" ? placeStoneOf(stacks, move.key, player) : moveStoneOf(stacks, move.origin, move.dest, player);
+    }
+    function getAllLegalMainMoves(stacks, player, supply) {
+      const moves = [];
+      if (supply > 0) {
+        RAW_BOARD.forEach(c => {
+          const st = stacks[c.key];
+          if (!st || !st.length) moves.push({ type: "place", key: c.key });
+        });
+      }
+      RAW_BOARD.forEach(c => {
+        if (topColorOf(stacks, c.key) !== player) return;
+        neighbors(c.key).forEach(n => {
+          if (isValidMoveTargetOf(stacks, c.key, n.key, player)) moves.push({ type: "move", origin: c.key, dest: n.key });
+        });
+      });
+      return moves;
+    }
+    function isNearAnyStone(stacks, key, radius) {
+      const c = BOARD_MAP[key];
+      for (const k in stacks) {
+        if (!stacks[k] || !stacks[k].length) continue;
+        const c2 = BOARD_MAP[k];
+        if (Math.max(Math.abs(c.q - c2.q), Math.abs(c.r - c2.r), Math.abs(c.s - c2.s)) <= radius) return true;
+      }
+      return false;
+    }
+    function getSearchMoves(stacks, player, supply) {
+      const moves = [];
+      if (supply > 0) {
+        RAW_BOARD.forEach(c => {
+          const st = stacks[c.key];
+          if (st && st.length) return;
+          if (isNearAnyStone(stacks, c.key, HARD_NEAR_RADIUS)) moves.push({ type: "place", key: c.key });
+        });
+      }
+      RAW_BOARD.forEach(c => {
+        if (topColorOf(stacks, c.key) !== player) return;
+        neighbors(c.key).forEach(n => {
+          if (isValidMoveTargetOf(stacks, c.key, n.key, player)) moves.push({ type: "move", origin: c.key, dest: n.key });
+        });
+      });
+      return moves;
+    }
+    function lineThreatScore(stacks, color) {
+      let score = 0;
+      for (const key in BOARD_MAP) {
+        if (topColorOf(stacks, key) !== color) continue;
+        const c = BOARD_MAP[key];
+        for (const dir of LINE_DIRS) {
+          const prevKey = (c.q - dir.q) + "_" + (c.r - dir.r);
+          if (topColorOf(stacks, prevKey) === color) continue;
+          let length = 1;
+          let cq = c.q + dir.q, cr = c.r + dir.r;
+          while (topColorOf(stacks, cq + "_" + cr) === color) { length++; cq += dir.q; cr += dir.r; }
+          if (length >= 5) continue;
+          const afterKey = cq + "_" + cr;
+          const beforeOpen = !!BOARD_MAP[prevKey] && !topColorOf(stacks, prevKey);
+          const afterOpen = !!BOARD_MAP[afterKey] && !topColorOf(stacks, afterKey);
+          const openEnds = (beforeOpen ? 1 : 0) + (afterOpen ? 1 : 0);
+          const base = [0, 2, 14, 90, 550][length] || 0;
+          score += base * (1 + openEnds);
+        }
+      }
+      return score;
+    }
+    function stackThreatScore(stacks, color) {
+      let score = 0;
+      const top3Cells = [];
+      for (const key in BOARD_MAP) {
+        const st = stacks[key];
+        if (!st || !st.length) continue;
+        const h = st.length;
+        if (st[h - 1] !== color) continue;
+        if (h === 3) { top3Cells.push(key); score += 30; }
+        else if (h === 2) score += 9;
+        else score += 1;
+      }
+      const top3Set = new Set(top3Cells);
+      let adjPairs = 0;
+      top3Cells.forEach(k => {
+        const c = BOARD_MAP[k];
+        NEIGHBOR_DIRS.forEach(d => {
+          if (top3Set.has((c.q + d.q) + "_" + (c.r + d.r))) adjPairs++;
+        });
+      });
+      score += adjPairs * 25;
+      return score;
+    }
+
+    let AI_PLAYER = 2, HUMAN_PLAYER = 1;
+
+    function evaluatePosition(stacks, forPlayer) {
+      const opp = otherPlayer(forPlayer);
+      if (checkWinOf(stacks, forPlayer)) return 1e7;
+      if (checkWinOf(stacks, opp)) return -1e7;
+      const mine = lineThreatScore(stacks, forPlayer) + stackThreatScore(stacks, forPlayer);
+      const theirs = lineThreatScore(stacks, opp) + stackThreatScore(stacks, opp);
+      return mine - theirs * 1.15;
+    }
+    function orderedCandidates(stacks, player, moves, isMaximizing, limit) {
+      const scored = moves.map(m => ({ m, s: evaluatePosition(applyMoveToStacks(stacks, m, player), AI_PLAYER) }));
+      scored.sort((a, b) => (isMaximizing ? b.s - a.s : a.s - b.s));
+      return scored.slice(0, limit).map(o => o.m);
+    }
+    function applyMoveWithSupply(stacks, supply, move, player) {
+      const nextStacks = applyMoveToStacks(stacks, move, player);
+      const nextSupply = move.type === "place" ? Object.assign({}, supply, { [player]: supply[player] - 1 }) : supply;
+      return { stacks: nextStacks, supply: nextSupply };
+    }
+    function minimax(stacks, supply, ply, isMaximizing, alpha, beta, deadline) {
+      if (checkWinOf(stacks, AI_PLAYER)) return 1e7 + ply;
+      if (checkWinOf(stacks, HUMAN_PLAYER)) return -1e7 - ply;
+      if (ply === 0 || Date.now() > deadline) return evaluatePosition(stacks, AI_PLAYER);
+      const player = isMaximizing ? AI_PLAYER : HUMAN_PLAYER;
+      const rawMoves = getSearchMoves(stacks, player, supply[player]);
+      if (!rawMoves.length) return evaluatePosition(stacks, AI_PLAYER);
+      const moves = orderedCandidates(stacks, player, rawMoves, isMaximizing, HARD_INNER_BEAM);
+      if (isMaximizing) {
+        let best = -Infinity;
+        for (const m of moves) {
+          const r = applyMoveWithSupply(stacks, supply, m, player);
+          const val = minimax(r.stacks, r.supply, ply - 1, false, alpha, beta, deadline);
+          if (val > best) best = val;
+          if (best > alpha) alpha = best;
+          if (alpha >= beta) break;
+          if (Date.now() > deadline) break;
+        }
+        return best;
+      }
+      let best = Infinity;
+      for (const m of moves) {
+        const r = applyMoveWithSupply(stacks, supply, m, player);
+        const val = minimax(r.stacks, r.supply, ply - 1, true, alpha, beta, deadline);
+        if (val < best) best = val;
+        if (best < beta) beta = best;
+        if (alpha >= beta) break;
+        if (Date.now() > deadline) break;
+      }
+      return best;
+    }
+    function moveIdKey(m) {
+      return m.type === "place" ? "p:" + m.key : "m:" + m.origin + ">" + m.dest;
+    }
+    function searchAtDepth(stacks, supply, plies, deadline, allMoves, forceInclude) {
+      const rootCandidates = orderedCandidates(stacks, AI_PLAYER, allMoves, true, ROOT_BEAM);
+      const included = new Set(rootCandidates.map(moveIdKey));
+      forceInclude.forEach(m => {
+        if (!included.has(moveIdKey(m))) { rootCandidates.push(m); included.add(moveIdKey(m)); }
+      });
+      let bestMove = rootCandidates[0], bestScore = -Infinity;
+      let alpha = -Infinity;
+      const beta = Infinity;
+      for (const m of rootCandidates) {
+        if (Date.now() > deadline) break;
+        const r = applyMoveWithSupply(stacks, supply, m, AI_PLAYER);
+        const val = minimax(r.stacks, r.supply, plies, false, alpha, beta, deadline);
+        if (val > bestScore) { bestScore = val; bestMove = m; }
+        if (bestScore > alpha) alpha = bestScore;
+      }
+      return { move: bestMove, score: bestScore };
+    }
+
+    self.onmessage = function (e) {
+      const msg = e.data;
+      if (msg.type !== "search") return;
+      const stacks = msg.stacks, supply = msg.supply, requestId = msg.requestId;
+      const timeBudgetMs = msg.timeBudgetMs;
+      AI_PLAYER = msg.aiPlayer;
+      HUMAN_PLAYER = msg.humanPlayer;
+
+      const startTime = Date.now();
+      const deadline = startTime + timeBudgetMs;
+
+      const allMoves = getAllLegalMainMoves(stacks, AI_PLAYER, supply[AI_PLAYER]);
+      for (const m of allMoves) {
+        if (checkWinOf(applyMoveToStacks(stacks, m, AI_PLAYER), AI_PLAYER)) {
+          self.postMessage({ type: "result", requestId: requestId, move: m, depthReached: 0 });
+          return;
+        }
+      }
+
+      const oppAllMoves = getAllLegalMainMoves(stacks, HUMAN_PLAYER, supply[HUMAN_PLAYER]);
+      const threatCells = {};
+      oppAllMoves.forEach(m => {
+        if (checkWinOf(applyMoveToStacks(stacks, m, HUMAN_PLAYER), HUMAN_PLAYER)) {
+          threatCells[m.type === "place" ? m.key : m.dest] = true;
+        }
+      });
+      const forceInclude = allMoves.filter(m => threatCells[m.type === "place" ? m.key : m.dest]);
+
+      let bestMove = null;
+      let depthReached = 0;
+      let plies = 3;
+
+      while (Date.now() < deadline && plies <= MAX_PLIES) {
+        const result = searchAtDepth(stacks, supply, plies, deadline, allMoves, forceInclude);
+        if (result.move) { bestMove = result.move; depthReached = plies; }
+        const elapsed = Date.now() - startTime;
+        if (elapsed > timeBudgetMs * 0.35) break;
+        plies += 1;
+      }
+
+      self.postMessage({ type: "result", requestId: requestId, move: bestMove, depthReached: depthReached });
+    };
+  }.toString() + ")()";
+
+  let aiWorker = null;
+  const pendingWorkerResolvers = new Map();
+  let workerRequestSeq = 0;
+  try {
+    const blob = new Blob([AI_WORKER_SOURCE], { type: "application/javascript" });
+    aiWorker = new Worker(URL.createObjectURL(blob));
+    aiWorker.onmessage = e => {
+      const resolve = pendingWorkerResolvers.get(e.data.requestId);
+      if (resolve) {
+        pendingWorkerResolvers.delete(e.data.requestId);
+        resolve(e.data.move);
+      }
+    };
+    aiWorker.onerror = () => { aiWorker = null; };
+  } catch (e) {
+    aiWorker = null;
+  }
+
+  function computeAIMainMoveHardAsync() {
+    return new Promise(resolve => {
+      const requestId = ++workerRequestSeq;
+      pendingWorkerResolvers.set(requestId, resolve);
+      aiWorker.postMessage({
+        type: "search",
+        requestId,
+        stacks: state.stacks,
+        supply: state.supply,
+        aiPlayer: AI_PLAYER,
+        humanPlayer: HUMAN_PLAYER,
+        timeBudgetMs: HARD_TIME_BUDGET_MS,
+      });
+    });
+  }
+
+  async function computeAIMainMove() {
+    const stacks = state.stacks;
+    const supply = state.supply[AI_PLAYER];
+    const moves = getAllLegalMainMoves(stacks, AI_PLAYER, supply);
+
+    for (const m of moves) {
+      if (checkWinOf(applyMoveToStacks(stacks, m, AI_PLAYER), AI_PLAYER)) return m;
+    }
+
+    if (aiDifficulty === "easy") {
+      return moves[randomInt(moves.length)];
+    }
+
+    if (aiDifficulty === "medium") {
+      const oppMoves = getAllLegalMainMoves(stacks, HUMAN_PLAYER, state.supply[HUMAN_PLAYER]);
+      const threatCells = new Set();
+      oppMoves.forEach(m => {
+        if (checkWinOf(applyMoveToStacks(stacks, m, HUMAN_PLAYER), HUMAN_PLAYER)) threatCells.add(m.type === "place" ? m.key : m.dest);
+      });
+      const blockMoves = moves.filter(m => threatCells.has(m.type === "place" ? m.key : m.dest));
+      const pool = blockMoves.length ? blockMoves : moves;
+      const scored = pool.map(m => ({ m, s: evaluatePosition(applyMoveToStacks(stacks, m, AI_PLAYER), AI_PLAYER) + Math.random() * 20 }));
+      scored.sort((a, b) => b.s - a.s);
+      return scored[0].m;
+    }
+
+    if (aiDifficulty === "extreme" && aiWorker) return computeAIMainMoveHardAsync();
+    return computeAIMainMoveHard();
+  }
+
+  async function computeAIMove() {
+    return state.phase === "initial" ? computeAIInitialMove() : computeAIMainMove();
+  }
+
+  // ---- 게임 상태 ----
+
+  let gameMode = "ai"; // "2p" | "ai"
+  let aiDifficulty = "hard"; // "easy" | "medium" | "hard" | "extreme"
+  let gameEpoch = 0;
+  let humanIsBlackNext = true; // AI 대결: 첫 판은 유저가 흑돌, 이후엔 진 사람이 흑돌
+  let history = []; // 무르기용: 각 수를 두기 직전 state 스냅샷
+  let usedUndo = false; // 이번 판에서 무르기를 사용했는지 (사용 시 랭킹 등록 불가)
+  let moveLog = []; // 기보 기록용: history와 항상 1:1로 push/pop되는 수순 목록
+
+  let state = {
+    stacks: {},
+    turn: 1,
+    phase: "initial",
+    stepIndex: 0,
+    placedInStep: 0,
+    supply: { 1: 25, 2: 25 },
+    selected: null,
+    winner: null,
+    winReason: "",
+    winCells: [],
+    aiThinking: false,
+    lastCell: null,
+  };
+
+  function setState(patch) {
+    const wasWinner = state.winner;
+    state = Object.assign({}, state, patch);
+    if (gameMode === "ai" && !wasWinner && state.winner) {
+      humanIsBlackNext = state.winner === AI_PLAYER; // 패자가 다음 판 흑돌
+      autoSubmitRankIfReturningPlayer();
+      submitGameLog();
+    }
+    render();
+    scheduleAIIfNeeded();
+  }
+
+  function scheduleAIIfNeeded() {
+    if (gameMode !== "ai") return;
+    if (state.winner) return;
+    if (state.turn !== AI_PLAYER) return;
+    if (state.aiThinking) return;
+    state.aiThinking = true;
+    render();
+    const epoch = gameEpoch;
+    setTimeout(() => {
+      if (epoch !== gameEpoch) return;
+      performAIMove(epoch);
+    }, 300 + Math.random() * 350);
+  }
+
+  async function performAIMove(epoch) {
+    const move = await computeAIMove();
+    if (epoch !== gameEpoch) return; // 그 사이 게임이 리셋/전환됐으면 이 결과는 버린다
+    state.aiThinking = false;
+    applyAIMove(move);
+  }
+
+  function applyAIMove(move) {
+    const player = AI_PLAYER;
+    history.push(state);
+    if (state.phase === "initial") {
+      moveLog.push({ player, type: "place", key: move.key });
+      const stacks = placeStoneOf(state.stacks, move.key, player);
+      const supply = Object.assign({}, state.supply, { [player]: state.supply[player] - 1 });
+      let stepIndex = state.stepIndex, placedInStep = state.placedInStep;
+      placedInStep++;
+      let phase = "initial", turn = player;
+      if (placedInStep >= INITIAL_STEPS[stepIndex].count) {
+        stepIndex++; placedInStep = 0;
+        if (stepIndex >= INITIAL_STEPS.length) {
+          phase = "main";
+          turn = otherPlayer(INITIAL_STEPS[INITIAL_STEPS.length - 1].player);
+        } else {
+          turn = INITIAL_STEPS[stepIndex].player;
+        }
+      }
+      setState({ stacks, supply, stepIndex, placedInStep, phase, turn, lastCell: move.key });
+      return;
+    }
+    moveLog.push(move.type === "place" ? { player, type: "place", key: move.key } : { player, type: "move", origin: move.origin, dest: move.dest });
+    const stacks = applyMoveToStacks(state.stacks, move, player);
+    const supply = move.type === "place" ? Object.assign({}, state.supply, { [player]: state.supply[player] - 1 }) : state.supply;
+    const win = checkWinOf(stacks, player);
+    const lastCell = move.type === "place" ? move.key : move.dest;
+    setState({ stacks, supply, selected: null, turn: win ? state.turn : otherPlayer(player), winner: win ? player : null, winReason: win ? win.reason : "", winCells: win ? win.cells : [], lastCell });
+  }
+
+  function onCellClick(key) {
+    if (state.winner) return;
+    if (state.aiThinking) return;
+    if (gameMode === "ai" && state.turn === AI_PLAYER) return;
+    const player = state.turn;
+
+    if (state.phase === "initial") {
+      if (!isValidInitialPlacementOf(state.stacks, key, player)) return;
+      const stacks = placeStoneOf(state.stacks, key, player);
+      const supply = Object.assign({}, state.supply, { [player]: state.supply[player] - 1 });
+      let stepIndex = state.stepIndex, placedInStep = state.placedInStep;
+      placedInStep++;
+      let phase = "initial", turn = player;
+      if (placedInStep >= INITIAL_STEPS[stepIndex].count) {
+        stepIndex++; placedInStep = 0;
+        if (stepIndex >= INITIAL_STEPS.length) {
+          phase = "main";
+          turn = otherPlayer(INITIAL_STEPS[INITIAL_STEPS.length - 1].player);
+        } else {
+          turn = INITIAL_STEPS[stepIndex].player;
+        }
+      }
+      history.push(state);
+      moveLog.push({ player, type: "place", key });
+      setState({ stacks, supply, stepIndex, placedInStep, phase, turn, lastCell: key });
+      return;
+    }
+
+    // main phase
+    if (state.selected === key) { setState({ selected: null }); return; }
+    if (state.selected) {
+      const origin = state.selected;
+      if (isValidMoveTargetOf(state.stacks, origin, key, player)) {
+        const stacks = moveStoneOf(state.stacks, origin, key, player);
+        const win = checkWinOf(stacks, player);
+        history.push(state);
+        moveLog.push({ player, type: "move", origin, dest: key });
+        setState({ stacks, selected: null, turn: win ? state.turn : otherPlayer(player), winner: win ? player : null, winReason: win ? win.reason : "", winCells: win ? win.cells : [], lastCell: key });
+      } else if (topColorOf(state.stacks, key) === player) {
+        setState({ selected: key });
+      } else {
+        setState({ selected: null });
+      }
+      return;
+    }
+    const st = state.stacks[key];
+    if (!st || !st.length) {
+      if (state.supply[player] <= 0) return;
+      const stacks = placeStoneOf(state.stacks, key, player);
+      const supply = Object.assign({}, state.supply, { [player]: state.supply[player] - 1 });
+      const win = checkWinOf(stacks, player);
+      history.push(state);
+      moveLog.push({ player, type: "place", key });
+      setState({ stacks, supply, turn: win ? state.turn : otherPlayer(player), winner: win ? player : null, winReason: win ? win.reason : "", winCells: win ? win.cells : [], lastCell: key });
+    } else if (topColorOf(state.stacks, key) === player) {
+      setState({ selected: key });
+    }
+  }
+
+  function resetGame() {
+    gameEpoch++;
+    rankSubmittedForThisGame = false;
+    history = [];
+    usedUndo = false;
+    moveLog = [];
+    document.getElementById("rank-register-result").classList.add("hidden");
+    document.getElementById("rank-nickname-input").disabled = false;
+    document.getElementById("rank-submit-btn").disabled = false;
+    document.getElementById("rank-submit-btn").textContent = "등록";
+    HUMAN_PLAYER = humanIsBlackNext ? 1 : 2;
+    AI_PLAYER = otherPlayer(HUMAN_PLAYER);
+    setState({
+      stacks: {}, turn: 1, phase: "initial", stepIndex: 0, placedInStep: 0,
+      supply: { 1: 25, 2: 25 }, selected: null, winner: null, winReason: "", winCells: [], aiThinking: false, lastCell: null,
+    });
+  }
+
+  // ---- 한 수 무르기 ----
+  // "무르기"는 사람이 둔 마지막 한 수를 되돌리는 개념이다. AI 대결에서는 기본 배치 단계처럼
+  // AI가 한 차례에 여러 ply를 연속으로 두는 경우가 있으므로, 고정 개수가 아니라
+  // "가장 최근의 사람 차례 이전" 스냅샷을 찾을 때까지 AI ply를 모두 되돌린다.
+  function canUndo() {
+    if (state.winner) return false;
+    if (state.aiThinking) return false;
+    if (gameMode === "ai") {
+      if (state.turn !== HUMAN_PLAYER) return false;
+      return history.some(h => h.turn === HUMAN_PLAYER);
+    }
+    return history.length >= 1;
+  }
+
+  function undoMove() {
+    if (!canUndo()) return;
+    let restored;
+    if (gameMode === "ai") {
+      while (history.length && history[history.length - 1].turn === AI_PLAYER) history.pop();
+      restored = history.pop();
+    } else {
+      restored = history.pop();
+    }
+    state = Object.assign({}, restored, { selected: null });
+    moveLog.length = history.length; // history와 1:1 대응이므로 같은 개수만큼 잘라낸다
+    usedUndo = true;
+    gameEpoch++;
+    render();
+    scheduleAIIfNeeded();
+  }
+
+  // ---- 모드/난이도 UI ----
+
+  // ---- 랜덤 닉네임 시작 ----
+  const NICKNAME_POOL = [
+    "이상민", "정근우", "박지민", "이태균", "하승진", "현성주", "윤비", "이진형", "홍진호", "서출구",
+    "최혜선", "허성범", "김경훈", "김유현", "김남희", "강지후", "곽범", "이관희", "신승용", "최연청", "덕후",
+  ];
+
+  function randomNickname() {
+    const word = NICKNAME_POOL[Math.floor(Math.random() * NICKNAME_POOL.length)];
+    const num = Math.floor(Math.random() * 999) + 1;
+    return `${word}#${num}`;
+  }
+
+  function getOrCreateStoredNickname(key) {
+    const saved = localStorage.getItem(key);
+    if (saved) return saved;
+    const generated = randomNickname();
+    localStorage.setItem(key, generated);
+    return generated;
+  }
+  // ---- 랜덤 닉네임 끝 ----
+
+  const RANK_CONFIGS = {
+    hard: { table: "gomoku_hard_ranking", nicknameKey: "gomokuHardRankingNickname", aiRating: 1600, label: "상" },
+    extreme: { table: "gomoku_extreme_ranking", nicknameKey: "gomokuExtremeRankingNickname", aiRating: 1900, label: "최상" },
+  };
+
+  function updateModeUI() {
+    document.querySelectorAll("#mode-group .mode-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === gameMode));
+    document.querySelectorAll("#difficulty-group .mode-btn").forEach(b => b.classList.toggle("active", b.dataset.diff === aiDifficulty));
+    document.getElementById("difficulty-group").classList.toggle("hidden", gameMode !== "ai");
+    const config = gameMode === "ai" ? RANK_CONFIGS[aiDifficulty] : null;
+    const rankToggleBtn = document.getElementById("rank-toggle-btn");
+    rankToggleBtn.classList.toggle("hidden", !config);
+    if (!config) {
+      document.getElementById("rank-panel").classList.add("hidden");
+      rankToggleBtn.classList.remove("active");
+    } else {
+      document.getElementById("rank-toggle-label").textContent = config.label;
+      document.getElementById("rank-panel-diff-label").textContent = config.label;
+      document.getElementById("rank-register-diff-label").textContent = config.label;
+      document.getElementById("rank-nickname-input").value = getOrCreateStoredNickname(config.nicknameKey);
+    }
+  }
+  document.querySelectorAll("#mode-group .mode-btn").forEach(b => {
+    b.addEventListener("click", () => { gameMode = b.dataset.mode; updateModeUI(); resetGame(); });
+  });
+  document.querySelectorAll("#difficulty-group .mode-btn").forEach(b => {
+    b.addEventListener("click", () => { aiDifficulty = b.dataset.diff; updateModeUI(); resetGame(); });
+  });
+  updateModeUI();
+
+  // ---- 상/최상 난이도 Elo 레이팅 ----
+
+  const RANK_SUPABASE_URL = "https://paktzmofotvwfdxcpmzv.supabase.co";
+  const RANK_SUPABASE_ANON_KEY = "sb_publishable_jWbstEn2pKJTNDxLTR4Jig_asglvzGW";
+  const RANK_K_FACTOR = 32;
+
+  function currentRankConfig() {
+    return RANK_CONFIGS[aiDifficulty] || null;
+  }
+
+  let rankSubmittedForThisGame = false;
+
+  async function fetchPlayerRating(nickname, table) {
+    const res = await fetch(
+      `${RANK_SUPABASE_URL}/rest/v1/${table}?select=nickname,rating,wins,losses&nickname=eq.${encodeURIComponent(nickname)}`,
+      { headers: { apikey: RANK_SUPABASE_ANON_KEY, Authorization: `Bearer ${RANK_SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) throw new Error("레이팅 조회 실패");
+    const rows = await res.json();
+    return rows[0] || { nickname, rating: 1000, wins: 0, losses: 0 };
+  }
+
+  async function upsertPlayerRating(nickname, rating, wins, losses, table) {
+    const res = await fetch(`${RANK_SUPABASE_URL}/rest/v1/${table}?on_conflict=nickname`, {
+      method: "POST",
+      headers: {
+        apikey: RANK_SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${RANK_SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify({ nickname, rating, wins, losses, updated_at: new Date().toISOString() }),
+    });
+    if (!res.ok) throw new Error("레이팅 등록 실패");
+    const [row] = await res.json();
+    return row;
+  }
+
+  // 상/최상 난이도 대국이 끝날 때마다 기보(수순 전체)를 남긴다. 랭킹 등록 여부와 무관하게
+  // 기록하되, 닉네임은 이전에 저장해둔 값이 있으면 그것만 best-effort로 붙인다.
+  async function submitGameLog() {
+    const config = currentRankConfig();
+    if (!config) return;
+    const nickname = localStorage.getItem(config.nicknameKey) || null;
+    try {
+      await fetch(`${RANK_SUPABASE_URL}/rest/v1/gomoku_game_log`, {
+        method: "POST",
+        headers: {
+          apikey: RANK_SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${RANK_SUPABASE_ANON_KEY}`,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({
+          difficulty: aiDifficulty,
+          nickname,
+          human_player: HUMAN_PLAYER,
+          winner: state.winner,
+          win_reason: state.winReason,
+          used_undo: usedUndo,
+          moves: moveLog,
+        }),
+      });
+    } catch (e) {
+      // 기보 저장 실패는 게임 진행에 영향을 주지 않도록 조용히 무시한다
+    }
+  }
+
+  async function fetchTopRanking(table) {
+    const res = await fetch(
+      `${RANK_SUPABASE_URL}/rest/v1/${table}?select=nickname,rating,wins,losses&order=rating.desc&limit=10`,
+      { headers: { apikey: RANK_SUPABASE_ANON_KEY, Authorization: `Bearer ${RANK_SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) throw new Error("랭킹 조회 실패");
+    return res.json();
+  }
+
+  function renderRankList(rows) {
+    const list = document.getElementById("rank-list");
+    list.innerHTML = "";
+    if (!rows.length) {
+      const empty = document.createElement("div");
+      empty.className = "rank-empty";
+      empty.textContent = "아직 등록된 레이팅이 없습니다.";
+      list.appendChild(empty);
+      return;
+    }
+    rows.forEach((r, i) => {
+      const row = document.createElement("div");
+      row.className = "rank-row";
+      row.innerHTML = `
+        <span class="no">${i + 1}</span>
+        <span class="nick">${r.nickname}</span>
+        <span class="record">${r.wins}승 ${r.losses}패</span>
+        <span class="rating">${r.rating}</span>
+      `;
+      list.appendChild(row);
+    });
+  }
+
+  document.getElementById("rank-toggle-btn").addEventListener("click", async () => {
+    const config = currentRankConfig();
+    if (!config) return;
+    const btn = document.getElementById("rank-toggle-btn");
+    const panel = document.getElementById("rank-panel");
+    const willShow = panel.classList.contains("hidden");
+    panel.classList.toggle("hidden", !willShow);
+    btn.classList.toggle("active", willShow);
+    if (willShow) {
+      try {
+        renderRankList(await fetchTopRanking(config.table));
+      } catch (e) {
+        document.getElementById("rank-list").innerHTML = '<div class="rank-empty">랭킹을 불러오지 못했습니다.</div>';
+      }
+    }
+  });
+
+  async function submitRankResult(nickname) {
+    const config = currentRankConfig();
+    if (!config || rankSubmittedForThisGame || !state.winner || usedUndo) return;
+    const input = document.getElementById("rank-nickname-input");
+    const btn = document.getElementById("rank-submit-btn");
+    const resultEl = document.getElementById("rank-register-result");
+    btn.disabled = true;
+    input.disabled = true;
+    btn.textContent = "등록 중...";
+    try {
+      localStorage.setItem(config.nicknameKey, nickname);
+      const current = await fetchPlayerRating(nickname, config.table);
+      const actual = state.winner === HUMAN_PLAYER ? 1 : 0;
+      const expected = 1 / (1 + Math.pow(10, (config.aiRating - current.rating) / 400));
+      const newRating = Math.round(current.rating + RANK_K_FACTOR * (actual - expected));
+      const wins = current.wins + (actual === 1 ? 1 : 0);
+      const losses = current.losses + (actual === 0 ? 1 : 0);
+      await upsertPlayerRating(nickname, newRating, wins, losses, config.table);
+      rankSubmittedForThisGame = true;
+      const diff = newRating - current.rating;
+      resultEl.textContent = `${nickname}님의 레이팅: ${current.rating} → ${newRating} (${diff >= 0 ? "+" : ""}${diff})`;
+      resultEl.classList.remove("hidden");
+      btn.textContent = "등록 완료";
+      if (!document.getElementById("rank-panel").classList.contains("hidden")) {
+        renderRankList(await fetchTopRanking(config.table));
+      }
+    } catch (e) {
+      resultEl.textContent = "레이팅 등록에 실패했습니다. 잠시 후 다시 시도해주세요.";
+      resultEl.classList.remove("hidden");
+      btn.disabled = false;
+      input.disabled = false;
+      btn.textContent = "등록";
+    }
+  }
+
+  document.getElementById("rank-submit-btn").addEventListener("click", () => {
+    const config = currentRankConfig();
+    const nickname = document.getElementById("rank-nickname-input").value.trim()
+      || (config ? getOrCreateStoredNickname(config.nicknameKey) : randomNickname());
+    submitRankResult(nickname);
+  });
+
+  // 한 번이라도 등록한 닉네임은 이후 패배(또는 승리)를 건너뛰지 못하도록 게임 종료 시 자동 등록
+  function autoSubmitRankIfReturningPlayer() {
+    const config = currentRankConfig();
+    if (gameMode !== "ai" || !config || !state.winner || usedUndo) return;
+    const savedNickname = localStorage.getItem(config.nicknameKey);
+    if (!savedNickname) return; // 처음 등록하는 유저는 닉네임 입력을 위해 수동 등록 유지
+    submitRankResult(savedNickname);
+  }
+
+  // ---- 보드 렌더링 ----
+
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  const boardWrap = document.getElementById("board-wrap");
+  boardWrap.style.width = BOARD_W + "px";
+  boardWrap.style.height = BOARD_H + "px";
+
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("width", BOARD_W);
+  svg.setAttribute("height", BOARD_H);
+  svg.style.position = "absolute";
+  svg.style.inset = "0";
+  GRID_LINES.forEach(ln => {
+    const line = document.createElementNS(SVG_NS, "line");
+    line.setAttribute("x1", ln.x1); line.setAttribute("y1", ln.y1);
+    line.setAttribute("x2", ln.x2); line.setAttribute("y2", ln.y2);
+    line.setAttribute("stroke", "rgba(120,95,40,.35)");
+    line.setAttribute("stroke-width", "1");
+    svg.appendChild(line);
+  });
+  boardWrap.appendChild(svg);
+
+  const cellEls = {};
+  RAW_BOARD.forEach(c => {
+    const wrap = document.createElement("div");
+    wrap.className = "cell-wrap";
+    wrap.style.left = c.left + "px";
+    wrap.style.top = c.top + "px";
+    wrap.style.width = HIT + "px";
+    wrap.style.height = HIT + "px";
+    wrap.addEventListener("click", () => onCellClick(c.key));
+
+    const stone = document.createElement("div");
+    stone.className = "stone";
+    wrap.appendChild(stone);
+
+    const pipsWrap = document.createElement("div");
+    pipsWrap.className = "pips-wrap";
+    pipsWrap.style.display = "none";
+    for (let i = 0; i < 3; i++) {
+      const pip = document.createElement("div");
+      pip.className = "pip";
+      pipsWrap.appendChild(pip);
+    }
+    wrap.appendChild(pipsWrap);
+
+    boardWrap.appendChild(wrap);
+    cellEls[c.key] = { wrap, stone, pipsWrap, pips: Array.from(pipsWrap.children) };
+  });
+
+  const boardScaleEl = document.getElementById("board-scale");
+  const boardCardEl = document.querySelector(".board-card");
+
+  function updateBoardScale() {
+    const cardStyle = getComputedStyle(boardCardEl);
+    const padX = parseFloat(cardStyle.paddingLeft) + parseFloat(cardStyle.paddingRight);
+    const available = boardCardEl.parentElement.clientWidth - padX;
+    const scale = Math.min(1, available / BOARD_W);
+    boardWrap.style.transform = `scale(${scale})`;
+    boardScaleEl.style.width = (BOARD_W * scale) + "px";
+    boardScaleEl.style.height = (BOARD_H * scale) + "px";
+  }
+  updateBoardScale();
+  let resizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(updateBoardScale, 100);
+  });
+  const phaseLabelEl = document.getElementById("phase-label");
+  const turnDotEl = document.getElementById("turn-dot");
+  const supply1El = document.getElementById("supply-1");
+  const supply2El = document.getElementById("supply-2");
+  const winOverlayEl = document.getElementById("win-overlay");
+  const winDotEl = document.getElementById("win-dot");
+  const winLabelEl = document.getElementById("win-label");
+  const winReasonEl = document.getElementById("win-reason");
+
+  function render() {
+    const { stacks, turn, phase, stepIndex, placedInStep, supply, selected, winner, winReason, winCells, aiThinking, lastCell } = state;
+
+    let legalTargets = new Set();
+    const aiTurnActive = gameMode === "ai" && turn === AI_PLAYER && !winner;
+    if (!winner && !aiTurnActive) {
+      if (phase === "initial") {
+        RAW_BOARD.forEach(c => { if (isValidInitialPlacementOf(stacks, c.key, turn)) legalTargets.add(c.key); });
+      } else if (selected) {
+        RAW_BOARD.forEach(c => { if (isValidMoveTargetOf(stacks, selected, c.key, turn)) legalTargets.add(c.key); });
+      } else {
+        RAW_BOARD.forEach(c => {
+          const st = stacks[c.key];
+          if (!st || !st.length) { if (supply[turn] > 0) legalTargets.add(c.key); }
+        });
+      }
+    }
+    const winSet = new Set(winCells);
+
+    RAW_BOARD.forEach(c => {
+      const els = cellEls[c.key];
+      const st = stacks[c.key] || [];
+      const height = st.length;
+      const top = height ? st[height - 1] : null;
+      const isSel = selected === c.key;
+      const isLegal = legalTargets.has(c.key);
+      const isWin = winSet.has(c.key);
+      const isLast = lastCell === c.key;
+
+      let ring = "none";
+      if (isWin) ring = "0 0 0 3px #5fb8b0";
+      else if (isSel) ring = "0 0 0 3px #5fb8b0";
+      else if (isLast) ring = "0 0 0 2px #ffd166";
+      else if (isLegal) ring = "0 0 0 2px rgba(95,184,176,.32)";
+
+      els.wrap.style.background = (isLegal && !height) ? "rgba(95,184,176,.08)" : "transparent";
+
+      if (height) {
+        const stoneSize = 50;
+        els.stone.style.display = "block";
+        els.stone.style.width = stoneSize + "px";
+        els.stone.style.height = stoneSize + "px";
+        els.stone.style.background = stoneColor(top);
+        els.stone.style.border = stoneBorder(top);
+        els.stone.style.boxShadow = (ring !== "none" ? ring + ", " : "") + "0 2px 5px rgba(0,0,0,.5)" + (height > 1 ? ", 0 " + (height * 2) + "px 0 -1px rgba(0,0,0,.35)" : "");
+      } else if (isLegal) {
+        els.stone.style.display = "block";
+        els.stone.style.width = "16px";
+        els.stone.style.height = "16px";
+        els.stone.style.background = "rgba(95,184,176,.4)";
+        els.stone.style.border = "none";
+        els.stone.style.boxShadow = "none";
+      } else {
+        els.stone.style.display = "none";
+      }
+
+      if (height > 0) {
+        els.pipsWrap.style.display = "flex";
+        for (let i = 0; i < 3; i++) {
+          const filled = st[i];
+          const pip = els.pips[i];
+          if (filled) {
+            pip.style.background = stoneColor(filled);
+            pip.style.border = "1px solid rgba(255,255,255,.25)";
+          } else {
+            pip.style.background = "transparent";
+            pip.style.border = "1px dashed rgba(255,255,255,.18)";
+          }
+        }
+      } else {
+        els.pipsWrap.style.display = "none";
+      }
+    });
+
+    let phaseLabel;
+    if (aiTurnActive) {
+      phaseLabel = phase === "initial" ? "AI가 배치하는 중..." : "AI가 생각하는 중...";
+    } else if (phase === "initial") {
+      const step = INITIAL_STEPS[stepIndex];
+      phaseLabel = `기본 배치 · ${colorName(step.player)} ${placedInStep + 1}/${step.count}번째 돌 놓는 중`;
+    } else if (winner) {
+      phaseLabel = "게임 종료";
+    } else {
+      phaseLabel = `${colorName(turn)} 차례` + (selected ? " · 이동할 칸을 선택하세요 (다시 누르면 취소)" : " · 돌을 놓거나 자신의 돌을 이동하세요");
+    }
+    phaseLabelEl.textContent = phaseLabel;
+    turnDotEl.style.background = stoneColor(turn);
+    supply1El.textContent = gameMode === "ai" ? `흑${HUMAN_PLAYER === 1 ? "(나)" : "(AI)"} ${supply[1]}` : `흑 ${supply[1]}`;
+    supply2El.textContent = gameMode === "ai" ? `백${HUMAN_PLAYER === 2 ? "(나)" : "(AI)"} ${supply[2]}` : `백 ${supply[2]}`;
+
+    boardCardEl.classList.toggle("thinking", aiTurnActive);
+
+    document.getElementById("undo-btn").disabled = !canUndo();
+    const hasRankConfig = gameMode === "ai" && !!RANK_CONFIGS[aiDifficulty];
+    document.getElementById("undo-used-chip").classList.toggle("hidden", !(usedUndo && hasRankConfig));
+
+    if (winner) {
+      winDotEl.style.background = stoneColor(winner);
+      winLabelEl.textContent = `${colorName(winner)} 승리!`;
+      winReasonEl.textContent = winReason;
+      winOverlayEl.classList.add("show");
+      document.getElementById("rank-register").classList.toggle("hidden", !(hasRankConfig && !usedUndo));
+      document.getElementById("undo-rank-note").classList.toggle("hidden", !(hasRankConfig && usedUndo));
+    } else {
+      winOverlayEl.classList.remove("show");
+    }
+  }
+
+  document.getElementById("reset-btn").addEventListener("click", resetGame);
+  document.getElementById("undo-btn").addEventListener("click", undoMove);
+  document.getElementById("win-close-btn").addEventListener("click", () => {
+    winOverlayEl.classList.remove("show");
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
