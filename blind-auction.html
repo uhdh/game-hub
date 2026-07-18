@@ -211,6 +211,7 @@
   const ITEMS_TABLE = "auction_items";
 
   const L = window.BlindAuctionLogic;
+  const PLAYER_LABELS = { user: "나", ai1: "AI 1", ai2: "AI 2", ai3: "AI 3", ai4: "AI 4" };
 
   function showScreen(id) {
     document.querySelectorAll(".screen").forEach((el) => el.classList.add("hidden"));
@@ -273,6 +274,145 @@
     document.getElementById("reveal-total-value").textContent = poolTotal;
     showScreen("screen-reveal");
   }
+
+  function startNextRound() {
+    if (state.roundIndex >= state.playQueue.length) {
+      showResults();
+      return;
+    }
+    state.currentItem = state.playQueue[state.roundIndex];
+    state.round = L.createRound(state.startPlayerId);
+    state.selectedCubes = [];
+    showScreen("screen-auction");
+    renderAuctionScreen();
+    maybeRunAiTurn();
+  }
+
+  function renderPlayersBar() {
+    const wrap = document.getElementById("players-bar");
+    wrap.innerHTML = "";
+    L.PLAYER_ORDER.forEach((id) => {
+      const player = L.findPlayer(state.players, id);
+      const active = state.round.active[id];
+      const isLeader = state.round.highestPlayerId === id;
+      const div = document.createElement("div");
+      div.className = "player-chip" + (active ? "" : " passed") + (isLeader ? " leading" : "");
+      const cubesLabel = id === "user" ? `큐브 ${player.cubes.reduce((a, b) => a + b, 0)}` : "";
+      div.innerHTML = `<span class="player-name">${PLAYER_LABELS[id]}</span><span class="player-status">${active ? (isLeader ? "최고가" : "대기") : "포기"}</span><span class="player-cubes">${cubesLabel}</span>`;
+      wrap.appendChild(div);
+    });
+  }
+
+  function renderCubeTray() {
+    const wrap = document.getElementById("cube-tray");
+    wrap.innerHTML = "";
+    const user = L.findPlayer(state.players, "user");
+    const remaining = L.remainingCubesInRound(user, state.round);
+    L.CUBE_VALUES.forEach((v) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "cube-btn";
+      btn.textContent = v;
+      const held = remaining.includes(v);
+      if (!held) {
+        btn.disabled = true;
+        btn.classList.add("used");
+      }
+      if (state.selectedCubes.includes(v)) {
+        btn.classList.add("selected");
+      }
+      btn.addEventListener("click", () => {
+        const idx = state.selectedCubes.indexOf(v);
+        if (idx === -1) state.selectedCubes.push(v);
+        else state.selectedCubes.splice(idx, 1);
+        renderAuctionScreen();
+      });
+      wrap.appendChild(btn);
+    });
+  }
+
+  function renderLog() {
+    const wrap = document.getElementById("log-list");
+    wrap.innerHTML = "";
+    state.round.log.slice().reverse().forEach((entry) => {
+      const line = document.createElement("div");
+      line.className = "log-line";
+      line.textContent = entry.type === "bid"
+        ? `${PLAYER_LABELS[entry.playerId]} → ${entry.total} (+${entry.cubes.join(",")})`
+        : `${PLAYER_LABELS[entry.playerId]} 포기`;
+      wrap.appendChild(line);
+    });
+  }
+
+  function renderAuctionScreen() {
+    document.getElementById("round-counter").textContent = `${state.roundIndex + 1} / ${L.TOTAL_ROUNDS} 라운드`;
+    document.getElementById("item-name-label").textContent = state.currentItem.item_name;
+    document.getElementById("highest-value").textContent = state.round.highestTotal;
+    document.getElementById("highest-bidder").textContent =
+      state.round.highestPlayerId ? PLAYER_LABELS[state.round.highestPlayerId] : "-";
+
+    renderPlayersBar();
+    renderCubeTray();
+    renderLog();
+
+    const actor = L.currentActor(state.round);
+    const isUserTurn = actor === "user";
+    const selectedSum = state.selectedCubes.reduce((a, b) => a + b, 0);
+    const prospective = state.round.submitted.user + selectedSum;
+
+    document.getElementById("selected-sum-label").textContent =
+      selectedSum > 0 ? `선택한 큐브 합계: ${selectedSum} (누적 ${prospective})` : "큐브를 선택해 입찰액을 만드세요";
+
+    const turnBanner = document.getElementById("turn-banner");
+    turnBanner.textContent = isUserTurn ? "당신의 차례입니다" : (actor ? `${PLAYER_LABELS[actor]} 진행 중...` : "");
+
+    document.getElementById("bid-btn").disabled = !isUserTurn || selectedSum === 0 || prospective <= state.round.highestTotal;
+    document.getElementById("pass-btn").disabled = !isUserTurn;
+  }
+
+  function handleUserBid() {
+    if (state.selectedCubes.length === 0) return;
+    const res = L.applyBid(state.round, state.players, "user", state.selectedCubes.slice());
+    if (!res.ok) return;
+    state.selectedCubes = [];
+    afterAction();
+  }
+
+  function handleUserPass() {
+    L.applyPass(state.round, "user");
+    state.selectedCubes = [];
+    afterAction();
+  }
+
+  function afterAction() {
+    if (L.isRoundOver(state.round)) {
+      resolveRound();
+      return;
+    }
+    renderAuctionScreen();
+    maybeRunAiTurn();
+  }
+
+  function maybeRunAiTurn() {
+    const actor = L.currentActor(state.round);
+    if (!actor || actor === "user") return;
+    setTimeout(() => {
+      const player = L.findPlayer(state.players, actor);
+      const profile = state.aiProfiles[actor];
+      const remainingRounds = L.TOTAL_ROUNDS - state.roundIndex;
+      const decision = L.decideAiAction(player, state.round, profile, state.poolTotal, remainingRounds);
+      if (decision.action === "bid") {
+        L.applyBid(state.round, state.players, actor, decision.cubes);
+      } else {
+        L.applyPass(state.round, actor);
+      }
+      afterAction();
+    }, 550);
+  }
+
+  document.getElementById("bid-btn").addEventListener("click", handleUserBid);
+  document.getElementById("pass-btn").addEventListener("click", handleUserPass);
+  document.getElementById("reveal-continue-btn").addEventListener("click", startNextRound);
 
   document.getElementById("restart-btn").addEventListener("click", () => {
     showScreen("screen-start");
