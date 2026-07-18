@@ -37,10 +37,20 @@
   .header-left a { font-size: 12px; font-weight: 600; }
   .header-left .title { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
   .version-tag { font-size: 11px; font-weight: 700; color: #8992a0; vertical-align: middle; }
+  .header-actions { display: flex; gap: 8px; flex: 0 0 auto; }
   .btn-reset {
     background: #15181c; border: 1px solid rgba(255,255,255,.1); color: #c7ccd4;
     font-size: 13px; font-weight: 600; padding: 9px 14px; border-radius: 10px; cursor: pointer;
   }
+  .btn-undo {
+    background: #15181c; border: 1px solid rgba(255,255,255,.1); color: #c7ccd4;
+    font-size: 13px; font-weight: 600; padding: 9px 14px; border-radius: 10px; cursor: pointer;
+  }
+  .btn-undo:disabled { opacity: .4; cursor: default; }
+  .undo-rank-note {
+    font-size: 12px; color: #8992a0; text-align: center;
+  }
+  .undo-rank-note.hidden { display: none; }
 
   .mode-bar { display: flex; flex-wrap: wrap; gap: 8px; }
   .mode-group {
@@ -86,6 +96,8 @@
   .phase-label { font-size: 14px; font-weight: 700; flex: 1; min-width: 0; }
   .supply-chips { display: flex; gap: 8px; flex: 0 0 auto; }
   .supply-chip { font-size: 12px; font-weight: 600; color: #c7ccd4; background: #1c2024; border-radius: 20px; padding: 4px 10px; }
+  .undo-used-chip { font-size: 12px; font-weight: 600; color: #ffd166; background: #1c2024; border-radius: 20px; padding: 4px 10px; }
+  .undo-used-chip.hidden { display: none; }
 
   .board-card {
     display: flex; justify-content: center;
@@ -171,9 +183,12 @@
     <div class="header-row">
       <div class="header-left">
         <a href="index.html">← 게임 허브</a>
-        <span class="title">3단 오목 <span class="version-tag">v0.2</span></span>
+        <span class="title">3단 오목 <span class="version-tag">v0.4</span></span>
       </div>
-      <button class="btn-reset" id="reset-btn">새 게임</button>
+      <div class="header-actions">
+        <button class="btn-undo" id="undo-btn">한 수 무르기</button>
+        <button class="btn-reset" id="reset-btn">새 게임</button>
+      </div>
     </div>
 
     <div class="mode-bar">
@@ -198,6 +213,7 @@
     <div class="status-bar">
       <div class="turn-dot" id="turn-dot"></div>
       <span class="phase-label" id="phase-label"></span>
+      <span class="undo-used-chip hidden" id="undo-used-chip">무르기 사용 · 랭킹 미등록</span>
       <div class="supply-chips">
         <span class="supply-chip" id="supply-1"></span>
         <span class="supply-chip" id="supply-2"></span>
@@ -240,6 +256,8 @@
       <div class="rank-register-result hidden" id="rank-register-result"></div>
     </div>
 
+    <span class="undo-rank-note hidden" id="undo-rank-note">무르기를 사용해 이번 판 결과는 랭킹에 등록할 수 없습니다.</span>
+
     <button class="btn-restart" id="win-close-btn">종료</button>
   </div>
 </div>
@@ -259,14 +277,17 @@
   const LINE_DIRS = [{ q: 1, r: 0 }, { q: 0, r: 1 }, { q: 1, r: -1 }];
 
   function toPixel(q, r) {
-    return { x: SIZE * Math.sqrt(3) * (q + r / 2), y: SIZE * 1.5 * r };
+    return { x: SIZE * 1.5 * q, y: SIZE * Math.sqrt(3) * (r + q / 2) };
   }
 
   const RAW_BOARD = [];
   for (let q = -5; q <= 5; q++) {
     for (let r = -5; r <= 5; r++) {
       const s = -q - r;
-      if (Math.abs(s) <= 5) RAW_BOARD.push({ q, r, s });
+      if (Math.abs(s) > 5) continue;
+      const isCorner = [Math.abs(q), Math.abs(r), Math.abs(s)].filter(v => v === 5).length >= 2;
+      if (isCorner) continue;
+      RAW_BOARD.push({ q, r, s });
     }
   }
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -368,10 +389,16 @@
       if (!isTop3(key)) continue;
       const c = BOARD_MAP[key];
       for (let i = 0; i < 6; i++) {
-        const d1 = NEIGHBOR_DIRS[i], d2 = NEIGHBOR_DIRS[(i + 1) % 6];
-        const n1 = (c.q + d1.q) + "_" + (c.r + d1.r);
-        const n2 = (c.q + d2.q) + "_" + (c.r + d2.r);
-        if (isTop3(n1) && isTop3(n2)) return [key, n1, n2];
+        const d1 = NEIGHBOR_DIRS[i];
+        const n1Key = (c.q + d1.q) + "_" + (c.r + d1.r);
+        if (!isTop3(n1Key)) continue;
+        const n1 = BOARD_MAP[n1Key];
+        for (let j = 0; j < 6; j++) {
+          const d2 = NEIGHBOR_DIRS[j];
+          const n2Key = (n1.q + d2.q) + "_" + (n1.r + d2.r);
+          if (n2Key === key) continue;
+          if (isTop3(n2Key)) return [key, n1Key, n2Key];
+        }
       }
     }
     return null;
@@ -652,7 +679,10 @@
     for (let q = -5; q <= 5; q++) {
       for (let r = -5; r <= 5; r++) {
         const s = -q - r;
-        if (Math.abs(s) <= 5) RAW_BOARD.push({ q, r, s, key: q + "_" + r });
+        if (Math.abs(s) > 5) continue;
+        const isCorner = [Math.abs(q), Math.abs(r), Math.abs(s)].filter(v => v === 5).length >= 2;
+        if (isCorner) continue;
+        RAW_BOARD.push({ q, r, s, key: q + "_" + r });
       }
     }
     const BOARD_MAP = {};
@@ -706,10 +736,16 @@
         if (!isTop3(key)) continue;
         const c = BOARD_MAP[key];
         for (let i = 0; i < 6; i++) {
-          const d1 = NEIGHBOR_DIRS[i], d2 = NEIGHBOR_DIRS[(i + 1) % 6];
-          const n1 = (c.q + d1.q) + "_" + (c.r + d1.r);
-          const n2 = (c.q + d2.q) + "_" + (c.r + d2.r);
-          if (isTop3(n1) && isTop3(n2)) return [key, n1, n2];
+          const d1 = NEIGHBOR_DIRS[i];
+          const n1Key = (c.q + d1.q) + "_" + (c.r + d1.r);
+          if (!isTop3(n1Key)) continue;
+          const n1 = BOARD_MAP[n1Key];
+          for (let j = 0; j < 6; j++) {
+            const d2 = NEIGHBOR_DIRS[j];
+            const n2Key = (n1.q + d2.q) + "_" + (n1.r + d2.r);
+            if (n2Key === key) continue;
+            if (isTop3(n2Key)) return [key, n1Key, n2Key];
+          }
         }
       }
       return null;
@@ -1015,6 +1051,8 @@
   let aiDifficulty = "hard"; // "easy" | "medium" | "hard" | "extreme"
   let gameEpoch = 0;
   let humanIsBlackNext = true; // AI 대결: 첫 판은 유저가 흑돌, 이후엔 진 사람이 흑돌
+  let history = []; // 무르기용: 각 수를 두기 직전 state 스냅샷
+  let usedUndo = false; // 이번 판에서 무르기를 사용했는지 (사용 시 랭킹 등록 불가)
 
   let state = {
     stacks: {},
@@ -1065,6 +1103,7 @@
 
   function applyAIMove(move) {
     const player = AI_PLAYER;
+    history.push(state);
     if (state.phase === "initial") {
       const stacks = placeStoneOf(state.stacks, move.key, player);
       const supply = Object.assign({}, state.supply, { [player]: state.supply[player] - 1 });
@@ -1112,6 +1151,7 @@
           turn = INITIAL_STEPS[stepIndex].player;
         }
       }
+      history.push(state);
       setState({ stacks, supply, stepIndex, placedInStep, phase, turn, lastCell: key });
       return;
     }
@@ -1123,6 +1163,7 @@
       if (isValidMoveTargetOf(state.stacks, origin, key, player)) {
         const stacks = moveStoneOf(state.stacks, origin, key, player);
         const win = checkWinOf(stacks, player);
+        history.push(state);
         setState({ stacks, selected: null, turn: win ? state.turn : otherPlayer(player), winner: win ? player : null, winReason: win ? win.reason : "", winCells: win ? win.cells : [], lastCell: key });
       } else if (topColorOf(state.stacks, key) === player) {
         setState({ selected: key });
@@ -1137,6 +1178,7 @@
       const stacks = placeStoneOf(state.stacks, key, player);
       const supply = Object.assign({}, state.supply, { [player]: state.supply[player] - 1 });
       const win = checkWinOf(stacks, player);
+      history.push(state);
       setState({ stacks, supply, turn: win ? state.turn : otherPlayer(player), winner: win ? player : null, winReason: win ? win.reason : "", winCells: win ? win.cells : [], lastCell: key });
     } else if (topColorOf(state.stacks, key) === player) {
       setState({ selected: key });
@@ -1146,6 +1188,8 @@
   function resetGame() {
     gameEpoch++;
     rankSubmittedForThisGame = false;
+    history = [];
+    usedUndo = false;
     document.getElementById("rank-register-result").classList.add("hidden");
     document.getElementById("rank-nickname-input").disabled = false;
     document.getElementById("rank-submit-btn").disabled = false;
@@ -1156,6 +1200,36 @@
       stacks: {}, turn: 1, phase: "initial", stepIndex: 0, placedInStep: 0,
       supply: { 1: 25, 2: 25 }, selected: null, winner: null, winReason: "", winCells: [], aiThinking: false, lastCell: null,
     });
+  }
+
+  // ---- 한 수 무르기 ----
+  // "무르기"는 사람이 둔 마지막 한 수를 되돌리는 개념이다. AI 대결에서는 기본 배치 단계처럼
+  // AI가 한 차례에 여러 ply를 연속으로 두는 경우가 있으므로, 고정 개수가 아니라
+  // "가장 최근의 사람 차례 이전" 스냅샷을 찾을 때까지 AI ply를 모두 되돌린다.
+  function canUndo() {
+    if (state.winner) return false;
+    if (state.aiThinking) return false;
+    if (gameMode === "ai") {
+      if (state.turn !== HUMAN_PLAYER) return false;
+      return history.some(h => h.turn === HUMAN_PLAYER);
+    }
+    return history.length >= 1;
+  }
+
+  function undoMove() {
+    if (!canUndo()) return;
+    let restored;
+    if (gameMode === "ai") {
+      while (history.length && history[history.length - 1].turn === AI_PLAYER) history.pop();
+      restored = history.pop();
+    } else {
+      restored = history.pop();
+    }
+    state = Object.assign({}, restored, { selected: null });
+    usedUndo = true;
+    gameEpoch++;
+    render();
+    scheduleAIIfNeeded();
   }
 
   // ---- 모드/난이도 UI ----
@@ -1279,7 +1353,7 @@
 
   async function submitRankResult(nickname) {
     const config = currentRankConfig();
-    if (!config || rankSubmittedForThisGame || !state.winner) return;
+    if (!config || rankSubmittedForThisGame || !state.winner || usedUndo) return;
     const input = document.getElementById("rank-nickname-input");
     const btn = document.getElementById("rank-submit-btn");
     const resultEl = document.getElementById("rank-register-result");
@@ -1320,7 +1394,7 @@
   // 한 번이라도 등록한 닉네임은 이후 패배(또는 승리)를 건너뛰지 못하도록 게임 종료 시 자동 등록
   function autoSubmitRankIfReturningPlayer() {
     const config = currentRankConfig();
-    if (gameMode !== "ai" || !config || !state.winner) return;
+    if (gameMode !== "ai" || !config || !state.winner || usedUndo) return;
     const savedNickname = localStorage.getItem(config.nicknameKey);
     if (!savedNickname) return; // 처음 등록하는 유저는 닉네임 입력을 위해 수동 등록 유지
     submitRankResult(savedNickname);
@@ -1495,18 +1569,24 @@
 
     boardCardEl.classList.toggle("thinking", aiTurnActive);
 
+    document.getElementById("undo-btn").disabled = !canUndo();
+    const hasRankConfig = gameMode === "ai" && !!RANK_CONFIGS[aiDifficulty];
+    document.getElementById("undo-used-chip").classList.toggle("hidden", !(usedUndo && hasRankConfig));
+
     if (winner) {
       winDotEl.style.background = stoneColor(winner);
       winLabelEl.textContent = `${colorName(winner)} 승리!`;
       winReasonEl.textContent = winReason;
       winOverlayEl.classList.add("show");
-      document.getElementById("rank-register").classList.toggle("hidden", !(gameMode === "ai" && !!RANK_CONFIGS[aiDifficulty]));
+      document.getElementById("rank-register").classList.toggle("hidden", !(hasRankConfig && !usedUndo));
+      document.getElementById("undo-rank-note").classList.toggle("hidden", !(hasRankConfig && usedUndo));
     } else {
       winOverlayEl.classList.remove("show");
     }
   }
 
   document.getElementById("reset-btn").addEventListener("click", resetGame);
+  document.getElementById("undo-btn").addEventListener("click", undoMove);
   document.getElementById("win-close-btn").addEventListener("click", () => {
     winOverlayEl.classList.remove("show");
   });
