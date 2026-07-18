@@ -47,6 +47,7 @@
     font-size: 13px; font-weight: 600; padding: 9px 14px; border-radius: 10px; cursor: pointer;
   }
   .btn-undo:disabled { opacity: .4; cursor: default; }
+  .btn-undo.hidden { display: none; }
   .undo-rank-note {
     font-size: 12px; color: #8992a0; text-align: center;
   }
@@ -183,7 +184,7 @@
     <div class="header-row">
       <div class="header-left">
         <a href="index.html">← 게임 허브</a>
-        <span class="title">3단 오목 <span class="version-tag">v0.4</span></span>
+        <span class="title">3단 오목 <span class="version-tag">v0.5</span></span>
       </div>
       <div class="header-actions">
         <button class="btn-undo" id="undo-btn">한 수 무르기</button>
@@ -195,6 +196,7 @@
       <div class="mode-group" id="mode-group">
         <button class="mode-btn" data-mode="2p">2인 플레이</button>
         <button class="mode-btn" data-mode="ai">AI와 대결</button>
+        <button class="mode-btn" data-mode="ai_vs_ai">AI vs AI 관전</button>
       </div>
       <div class="mode-group" id="difficulty-group">
         <button class="mode-btn" data-diff="easy">하</button>
@@ -1133,9 +1135,11 @@
   function setState(patch) {
     const wasWinner = state.winner;
     state = Object.assign({}, state, patch);
-    if (gameMode === "ai" && !wasWinner && state.winner) {
-      humanIsBlackNext = state.winner === AI_PLAYER; // 패자가 다음 판 흑돌
-      autoSubmitRankIfReturningPlayer();
+    if ((gameMode === "ai" || gameMode === "ai_vs_ai") && !wasWinner && state.winner) {
+      if (gameMode === "ai") {
+        humanIsBlackNext = state.winner === AI_PLAYER; // 패자가 다음 판 흑돌
+        autoSubmitRankIfReturningPlayer();
+      }
       submitGameLog();
     }
     render();
@@ -1143,9 +1147,9 @@
   }
 
   function scheduleAIIfNeeded() {
-    if (gameMode !== "ai") return;
+    if (gameMode !== "ai" && gameMode !== "ai_vs_ai") return;
     if (state.winner) return;
-    if (state.turn !== AI_PLAYER) return;
+    if (gameMode === "ai" && state.turn !== AI_PLAYER) return;
     if (state.aiThinking) return;
     state.aiThinking = true;
     render();
@@ -1157,6 +1161,14 @@
   }
 
   async function performAIMove(epoch) {
+    // AI vs AI 모드: 새로 탐색 로직을 만들지 않고, 지금 둘 차례인 쪽을 임시로
+    // AI_PLAYER로 놓고 기존 탐색 함수를 그대로 재사용한다. scheduleAIIfNeeded가
+    // state.aiThinking으로 항상 한 번에 하나의 performAIMove만 진행되게 막아주므로
+    // 이 재할당이 다른 진행 중인 탐색과 겹칠 일은 없다.
+    if (gameMode === "ai_vs_ai") {
+      AI_PLAYER = state.turn;
+      HUMAN_PLAYER = otherPlayer(state.turn);
+    }
     const move = await computeAIMove();
     if (epoch !== gameEpoch) return; // 그 사이 게임이 리셋/전환됐으면 이 결과는 버린다
     state.aiThinking = false;
@@ -1196,6 +1208,7 @@
   function onCellClick(key) {
     if (state.winner) return;
     if (state.aiThinking) return;
+    if (gameMode === "ai_vs_ai") return;
     if (gameMode === "ai" && state.turn === AI_PLAYER) return;
     const player = state.turn;
 
@@ -1277,6 +1290,7 @@
   function canUndo() {
     if (state.winner) return false;
     if (state.aiThinking) return false;
+    if (gameMode === "ai_vs_ai") return false;
     if (gameMode === "ai") {
       if (state.turn !== HUMAN_PLAYER) return false;
       return history.some(h => h.turn === HUMAN_PLAYER);
@@ -1333,6 +1347,7 @@
     document.querySelectorAll("#mode-group .mode-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === gameMode));
     document.querySelectorAll("#difficulty-group .mode-btn").forEach(b => b.classList.toggle("active", b.dataset.diff === aiDifficulty));
     document.getElementById("difficulty-group").classList.toggle("hidden", gameMode !== "ai");
+    document.getElementById("undo-btn").classList.toggle("hidden", gameMode === "ai_vs_ai");
     const config = gameMode === "ai" ? RANK_CONFIGS[aiDifficulty] : null;
     const rankToggleBtn = document.getElementById("rank-toggle-btn");
     rankToggleBtn.classList.toggle("hidden", !config);
@@ -1347,7 +1362,12 @@
     }
   }
   document.querySelectorAll("#mode-group .mode-btn").forEach(b => {
-    b.addEventListener("click", () => { gameMode = b.dataset.mode; updateModeUI(); resetGame(); });
+    b.addEventListener("click", () => {
+      gameMode = b.dataset.mode;
+      if (gameMode === "ai_vs_ai") aiDifficulty = "extreme";
+      updateModeUI();
+      resetGame();
+    });
   });
   document.querySelectorAll("#difficulty-group .mode-btn").forEach(b => {
     b.addEventListener("click", () => { aiDifficulty = b.dataset.diff; updateModeUI(); resetGame(); });
@@ -1397,7 +1417,8 @@
   async function submitGameLog() {
     const config = currentRankConfig();
     if (!config) return;
-    const nickname = localStorage.getItem(config.nicknameKey) || null;
+    const isAiVsAi = gameMode === "ai_vs_ai";
+    const nickname = isAiVsAi ? null : (localStorage.getItem(config.nicknameKey) || null);
     try {
       await fetch(`${RANK_SUPABASE_URL}/rest/v1/gomoku_game_log`, {
         method: "POST",
@@ -1410,7 +1431,8 @@
         body: JSON.stringify({
           difficulty: aiDifficulty,
           nickname,
-          human_player: HUMAN_PLAYER,
+          human_player: isAiVsAi ? null : HUMAN_PLAYER,
+          game_type: isAiVsAi ? "ai_vs_ai" : "human",
           winner: state.winner,
           win_reason: state.winReason,
           used_undo: usedUndo,
@@ -1603,7 +1625,7 @@
     const { stacks, turn, phase, stepIndex, placedInStep, supply, selected, winner, winReason, winCells, aiThinking, lastCell } = state;
 
     let legalTargets = new Set();
-    const aiTurnActive = gameMode === "ai" && turn === AI_PLAYER && !winner;
+    const aiTurnActive = ((gameMode === "ai" && turn === AI_PLAYER) || gameMode === "ai_vs_ai") && !winner;
     if (!winner && !aiTurnActive) {
       if (phase === "initial") {
         RAW_BOARD.forEach(c => { if (isValidInitialPlacementOf(stacks, c.key, turn)) legalTargets.add(c.key); });
@@ -1675,7 +1697,8 @@
 
     let phaseLabel;
     if (aiTurnActive) {
-      phaseLabel = phase === "initial" ? "AI가 배치하는 중..." : "AI가 생각하는 중...";
+      const aiLabel = gameMode === "ai_vs_ai" ? `${colorName(turn)} AI` : "AI";
+      phaseLabel = phase === "initial" ? `${aiLabel}가 배치하는 중...` : `${aiLabel}가 생각하는 중...`;
     } else if (phase === "initial") {
       const step = INITIAL_STEPS[stepIndex];
       phaseLabel = `기본 배치 · ${colorName(step.player)} ${placedInStep + 1}/${step.count}번째 돌 놓는 중`;
@@ -1686,8 +1709,8 @@
     }
     phaseLabelEl.textContent = phaseLabel;
     turnDotEl.style.background = stoneColor(turn);
-    supply1El.textContent = gameMode === "ai" ? `흑${HUMAN_PLAYER === 1 ? "(나)" : "(AI)"} ${supply[1]}` : `흑 ${supply[1]}`;
-    supply2El.textContent = gameMode === "ai" ? `백${HUMAN_PLAYER === 2 ? "(나)" : "(AI)"} ${supply[2]}` : `백 ${supply[2]}`;
+    supply1El.textContent = gameMode === "ai" ? `흑${HUMAN_PLAYER === 1 ? "(나)" : "(AI)"} ${supply[1]}` : gameMode === "ai_vs_ai" ? `흑(AI) ${supply[1]}` : `흑 ${supply[1]}`;
+    supply2El.textContent = gameMode === "ai" ? `백${HUMAN_PLAYER === 2 ? "(나)" : "(AI)"} ${supply[2]}` : gameMode === "ai_vs_ai" ? `백(AI) ${supply[2]}` : `백 ${supply[2]}`;
 
     boardCardEl.classList.toggle("thinking", aiTurnActive);
 
