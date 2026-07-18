@@ -60,6 +60,15 @@
   #round-counter { font-size: 11.5px; color: var(--text-dim); font-weight: 700; }
   #item-name-label { font-size: 19px; font-weight: 800; }
 
+  .artwork-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .artwork-image-wrap { width: 100%; border-radius: 12px; overflow: hidden; background: var(--panel-light); display: flex; align-items: center; justify-content: center; min-height: 160px; }
+  .artwork-image-wrap img { width: 100%; max-height: 260px; object-fit: contain; display: block; }
+  .artwork-image-wrap img.hidden { display: none; }
+  .artwork-placeholder { font-size: 40px; padding: 40px 0; color: var(--text-dim); }
+  .artwork-placeholder.hidden { display: none; }
+  .artwork-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--text-dim); }
+  .artwork-meta b { color: var(--text); font-weight: 700; }
+
   .players-bar { display: flex; flex-wrap: wrap; gap: 8px; }
   .player-chip { flex: 1 1 auto; min-width: 90px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; font-size: 11.5px; }
   .player-chip.leading { border-color: var(--gold); background: rgba(255,209,102,.1); }
@@ -137,7 +146,7 @@
 
     <div id="screen-reveal" class="screen hidden">
       <div class="reveal-card">
-        <div class="reveal-label">물품 22개 가치 총합</div>
+        <div class="reveal-label">물품 22개 가치 총합 (억원)</div>
         <div class="reveal-total" id="reveal-total-value">0</div>
         <div class="reveal-hint">이 중 11개만 경매에 오릅니다.</div>
       </div>
@@ -149,6 +158,16 @@
         <span id="round-counter">1 / 11 라운드</span>
         <span id="item-name-label">?</span>
       </div>
+
+      <div class="artwork-card">
+        <div class="artwork-image-wrap">
+          <img id="artwork-image" class="hidden" alt="">
+          <span id="artwork-placeholder" class="artwork-placeholder">🖼️</span>
+        </div>
+        <div class="artwork-meta" id="artwork-meta"></div>
+      </div>
+
+      <div class="log-card" id="log-list"></div>
 
       <div class="players-bar" id="players-bar"></div>
 
@@ -167,8 +186,6 @@
         <button type="button" class="btn-primary" id="bid-btn" disabled>입찰</button>
         <button type="button" class="btn-secondary" id="pass-btn" disabled>포기</button>
       </div>
-
-      <div class="log-card" id="log-list"></div>
     </div>
 
     <div id="screen-results" class="screen hidden">
@@ -193,7 +210,12 @@
 
 <div id="modal-resolve" class="modal hidden">
   <div class="modal-box">
+    <div class="artwork-image-wrap">
+      <img id="resolve-image" class="hidden" alt="">
+      <span id="resolve-placeholder" class="artwork-placeholder">🖼️</span>
+    </div>
     <div class="modal-item-name" id="resolve-item-name"></div>
+    <div class="artwork-meta" id="resolve-meta"></div>
     <div class="modal-value" id="resolve-value"></div>
     <div class="modal-memo" id="resolve-memo"></div>
     <div class="modal-winner" id="resolve-winner"></div>
@@ -237,11 +259,39 @@
 
   async function fetchAllItems() {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/${ITEMS_TABLE}?select=id,item_name,value,memo`,
+      `${SUPABASE_URL}/rest/v1/${ITEMS_TABLE}?select=id,item_name,value,memo,artist,created_year,auction_year,auction_house,image_url&image_url=not.is.null`,
       { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
     );
     if (!res.ok) throw new Error("물품 목록 조회 실패");
     return res.json();
+  }
+
+  function buildImageSrc(filename) {
+    if (!filename) return null;
+    return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}`;
+  }
+
+  function renderArtworkVisual(item, imgEl, placeholderEl) {
+    const src = buildImageSrc(item.image_url);
+    if (src) {
+      imgEl.src = src;
+      imgEl.alt = item.item_name;
+      imgEl.classList.remove("hidden");
+      placeholderEl.classList.add("hidden");
+    } else {
+      imgEl.classList.add("hidden");
+      imgEl.removeAttribute("src");
+      placeholderEl.classList.remove("hidden");
+    }
+  }
+
+  function renderArtworkMeta(item) {
+    const parts = [];
+    if (item.artist) parts.push(`<b>작가</b> ${item.artist}`);
+    if (item.created_year) parts.push(`<b>제작년도</b> ${item.created_year}년`);
+    if (item.auction_year) parts.push(`<b>경매년도</b> ${item.auction_year}년`);
+    if (item.auction_house) parts.push(`<b>경매장</b> ${item.auction_house}`);
+    return parts.map((p) => `<span>${p}</span>`).join("");
   }
 
   async function initStartScreen() {
@@ -347,9 +397,12 @@
   function renderAuctionScreen() {
     document.getElementById("round-counter").textContent = `${state.roundIndex + 1} / ${L.TOTAL_ROUNDS} 라운드`;
     document.getElementById("item-name-label").textContent = state.currentItem.item_name;
-    document.getElementById("highest-value").textContent = state.round.highestTotal;
+    document.getElementById("highest-value").textContent = `${state.round.highestTotal}큐브`;
     document.getElementById("highest-bidder").textContent =
       state.round.highestPlayerId ? PLAYER_LABELS[state.round.highestPlayerId] : "-";
+
+    renderArtworkVisual(state.currentItem, document.getElementById("artwork-image"), document.getElementById("artwork-placeholder"));
+    document.getElementById("artwork-meta").innerHTML = renderArtworkMeta(state.currentItem);
 
     renderPlayersBar();
     renderCubeTray();
@@ -417,12 +470,14 @@
   function resolveRound() {
     const result = L.finalizeRound(state.round, state.players, state.currentItem);
     const modal = document.getElementById("modal-resolve");
+    renderArtworkVisual(state.currentItem, document.getElementById("resolve-image"), document.getElementById("resolve-placeholder"));
     document.getElementById("resolve-item-name").textContent = state.currentItem.item_name;
-    document.getElementById("resolve-value").textContent = `실제 가치: ${state.currentItem.value}`;
+    document.getElementById("resolve-meta").innerHTML = renderArtworkMeta(state.currentItem);
+    document.getElementById("resolve-value").textContent = `실제 가치: ${state.currentItem.value}억원`;
     document.getElementById("resolve-memo").textContent = state.currentItem.memo || "";
     document.getElementById("resolve-winner").textContent =
       result.type === "won"
-        ? `${PLAYER_LABELS[result.winnerId]}님이 ${result.amount}에 낙찰받았습니다.`
+        ? `${PLAYER_LABELS[result.winnerId]}님이 큐브 ${result.amount}로 낙찰받았습니다.`
         : "유찰 — 아무도 낙찰받지 못했습니다.";
     modal.classList.remove("hidden");
 
@@ -482,7 +537,7 @@
       const row = document.createElement("div");
       row.className = "ranking-row" + (i === 0 ? " winner" : "");
       const items = entry.wonItems.map((it) => it.itemName).join(", ") || "낙찰 없음";
-      row.innerHTML = `<span class="rank-no">${i + 1}</span><span class="rank-name">${PLAYER_LABELS[entry.id]}</span><span class="rank-total">${entry.total}</span><span class="rank-items">${items}</span>`;
+      row.innerHTML = `<span class="rank-no">${i + 1}</span><span class="rank-name">${PLAYER_LABELS[entry.id]}</span><span class="rank-total">${entry.total}억</span><span class="rank-items">${items}</span>`;
       wrap.appendChild(row);
     });
 
