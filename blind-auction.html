@@ -307,6 +307,9 @@
     const statusEl = document.getElementById("start-status");
     const startBtn = document.getElementById("start-btn");
     startBtn.disabled = true;
+    startBtn.style.display = "none";
+    statusEl.className = "status-banner show ok";
+    statusEl.textContent = "물품을 불러오는 중...";
     try {
       const items = await fetchAllItems();
       if (items.length < L.POOL_SIZE) {
@@ -314,10 +317,7 @@
         statusEl.textContent = `사진 있는 물품이 ${items.length}개뿐입니다(사진 없는 물품은 경매에서 제외). ${L.POOL_SIZE}개 이상 필요합니다. 관리자 페이지에서 등록해주세요.`;
         return;
       }
-      statusEl.className = "status-banner show ok";
-      statusEl.textContent = `사진 있는 물품 ${items.length}개 등록됨 · 게임 시작 가능`;
-      startBtn.disabled = false;
-      startBtn.onclick = () => beginGame(items);
+      beginGame(items);
     } catch (err) {
       statusEl.className = "status-banner show err";
       statusEl.textContent = "물품 목록을 불러오지 못했습니다. 새로고침 해주세요.";
