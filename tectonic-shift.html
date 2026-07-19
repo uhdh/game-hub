@@ -933,6 +933,11 @@
   async function saveResult() {
     if (state.resultSaved) return;
     state.resultSaved = true;
+    // 3인 로컬 플레이는 한 기기를 여럿이 돌려가며 쓰는 핫시트라 승패가 특정
+    // 닉네임의 실력을 일관되게 반영하지 않는다 — 랭킹은 매번 같은 AI를
+    // 상대하는 "1인 vs AI 2명" 모드에서만 의미가 있으므로, 3인 로컬 플레이
+    // 결과는 아예 기록하지 않는다.
+    if (mode !== 'vs_ai') return;
     const winnerNickname = isAiSeat(state.winner) ? null : (state.nicknames[state.winner] || null);
     try {
       await fetch(`${SUPABASE_URL}/rest/v1/${RESULTS_TABLE}`, {
@@ -958,17 +963,36 @@
     }
   }
 
+  // 랭킹은 "1인 vs AI 2명" 대국만 대상(사람은 항상 빨강 자리). 승수만 보면
+  // 몇 판 해서 이긴 건지 알 수 없어서, 매번 같은 사람(nicknames.R)의 전체
+  // 대국을 모아 총 대국 수·승수·승률을 함께 계산한다.
   async function fetchRanking() {
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/${RESULTS_TABLE}?select=winner_nickname&winner_nickname=not.is.null`,
+        `${SUPABASE_URL}/rest/v1/${RESULTS_TABLE}?select=nicknames,winner_color&mode=eq.vs_ai&order=created_at.desc&limit=2000`,
         { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
       );
       if (!res.ok) throw new Error('랭킹 조회 실패');
       const rows = await res.json();
-      const counts = new Map();
-      rows.forEach(r => counts.set(r.winner_nickname, (counts.get(r.winner_nickname) || 0) + 1));
-      const ranked = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      const stats = new Map();
+      rows.forEach(r => {
+        const nickname = r.nicknames && r.nicknames.R;
+        if (!nickname) return;
+        const s = stats.get(nickname) || { games: 0, wins: 0 };
+        s.games += 1;
+        if (r.winner_color === 'R') s.wins += 1;
+        stats.set(nickname, s);
+      });
+      const ranked = Array.from(stats.entries())
+        .map(([nickname, s]) => ({
+          nickname,
+          games: s.games,
+          wins: s.wins,
+          losses: s.games - s.wins,
+          winRate: s.games ? Math.round((s.wins / s.games) * 100) : 0,
+        }))
+        .sort((a, b) => b.wins - a.wins || b.winRate - a.winRate)
+        .slice(0, 10);
       renderRanking(ranked);
     } catch (err) {
       // 랭킹 조회 실패는 게임 진행을 막지 않음
@@ -978,10 +1002,10 @@
   function renderRanking(ranked) {
     const wrap = document.getElementById('ranking-list');
     wrap.innerHTML = '';
-    ranked.forEach(([nickname, wins], i) => {
+    ranked.forEach((r, i) => {
       const row = document.createElement('div');
       row.className = 'ranking-row';
-      row.innerHTML = `<span class="rk-no">${i + 1}</span><span class="rk-name">${nickname}</span><span class="rk-wins">${wins}승</span>`;
+      row.innerHTML = `<span class="rk-no">${i + 1}</span><span class="rk-name">${r.nickname}</span><span class="rk-wins">${r.wins}승 ${r.losses}패 · ${r.winRate}%</span>`;
       wrap.appendChild(row);
     });
   }
