@@ -431,7 +431,14 @@
     const val = document.getElementById("gate-input").value;
     const submitBtn = e.target.querySelector("button[type=submit]");
     submitBtn.disabled = true;
-    const ok = await checkPassword(val);
+    let ok = false;
+    try {
+      ok = await checkPassword(val);
+    } catch (err) {
+      document.getElementById("gate-error").textContent = "인증 서버에 연결하지 못했습니다. 다시 시도해주세요.";
+      submitBtn.disabled = false;
+      return;
+    }
     submitBtn.disabled = false;
     if (ok) {
       ADMIN_PW = val;
