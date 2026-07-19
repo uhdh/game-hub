@@ -1836,7 +1836,7 @@
       const actual = state.winner === HUMAN_PLAYER ? 1 : 0;
       if (actual === 1 && await hasIdenticalPriorGame(nickname, aiDifficulty, moveLog, lastGameLogId)) {
         rankSubmittedForThisGame = true;
-        resultEl.textContent = "이전에 둔 것과 완전히 똑같은 수순이라 레이팅에 반영하지 않았습니다.";
+        resultEl.textContent = "이전에 둔 것과 완전히 똑같은 수순이라 승수·레이팅 모두 반영하지 않았습니다.";
         resultEl.classList.remove("hidden");
         btn.textContent = "등록 완료";
         return;
