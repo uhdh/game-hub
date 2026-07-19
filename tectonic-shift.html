@@ -969,7 +969,7 @@
   async function fetchRanking() {
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/${RESULTS_TABLE}?select=nicknames,winner_color&mode=eq.vs_ai&order=created_at.desc&limit=2000`,
+        `${SUPABASE_URL}/rest/v1/${RESULTS_TABLE}?select=nicknames,winner_color,scores&mode=eq.vs_ai&order=created_at.desc&limit=2000`,
         { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
       );
       if (!res.ok) throw new Error('랭킹 조회 실패');
@@ -978,9 +978,10 @@
       rows.forEach(r => {
         const nickname = r.nicknames && r.nicknames.R;
         if (!nickname) return;
-        const s = stats.get(nickname) || { games: 0, wins: 0 };
+        const s = stats.get(nickname) || { games: 0, wins: 0, scoreSum: 0 };
         s.games += 1;
         if (r.winner_color === 'R') s.wins += 1;
+        s.scoreSum += (r.scores && typeof r.scores.R === 'number') ? r.scores.R : 0;
         stats.set(nickname, s);
       });
       const ranked = Array.from(stats.entries())
@@ -990,6 +991,7 @@
           wins: s.wins,
           losses: s.games - s.wins,
           winRate: s.games ? Math.round((s.wins / s.games) * 100) : 0,
+          avgScore: s.games ? Math.round(s.scoreSum / s.games) : 0,
         }))
         .sort((a, b) => b.wins - a.wins || b.winRate - a.winRate)
         .slice(0, 10);
@@ -1005,7 +1007,7 @@
     ranked.forEach((r, i) => {
       const row = document.createElement('div');
       row.className = 'ranking-row';
-      row.innerHTML = `<span class="rk-no">${i + 1}</span><span class="rk-name">${r.nickname}</span><span class="rk-wins">${r.wins}승 ${r.losses}패 · ${r.winRate}%</span>`;
+      row.innerHTML = `<span class="rk-no">${i + 1}</span><span class="rk-name">${r.nickname}</span><span class="rk-wins">${r.wins}승 ${r.losses}패 · ${r.winRate}% · 평균 ${r.avgScore}점</span>`;
       wrap.appendChild(row);
     });
   }
