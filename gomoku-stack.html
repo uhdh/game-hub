@@ -762,14 +762,30 @@
   // targetCells(반드시 막아야 하는 칸들) 중 하나를 두는 수만 추려서, 그 안에서
   // 1수 평가로 가장 나은 것을 고른다. 시간 예산에 따라 결과가 흔들리는 탐색에
   // 맡기지 않고 결정적으로(항상 같은 국면이면 같은 수) 고르기 위한 함수.
-  function pickBestBlock(stacks, allMoves, targetCells) {
+  //
+  // 위협 칸이 여러 개(예: "그냥 이어붙이면 이김" 칸과 "무른 차단을 쌓기로
+  // 되찾으면 이김" 칸이 동시에 존재하는 겹사 형태)일 때, 예전에는 targetCells
+  // 중 아무 하나만 막는 수를 점수 위주로 골라서 — 정작 그 수가 다른 위협은
+  // 하나도 막지 못하는데도 "막았다"고 착각하고 반환하는 사고가 있었다(2026-07-19,
+  // 덕후#912 기보 — 이어붙이는 칸과 무른 차단 되찾기 칸이 동시에 위협이었는데
+  // 무른 차단 보강만 하고 이어붙이는 칸은 그대로 열어둬서 다음 수에 그대로 짐).
+  // 그래서 후보들 중 "두고 나면 상대에게 즉시 이기는 수가 하나도 안 남는" 것을
+  // 먼저 걸러 그 안에서 고르고, 그런 후보가 하나도 없을 때만(진짜 못 막는 겹사)
+  // 기존처럼 점수 위주로 고른다.
+  function pickBestBlock(stacks, supply, allMoves, targetCells, opponent) {
     const blockMoves = allMoves.filter(m => targetCells.has(m.type === "place" ? m.key : m.dest));
     // 상대의 위협 칸이라도 내가 실제로 둘 수 있는 수(놓기/쌓기)가 하나도 없으면
     // (서플라이가 바닥났거나 인접 칸이 없는 등) 막을 방법 자체가 없는 것이므로
     // null을 반환해 호출부가 일반 탐색으로 넘어가게 한다.
     if (!blockMoves.length) return null;
-    let best = blockMoves[0], bestScore = -Infinity;
-    blockMoves.forEach(m => {
+    const fullyBlocking = blockMoves.filter(m => {
+      const { stacks: ns, supply: nsup } = applyMoveWithSupply(stacks, supply, m, AI_PLAYER);
+      const oppNextMoves = getAllLegalMainMoves(ns, opponent, nsup[opponent]);
+      return !oppNextMoves.some(om => checkWinOf(applyMoveToStacks(ns, om, opponent), opponent));
+    });
+    const pool = fullyBlocking.length ? fullyBlocking : blockMoves;
+    let best = pool[0], bestScore = -Infinity;
+    pool.forEach(m => {
       const score = evaluatePosition(applyMoveToStacks(stacks, m, AI_PLAYER), AI_PLAYER) + (Math.random() - 0.5) * 6;
       if (score > bestScore) { bestScore = score; best = m; }
     });
@@ -799,7 +815,7 @@
       }
     });
     if (immediateThreatCells.size) {
-      const block = pickBestBlock(stacks, allMoves, immediateThreatCells);
+      const block = pickBestBlock(stacks, supply, allMoves, immediateThreatCells, HUMAN_PLAYER);
       if (block) return block;
     }
 
@@ -807,7 +823,7 @@
     //    직접 막는다.
     const openThreeCells = findOpenThreeBlockCells(stacks, HUMAN_PLAYER);
     if (openThreeCells.size) {
-      const block = pickBestBlock(stacks, allMoves, openThreeCells);
+      const block = pickBestBlock(stacks, supply, allMoves, openThreeCells, HUMAN_PLAYER);
       if (block) return block;
     }
 
@@ -1151,11 +1167,22 @@
     }
     // targetCells 중 하나를 두는 수만 추려서 1수 평가로 가장 나은 것을 결정적으로
     // 고른다(시간 예산에 따라 흔들리는 탐색에 맡기지 않음).
-    function pickBestBlock(stacks, allMoves, targetCells) {
+    //
+    // 위협 칸이 여러 개(예: 이어붙이는 칸과, 무른 차단을 쌓기로 되찾으면 이기는
+    // 칸이 동시에 있는 겹사)일 때 아무 하나만 막고 다른 위협은 그대로 열어두는
+    // 사고를 막기 위해, "두고 나면 상대에게 즉시 이기는 수가 하나도 안 남는"
+    // 후보를 먼저 고른다(2026-07-19, 덕후#912 기보에서 실제 확인).
+    function pickBestBlock(stacks, supply, allMoves, targetCells, opponent) {
       const blockMoves = allMoves.filter(m => targetCells.has(m.type === "place" ? m.key : m.dest));
       if (!blockMoves.length) return null;
-      let best = blockMoves[0], bestScore = -Infinity;
-      blockMoves.forEach(m => {
+      const fullyBlocking = blockMoves.filter(m => {
+        const r = applyMoveWithSupply(stacks, supply, m, AI_PLAYER);
+        const oppNextMoves = getAllLegalMainMoves(r.stacks, opponent, r.supply[opponent]);
+        return !oppNextMoves.some(om => checkWinOf(applyMoveToStacks(r.stacks, om, opponent), opponent));
+      });
+      const pool = fullyBlocking.length ? fullyBlocking : blockMoves;
+      let best = pool[0], bestScore = -Infinity;
+      pool.forEach(m => {
         const score = evaluatePosition(applyMoveToStacks(stacks, m, AI_PLAYER), AI_PLAYER) + (Math.random() - 0.5) * 6;
         if (score > bestScore) { bestScore = score; best = m; }
       });
@@ -1213,7 +1240,7 @@
         }
       });
       if (immediateThreatCells.size) {
-        const move = pickBestBlock(stacks, allMoves, immediateThreatCells);
+        const move = pickBestBlock(stacks, supply, allMoves, immediateThreatCells, HUMAN_PLAYER);
         if (move) {
           self.postMessage({ type: "result", requestId: requestId, move: move, depthReached: 0 });
           return;
@@ -1221,7 +1248,7 @@
       }
       const openThreeCells = findOpenThreeBlockCells(stacks, HUMAN_PLAYER);
       if (openThreeCells.size) {
-        const move = pickBestBlock(stacks, allMoves, openThreeCells);
+        const move = pickBestBlock(stacks, supply, allMoves, openThreeCells, HUMAN_PLAYER);
         if (move) {
           self.postMessage({ type: "result", requestId: requestId, move: move, depthReached: 0 });
           return;
