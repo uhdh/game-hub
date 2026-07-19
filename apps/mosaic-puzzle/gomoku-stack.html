@@ -558,9 +558,14 @@
         for (const k of cells) {
           const top = topColorOf(stacks, k);
           if (top === color) mine++;
-          else if (top) {
-            if (isRestackableBlock(stacks, k, color)) mine++;
-            else { blocked = true; break; }
+          // 상대 돌이 있어도 "무른 차단"(쌓기로 되찾을 수 있음)이면 실제로는
+          // 막힌 게 아니다 — 그렇다고 이미 내 돌이 있는 것처럼 mine을 올리면
+          // 안 된다(빈 칸보다 더 유리하게 취급하는 오류였음: 상대 관점에서
+          // 빈 칸=아직 안 셈, 무른 차단=이미 다 채운 것처럼 셈 → 오히려
+          // 그 자리를 직접 막는 게 손해로 평가되는 역효과가 있었다). 빈 칸과
+          // 완전히 동일하게 "세지도 막지도 않음"으로 처리한다.
+          else if (top && !isRestackableBlock(stacks, k, color)) {
+            blocked = true; break;
           }
         }
         if (blocked) continue;
@@ -579,6 +584,41 @@
     return mine - theirs * 1.15;
   }
 
+  // 초기 배치는 딱 한 수만 보고 평가하는 얕은 판단이라, 상대가 이미 위험한
+  // 5칸 구간(같은 색 3개 이상, 하드 블록 없음)을 만들어 놓았을 때 그 구간 안의
+  // 칸을 선점하는 가치를 windowThreatScore만으로는 못 알아본다. 실전에서
+  // 이 때문에 AI가 명백히 위험한 자리를 놔두고 다른 데를 두는 사고가 실제로
+  // 있었다(2026-07-19, 테스트유저 기보 — 그 자리를 두는 게 오히려 손해로
+  // 잘못 평가되기까지 했음). 그 칸이 상대의 위험한 구간 안에 있으면 선점
+  // 가산점을 직접 준다.
+  function contestedSquareBonus(stacks, key, defender) {
+    const opp = otherPlayer(defender);
+    const c = BOARD_MAP[key];
+    let bonus = 0;
+    LINE_DIRS.forEach(dir => {
+      for (let start = -4; start <= 0; start++) {
+        const cells = [];
+        let onBoard = true;
+        for (let i = 0; i < 5; i++) {
+          const cq = c.q + dir.q * (start + i), cr = c.r + dir.r * (start + i);
+          const k2 = cq + "_" + cr;
+          if (!BOARD_MAP[k2]) { onBoard = false; break; }
+          cells.push(k2);
+        }
+        if (!onBoard || !cells.includes(key)) continue;
+        let oppCount = 0, hasDefenderStone = false;
+        cells.forEach(k2 => {
+          if (k2 === key) return;
+          const top = topColorOf(stacks, k2);
+          if (top === opp) oppCount++;
+          else if (top === defender) hasDefenderStone = true;
+        });
+        if (!hasDefenderStone && oppCount >= 3) bonus += oppCount * 40;
+      }
+    });
+    return bonus;
+  }
+
   function computeAIInitialMove() {
     const candidates = RAW_BOARD.filter(c => isValidInitialPlacementOf(state.stacks, c.key, AI_PLAYER));
     if (aiDifficulty === "easy") return { type: "place", key: candidates[randomInt(candidates.length)].key };
@@ -593,7 +633,8 @@
       candidates.forEach(c => {
         const result = placeStoneOf(state.stacks, c.key, AI_PLAYER);
         const centerBias = -Math.max(Math.abs(c.q), Math.abs(c.r), Math.abs(c.s)) * 0.5;
-        const score = evaluatePosition(result, AI_PLAYER) + centerBias + (Math.random() - 0.5) * AI_SCORE_JITTER;
+        const bonus = contestedSquareBonus(state.stacks, c.key, AI_PLAYER);
+        const score = evaluatePosition(result, AI_PLAYER) + centerBias + bonus + (Math.random() - 0.5) * AI_SCORE_JITTER;
         if (score > bestScore) { bestScore = score; best = c; }
       });
       return { type: "place", key: best.key };
@@ -1018,9 +1059,8 @@
           for (const k of cells) {
             const top = topColorOf(stacks, k);
             if (top === color) mine++;
-            else if (top) {
-              if (isRestackableBlock(stacks, k, color)) mine++;
-              else { blocked = true; break; }
+            else if (top && !isRestackableBlock(stacks, k, color)) {
+              blocked = true; break;
             }
           }
           if (blocked) continue;
