@@ -424,26 +424,87 @@
   }
 
   // ---- AI 의사결정 ----
-  function decideAiMove(player, board) {
+  // 예전엔 "이번 한 수만 보고 가장 점수 좋은 곳"을 고르는 1수짜리 탐욕적
+  // 판단이라 몇 수 앞을 내다보는 사람에게 쉽게 뚫렸다. 3인 게임이라 단순한
+  // 2인용 미니맥스(내가 최대화, 상대가 최소화)를 그대로 쓸 수 없어서, 각
+  // 플레이어가 "자기 자신의 점수"를 최대화한다고 가정하는 max^n 탐색을 쓴다
+  // — 매 노드에서 그 차례인 플레이어가 자기 색 점수가 가장 높아지는 수를
+  // 고르고, 그 선택 결과(3색 전체 점수 벡터)를 그대로 위로 전달한다.
+  const AI_SEARCH_DEPTH = 3; // 나 + 다음 플레이어 + 그다음 플레이어까지 내다봄
+  const AI_ROOT_BEAM = 6;    // 내 차례 후보 수를 1수 평가로 추려서 이만큼만 실제로 탐색
+  const AI_INNER_BEAM = 4;   // 상대 차례(시뮬레이션)에서 고려하는 후보 수
+
+  function evaluateForColor(scores, board, color) {
+    let mobility = 0, potential = 0, stuckPenalty = 0;
+    Object.keys(board).forEach(id => {
+      if (board[id].piece !== color) return;
+      const n = legalDestinations(id, board).length;
+      if (n === 0) stuckPenalty += 15;
+      else { mobility += n; potential += board[id].score; }
+    });
+    return scores[color] + potential * 0.5 + mobility - stuckPenalty;
+  }
+
+  function nextTurnIdx(board, fromIdx) {
+    const alive = alivePlayersOf(board);
+    for (let i = 1; i <= 3; i++) {
+      const cand = PLAYER_ORDER[(fromIdx + i) % 3];
+      if (alive[cand] > 0) return (fromIdx + i) % 3;
+    }
+    return fromIdx;
+  }
+
+  function leafVector(scores, board) {
+    return {
+      R: evaluateForColor(scores, board, 'R'),
+      G: evaluateForColor(scores, board, 'G'),
+      Y: evaluateForColor(scores, board, 'Y'),
+    };
+  }
+
+  // depth: 이 노드부터 몇 수 더 내다볼지. 0이면 더 안 두고 바로 평가.
+  // 반환값 vector는 "이 노드 이후 최선의 진행이 이뤄졌을 때"의 3색 점수 벡터.
+  function searchMaxN(board, scores, turnIdx, depth) {
+    const player = PLAYER_ORDER[turnIdx];
+    const alive = alivePlayersOf(board);
+    if (alive[player] === 0) {
+      // 이 플레이어는 이미 탈락 — 다음 생존자 차례로 넘긴다(무한루프 방지를
+      // 위해 depth는 그대로 소비).
+      const idx = nextTurnIdx(board, turnIdx);
+      if (idx === turnIdx) return { vector: leafVector(scores, board) };
+      return searchMaxN(board, scores, idx, depth);
+    }
+    const moves = allLegalMovesOf(player, board);
+    if (depth <= 0 || !moves.length) {
+      return { vector: leafVector(scores, board) };
+    }
+    const beam = depth === AI_SEARCH_DEPTH ? AI_ROOT_BEAM : AI_INNER_BEAM;
+    const candidates = moves
+      .map(m => ({ m, gained: board[m.origin].score }))
+      .sort((a, b) => b.gained - a.gained)
+      .slice(0, beam);
+
+    let bestMove = candidates[0].m, bestVector = null, bestVal = -Infinity;
+    candidates.forEach(({ m }) => {
+      const { board: after, gained } = simulateMove(board, m.origin, m.dest);
+      const nextScores = { ...scores, [player]: scores[player] + gained };
+      const nextAlive = alivePlayersOf(after);
+      const eliminated = PLAYER_ORDER.some(p => p !== player && nextAlive[p] === 0) || nextAlive[player] === 0;
+      const child = eliminated || depth - 1 <= 0
+        ? { vector: leafVector(nextScores, after) }
+        : searchMaxN(after, nextScores, nextTurnIdx(after, turnIdx), depth - 1);
+      const val = child.vector[player];
+      if (val > bestVal) { bestVal = val; bestVector = child.vector; bestMove = m; }
+    });
+    return { vector: bestVector, move: bestMove };
+  }
+
+  function decideAiMove(player, board, scores) {
     const moves = allLegalMovesOf(player, board);
     if (!moves.length) return null;
-    let best = null, bestScore = -Infinity, ties = [];
-    moves.forEach(m => {
-      const beforeAlive = alivePlayersOf(board)[player];
-      const { board: after, gained } = simulateMove(board, m.origin, m.dest);
-      const afterAlive = alivePlayersOf(after)[player];
-      const isolationLoss = Math.max(0, beforeAlive - afterAlive - 0); // 이동 자체로 사라진 origin 제외, 이동한 말은 살아있으므로 순수 추가 고립 수
-      let mineMobility = 0, theirMobility = 0;
-      Object.keys(after).forEach(id => {
-        if (!after[id].piece) return;
-        const n = legalDestinations(id, after).length;
-        if (after[id].piece === player) mineMobility += n; else theirMobility += n;
-      });
-      const score = gained * 100 - isolationLoss * 60 + (mineMobility - theirMobility) * 2;
-      if (score > bestScore) { bestScore = score; best = m; ties = [m]; }
-      else if (score === bestScore) { ties.push(m); }
-    });
-    return ties[Math.floor(Math.random() * ties.length)];
+    const turnIdx = PLAYER_ORDER.indexOf(player);
+    const result = searchMaxN(board, scores, turnIdx, AI_SEARCH_DEPTH);
+    return result.move || moves[0];
   }
 
   // ---- 게임 상태 ----
@@ -719,7 +780,7 @@
     }
     setTimeout(() => {
       if (!state || state.winner) return;
-      const move = decideAiMove(player, state.board);
+      const move = decideAiMove(player, state.board, state.scores);
       if (!move) { passTurn(); return; }
       applyMove(move.origin, move.dest);
     }, 1000);
