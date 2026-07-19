@@ -302,8 +302,9 @@
     </div>
 
     <div class="admin-login" id="admin-login">
-      <input type="password" id="admin-pw-input" placeholder="관리자 비밀번호">
-      <button id="admin-pw-submit">확인</button>
+      <input type="password" id="admin-pw-input" placeholder="관리자 비밀번호" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button type="button" id="admin-pw-toggle">👁</button>
+      <button type="button" id="admin-pw-submit">확인</button>
     </div>
 
     <div class="header">
@@ -656,13 +657,16 @@
     adminLogin.classList.toggle("show");
   });
   document.getElementById("admin-pw-submit").addEventListener("click", async () => {
-    const pw = adminPwInput.value;
+    const pw = adminPwInput.value.trim();
     if (!pw) return;
-    await tryEnableAdmin(pw);
-    adminPwInput.value = "";
+    const ok = await tryEnableAdmin(pw);
+    if (ok) adminPwInput.value = "";
   });
   adminPwInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") document.getElementById("admin-pw-submit").click();
+  });
+  document.getElementById("admin-pw-toggle").addEventListener("click", () => {
+    adminPwInput.type = adminPwInput.type === "password" ? "text" : "password";
   });
 
   loadAll().then(() => {
