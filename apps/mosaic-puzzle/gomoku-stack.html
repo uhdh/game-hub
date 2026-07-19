@@ -583,11 +583,17 @@
     const candidates = RAW_BOARD.filter(c => isValidInitialPlacementOf(state.stacks, c.key, AI_PLAYER));
     if (aiDifficulty === "easy") return { type: "place", key: candidates[randomInt(candidates.length)].key };
     if (aiDifficulty === "hard" || aiDifficulty === "extreme") {
+      // 평가가 완전히 결정론적이면, 같은 국면엔 항상 같은 수를 둔다 — 누군가 한 번
+      // 이기는 오프닝을 찾으면 그걸 그대로 재생하기만 해도 영원히 이길 수 있다는
+      // 뜻이다(실제로 이렇게 40연승한 사례를 발견함). 거의 동점인 후보들 사이에서
+      // 아주 작은 무작위 흔들림을 더해 매번 완전히 같은 수만 나오지 않게 한다 —
+      // 확실히 더 나은 수를 밀어낼 만큼 크지 않은 값이라 실력 저하는 미미하다.
+      const AI_SCORE_JITTER = 6;
       let best = candidates[0], bestScore = -Infinity;
       candidates.forEach(c => {
         const result = placeStoneOf(state.stacks, c.key, AI_PLAYER);
         const centerBias = -Math.max(Math.abs(c.q), Math.abs(c.r), Math.abs(c.s)) * 0.5;
-        const score = evaluatePosition(result, AI_PLAYER) + centerBias;
+        const score = evaluatePosition(result, AI_PLAYER) + centerBias + (Math.random() - 0.5) * AI_SCORE_JITTER;
         if (score > bestScore) { bestScore = score; best = c; }
       });
       return { type: "place", key: best.key };
@@ -723,7 +729,7 @@
     if (!blockMoves.length) return null;
     let best = blockMoves[0], bestScore = -Infinity;
     blockMoves.forEach(m => {
-      const score = evaluatePosition(applyMoveToStacks(stacks, m, AI_PLAYER), AI_PLAYER);
+      const score = evaluatePosition(applyMoveToStacks(stacks, m, AI_PLAYER), AI_PLAYER) + (Math.random() - 0.5) * 6;
       if (score > bestScore) { bestScore = score; best = m; }
     });
     return best;
@@ -766,13 +772,17 @@
 
     // 4. 급한 위협이 없거나(또는 막을 방법이 없어서) 기존 탐색으로 결정한다.
     const rootCandidates = orderedCandidates(stacks, AI_PLAYER, supply, allMoves, true, HARD_ROOT_BEAM);
-    let bestMove = rootCandidates[0], bestScore = -Infinity;
+    let bestMove = rootCandidates[0], bestScore = -Infinity, bestJittered = -Infinity;
     let alpha = -Infinity;
     const beta = Infinity;
     for (const m of rootCandidates) {
       const { stacks: ns, supply: nsup } = applyMoveWithSupply(stacks, supply, m, AI_PLAYER);
       const val = minimax(ns, nsup, HARD_SEARCH_PLIES, false, alpha, beta);
-      if (val > bestScore) { bestScore = val; bestMove = m; }
+      // alpha 갱신은 실제 val로만(가지치기 정확성 유지), 최종 수 선택 비교에만
+      // 살짝 흔들림을 줘서 거의 동점인 최상위 후보들 사이에서 매번 완전히
+      // 같은 수만 나오지 않게 한다(결정론적 AI를 외워서 반복 재생하는 것 방지).
+      const jittered = val + (Math.random() - 0.5) * 20;
+      if (jittered > bestJittered) { bestScore = val; bestJittered = jittered; bestMove = m; }
       if (bestScore > alpha) alpha = bestScore;
     }
     return bestMove;
@@ -1106,7 +1116,7 @@
       if (!blockMoves.length) return null;
       let best = blockMoves[0], bestScore = -Infinity;
       blockMoves.forEach(m => {
-        const score = evaluatePosition(applyMoveToStacks(stacks, m, AI_PLAYER), AI_PLAYER);
+        const score = evaluatePosition(applyMoveToStacks(stacks, m, AI_PLAYER), AI_PLAYER) + (Math.random() - 0.5) * 6;
         if (score > bestScore) { bestScore = score; best = m; }
       });
       return best;
@@ -1117,14 +1127,15 @@
       forceInclude.forEach(m => {
         if (!included.has(moveIdKey(m))) { rootCandidates.push(m); included.add(moveIdKey(m)); }
       });
-      let bestMove = rootCandidates[0], bestScore = -Infinity;
+      let bestMove = rootCandidates[0], bestScore = -Infinity, bestJittered = -Infinity;
       let alpha = -Infinity;
       const beta = Infinity;
       for (const m of rootCandidates) {
         if (Date.now() > deadline) break;
         const r = applyMoveWithSupply(stacks, supply, m, AI_PLAYER);
         const val = minimax(r.stacks, r.supply, plies, false, alpha, beta, deadline);
-        if (val > bestScore) { bestScore = val; bestMove = m; }
+        const jittered = val + (Math.random() - 0.5) * 20;
+        if (jittered > bestJittered) { bestScore = val; bestJittered = jittered; bestMove = m; }
         if (bestScore > alpha) alpha = bestScore;
       }
       return { move: bestMove, score: bestScore };
