@@ -250,8 +250,8 @@
   const SUPABASE_URL = "https://paktzmofotvwfdxcpmzv.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_jWbstEn2pKJTNDxLTR4Jig_asglvzGW";
   const ELIMINATIONS_TABLE = "eliminations";
-  const ADMIN_PASSWORD = "dbqlgusejr1234";
-  const ADMIN_SESSION_KEY = "bloodGameXAdminOk";
+  const ADMIN_PW_KEY = "bloodGameXAdminPw";
+  let ADMIN_PW = "";
 
   const TEAMS = [
     { key: "P1", label: "P1팀", color: "#ff6b6b", members: ["이상민", "박지민", "정근우", "이태균"] },
@@ -294,33 +294,28 @@
   }
 
   async function eliminate(key, week) {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/${ELIMINATIONS_TABLE}?on_conflict=participant_key`,
-      {
-        method: "POST",
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          "Content-Type": "application/json",
-          Prefer: "resolution=merge-duplicates,return=representation",
-        },
-        body: JSON.stringify({ participant_key: key, week }),
-      }
-    );
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/admin_upsert_elimination`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ p_participant_key: key, p_week: week, p_password: ADMIN_PW }),
+    });
     if (!res.ok) throw new Error("탈락 처리 실패");
   }
 
   async function restore(key) {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/${ELIMINATIONS_TABLE}?participant_key=eq.${encodeURIComponent(key)}`,
-      {
-        method: "DELETE",
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        },
-      }
-    );
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/admin_restore_elimination`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ p_participant_key: key, p_password: ADMIN_PW }),
+    });
     if (!res.ok) throw new Error("복구 실패");
   }
 
@@ -412,15 +407,42 @@
     initApp();
   }
 
-  if (sessionStorage.getItem(ADMIN_SESSION_KEY) === "1") {
+  async function checkPassword(pw) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/admin_check_password`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ p_password: pw }),
+    });
+    return res.ok;
+  }
+
+  const storedPw = sessionStorage.getItem(ADMIN_PW_KEY);
+  if (storedPw) {
+    ADMIN_PW = storedPw;
     unlock();
   }
 
-  document.getElementById("gate-form").addEventListener("submit", (e) => {
+  document.getElementById("gate-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const val = document.getElementById("gate-input").value;
-    if (val === ADMIN_PASSWORD) {
-      sessionStorage.setItem(ADMIN_SESSION_KEY, "1");
+    const submitBtn = e.target.querySelector("button[type=submit]");
+    submitBtn.disabled = true;
+    let ok = false;
+    try {
+      ok = await checkPassword(val);
+    } catch (err) {
+      document.getElementById("gate-error").textContent = "인증 서버에 연결하지 못했습니다. 다시 시도해주세요.";
+      submitBtn.disabled = false;
+      return;
+    }
+    submitBtn.disabled = false;
+    if (ok) {
+      ADMIN_PW = val;
+      sessionStorage.setItem(ADMIN_PW_KEY, val);
       unlock();
     } else {
       document.getElementById("gate-error").textContent = "비밀번호가 올바르지 않습니다.";
@@ -441,24 +463,28 @@
   }
 
   async function insertAuctionItems(items) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${AUCTION_TABLE}`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/admin_insert_auction_items`, {
       method: "POST",
       headers: {
         apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
         "Content-Type": "application/json",
-        Prefer: "return=representation",
       },
-      body: JSON.stringify(items),
+      body: JSON.stringify({ p_items: items, p_password: ADMIN_PW }),
     });
     if (!res.ok) throw new Error("경매 물품 등록 실패");
     return res.json();
   }
 
   async function deleteAuctionItem(id) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${AUCTION_TABLE}?id=eq.${id}`, {
-      method: "DELETE",
-      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/admin_delete_auction_item`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ p_id: id, p_password: ADMIN_PW }),
     });
     if (!res.ok) throw new Error("삭제 실패");
   }
