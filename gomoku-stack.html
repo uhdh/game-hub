@@ -810,9 +810,15 @@
     const oppAllMoves = getAllLegalMainMoves(stacks, HUMAN_PLAYER, supply[HUMAN_PLAYER]);
     const immediateThreatCells = new Set();
     oppAllMoves.forEach(m => {
-      if (checkWinOf(applyMoveToStacks(stacks, m, HUMAN_PLAYER), HUMAN_PLAYER)) {
-        immediateThreatCells.add(m.type === "place" ? m.key : m.dest);
-      }
+      // 이긴 수의 착지 칸만 후보로 넣으면, pickBestBlock의 "완전 차단" 필터가 그
+      // 칸만 둔 뒤에도 다른 완성 경로(예: 이미 놓인 내 돌을 밟고 올라서서 색을
+      // 뒤집는 "쌓기 이동")가 남아있는 걸 보고 전부 탈락시켜 결국 점수 위주
+      // 폴백으로 빠지는 사고가 있었다(2026-07-19, 덕후#912 기보 — 겹사 차단
+      // 수정 이후에도 재현됨). checkWinOf가 돌려주는 실제 승리 라인의 모든 칸
+      // (상대가 이미 둔 돌 포함)을 후보로 넣어야, 그 돌 중 하나를 덮어써서
+      // 라인을 끊는 것도 유효한 차단 후보로 걸러진다.
+      const win = checkWinOf(applyMoveToStacks(stacks, m, HUMAN_PLAYER), HUMAN_PLAYER);
+      if (win) win.cells.forEach(k => immediateThreatCells.add(k));
     });
     if (immediateThreatCells.size) {
       const block = pickBestBlock(stacks, supply, allMoves, immediateThreatCells, HUMAN_PLAYER);
@@ -1235,9 +1241,15 @@
       const oppAllMoves = getAllLegalMainMoves(stacks, HUMAN_PLAYER, supply[HUMAN_PLAYER]);
       const immediateThreatCells = new Set();
       oppAllMoves.forEach(m => {
-        if (checkWinOf(applyMoveToStacks(stacks, m, HUMAN_PLAYER), HUMAN_PLAYER)) {
-          immediateThreatCells.add(m.type === "place" ? m.key : m.dest);
-        }
+        // 이긴 수의 착지 칸만 후보로 넣으면, pickBestBlock의 "완전 차단" 필터가 그
+        // 칸만 둔 뒤에도 다른 완성 경로(예: 이미 놓인 내 돌을 밟고 올라서서 색을
+        // 뒤집는 "쌓기 이동")가 남아있는 걸 보고 전부 탈락시켜 결국 점수 위주
+        // 폴백으로 빠지는 사고가 있었다(2026-07-19, 덕후#912 기보 — 겹사 차단
+        // 수정 이후에도 재현됨). checkWinOf가 돌려주는 실제 승리 라인의 모든 칸
+        // (상대가 이미 둔 돌 포함)을 후보로 넣어야, 그 돌 중 하나를 덮어써서
+        // 라인을 끊는 것도 유효한 차단 후보로 걸러진다.
+        const win = checkWinOf(applyMoveToStacks(stacks, m, HUMAN_PLAYER), HUMAN_PLAYER);
+        if (win) win.cells.forEach(k => immediateThreatCells.add(k));
       });
       if (immediateThreatCells.size) {
         const move = pickBestBlock(stacks, supply, allMoves, immediateThreatCells, HUMAN_PLAYER);
