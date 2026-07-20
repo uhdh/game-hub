@@ -256,6 +256,120 @@
     padding: 8px 0;
   }
 
+  .chat-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px 20px 20px;
+    min-height: 0;
+  }
+  .chat-nickname-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #8992a0;
+  }
+  .chat-nickname-row input {
+    width: 120px;
+    background: #15181c;
+    border: 1px solid rgba(255, 255, 255, .1);
+    border-radius: 8px;
+    padding: 6px 8px;
+    color: #e7ebee;
+    font-size: 12px;
+    font-family: inherit;
+  }
+  .chat-box {
+    background: #15181c;
+    border: 1px solid rgba(255, 255, 255, .06);
+    border-radius: 12px;
+    padding: 12px;
+    height: 42vh;
+    min-height: 240px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .chat-empty {
+    margin: auto;
+    text-align: center;
+    color: #5b6270;
+    font-size: 13px;
+  }
+  .msg-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-width: 82%;
+  }
+  .msg-row.mine {
+    align-self: flex-end;
+    align-items: flex-end;
+  }
+  .msg-meta {
+    display: flex;
+    gap: 6px;
+    font-size: 11px;
+    color: #5b6270;
+    padding: 0 2px;
+  }
+  .msg-nickname {
+    font-weight: 700;
+    color: #8992a0;
+  }
+  .msg-bubble {
+    background: #1c2024;
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 12px;
+    padding: 8px 12px;
+    font-size: 13.5px;
+    line-height: 1.4;
+    word-break: break-word;
+  }
+  .msg-row.mine .msg-bubble {
+    background: rgba(95, 184, 176, .16);
+    border-color: rgba(95, 184, 176, .4);
+  }
+  .chat-composer {
+    display: flex;
+    gap: 8px;
+  }
+  .chat-composer input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    background: #15181c;
+    border: 1px solid rgba(255, 255, 255, .1);
+    border-radius: 10px;
+    padding: 10px 12px;
+    color: #e7ebee;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  .chat-composer input[type="text"]::placeholder { color: #5b6270; }
+  .chat-send-btn {
+    flex: 0 0 auto;
+    background: #5fb8b0;
+    color: #0f0f12;
+    border: none;
+    border-radius: 10px;
+    padding: 0 16px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .chat-send-btn:disabled {
+    background: #2a2e33;
+    color: #5b6270;
+    cursor: not-allowed;
+  }
+  .chat-status-msg {
+    font-size: 12px;
+    color: #e08a8a;
+    min-height: 14px;
+  }
+
   .game-list {
     display: flex;
     flex-direction: column;
@@ -410,6 +524,9 @@
 </div>
 
 <div class="floating-actions">
+  <button type="button" class="floating-btn" id="chat-btn">
+    <span>💬 채팅</span>
+  </button>
   <a href="./predict.html" class="floating-btn">
     <span>🏆 우승자 예측</span>
   </a>
@@ -437,6 +554,30 @@
       <div id="ann-history-list" class="ann-history-list">
         <div class="ann-empty">불러오는 중...</div>
       </div>
+    </div>
+  </div>
+</div>
+
+<div id="chat-overlay" class="ann-overlay">
+  <div class="ann-box">
+    <div class="ann-head">
+      <div>
+        <span class="ann-head-title">실시간 채팅</span>
+        <span class="ann-meta">게임 허브를 같이 쓰는 사람들과 대화해보세요</span>
+      </div>
+      <button type="button" id="chat-close" class="ann-close" aria-label="닫기">✕</button>
+    </div>
+    <div class="chat-modal-body">
+      <div class="chat-nickname-row">
+        <span>닉네임</span>
+        <input type="text" id="chat-nickname-input" maxlength="20">
+      </div>
+      <div class="chat-box" id="chat-box"></div>
+      <div class="chat-composer">
+        <input type="text" id="chat-content-input" placeholder="메시지를 입력하세요" maxlength="200">
+        <button class="chat-send-btn" id="chat-send-btn">전송</button>
+      </div>
+      <div class="chat-status-msg" id="chat-status-msg"></div>
     </div>
   </div>
 </div>
@@ -548,11 +689,14 @@
 
   let announcementVersion = '';
 
-  function annHeaders() {
-    return {
-      apikey: ANNOUNCEMENT_SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${ANNOUNCEMENT_SUPABASE_ANON_KEY}`,
-    };
+  function annHeaders(extra) {
+    return Object.assign(
+      {
+        apikey: ANNOUNCEMENT_SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${ANNOUNCEMENT_SUPABASE_ANON_KEY}`,
+      },
+      extra || {}
+    );
   }
 
   async function loadAnnouncement() {
@@ -632,6 +776,170 @@
     const isHidden = annIntroMore.hidden;
     annIntroMore.hidden = !isHidden;
     annIntroToggle.textContent = isHidden ? '사이트 소개 접기 ↑' : '사이트 소개 보기 →';
+  });
+
+  // ---- 실시간 채팅 ----
+  const CHAT_TABLE = 'hub_chat_messages';
+  const CHAT_NICKNAME_KEY = 'hubChatNickname';
+  const CHAT_POLL_MS = 3000;
+  const CHAT_HISTORY_LIMIT = 50;
+
+  const NICKNAME_POOL = [
+    '이상민', '정근우', '박지민', '이태균', '하승진', '현성주', '윤비', '이진형', '홍진호', '서출구',
+    '최혜선', '허성범', '김경훈', '김유현', '김남희', '강지후', '곽범', '이관희', '신승용', '덕후',
+  ];
+  function randomNickname() {
+    const word = NICKNAME_POOL[Math.floor(Math.random() * NICKNAME_POOL.length)];
+    const num = Math.floor(Math.random() * 999) + 1;
+    return `${word}#${num}`;
+  }
+  function getOrCreateStoredNickname(key) {
+    const saved = localStorage.getItem(key);
+    if (saved) return saved;
+    const generated = randomNickname();
+    localStorage.setItem(key, generated);
+    return generated;
+  }
+
+  const chatBtn = document.getElementById('chat-btn');
+  const chatOverlay = document.getElementById('chat-overlay');
+  const chatClose = document.getElementById('chat-close');
+  const chatNicknameInput = document.getElementById('chat-nickname-input');
+  const chatBox = document.getElementById('chat-box');
+  const chatContentInput = document.getElementById('chat-content-input');
+  const chatSendBtn = document.getElementById('chat-send-btn');
+  const chatStatusEl = document.getElementById('chat-status-msg');
+
+  chatNicknameInput.value = getOrCreateStoredNickname(CHAT_NICKNAME_KEY);
+  chatNicknameInput.addEventListener('change', () => {
+    const v = chatNicknameInput.value.trim();
+    if (v) localStorage.setItem(CHAT_NICKNAME_KEY, v);
+    else chatNicknameInput.value = getOrCreateStoredNickname(CHAT_NICKNAME_KEY);
+  });
+
+  let myChatNickname = chatNicknameInput.value;
+  let chatLastId = -1;
+  let chatLatestMessages = [];
+  let chatPollTimer = null;
+
+  function chatShowStatus(msg) {
+    chatStatusEl.textContent = msg || '';
+    if (msg) setTimeout(() => { if (chatStatusEl.textContent === msg) chatStatusEl.textContent = ''; }, 3000);
+  }
+
+  async function fetchChatMessages() {
+    const res = await fetch(
+      `${ANNOUNCEMENT_SUPABASE_URL}/rest/v1/${CHAT_TABLE}?select=id,nickname,content,created_at&order=created_at.desc&limit=${CHAT_HISTORY_LIMIT}`,
+      { headers: annHeaders() }
+    );
+    if (!res.ok) throw new Error('메시지 조회 실패');
+    const rows = await res.json();
+    return rows.reverse();
+  }
+
+  async function sendChatMessage(nickname, content) {
+    const res = await fetch(`${ANNOUNCEMENT_SUPABASE_URL}/rest/v1/${CHAT_TABLE}`, {
+      method: 'POST',
+      headers: annHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+      body: JSON.stringify({ nickname, content }),
+    });
+    if (!res.ok) throw new Error('전송 실패');
+  }
+
+  function chatFormatTime(iso) {
+    const d = new Date(iso);
+    const pad = n => String(n).padStart(2, '0');
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function chatIsScrolledToBottom() {
+    return chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight < 40;
+  }
+
+  function renderChatMessages(messages) {
+    const stickToBottom = chatIsScrolledToBottom();
+    chatBox.innerHTML = '';
+
+    if (!messages.length) {
+      const empty = document.createElement('div');
+      empty.className = 'chat-empty';
+      empty.textContent = '아직 메시지가 없어요. 첫 메시지를 남겨보세요!';
+      chatBox.appendChild(empty);
+      return;
+    }
+
+    messages.forEach((m) => {
+      const row = document.createElement('div');
+      row.className = 'msg-row' + (m.nickname === myChatNickname ? ' mine' : '');
+      row.innerHTML = `
+        <div class="msg-meta">
+          <span class="msg-nickname"></span>
+          <span class="msg-time"></span>
+        </div>
+        <div class="msg-bubble"></div>
+      `;
+      row.querySelector('.msg-nickname').textContent = m.nickname;
+      row.querySelector('.msg-time').textContent = chatFormatTime(m.created_at);
+      row.querySelector('.msg-bubble').textContent = m.content;
+      chatBox.appendChild(row);
+    });
+
+    if (stickToBottom) chatBox.scrollTop = chatBox.scrollHeight;
+  }
+
+  async function pollChatMessages() {
+    try {
+      const messages = await fetchChatMessages();
+      const newLastId = messages.length ? messages[messages.length - 1].id : 0;
+      if (newLastId !== chatLastId || messages.length !== chatLatestMessages.length) {
+        chatLastId = newLastId;
+        chatLatestMessages = messages;
+        renderChatMessages(messages);
+      }
+    } catch (e) {
+      chatShowStatus('메시지를 불러오지 못했어요');
+    }
+  }
+
+  async function handleChatSend() {
+    const content = chatContentInput.value.trim();
+    if (!content) return;
+    const nickname = chatNicknameInput.value.trim() || getOrCreateStoredNickname(CHAT_NICKNAME_KEY);
+    myChatNickname = nickname;
+    chatSendBtn.disabled = true;
+    try {
+      await sendChatMessage(nickname, content);
+      chatContentInput.value = '';
+      await pollChatMessages();
+      chatBox.scrollTop = chatBox.scrollHeight;
+    } catch (e) {
+      chatShowStatus('전송에 실패했어요. 잠시 후 다시 시도해주세요');
+    } finally {
+      chatSendBtn.disabled = false;
+      chatContentInput.focus();
+    }
+  }
+  chatSendBtn.addEventListener('click', handleChatSend);
+  chatContentInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') handleChatSend();
+  });
+
+  function openChat() {
+    chatOverlay.classList.add('show');
+    pollChatMessages().then(() => { chatBox.scrollTop = chatBox.scrollHeight; });
+    if (!chatPollTimer) chatPollTimer = setInterval(pollChatMessages, CHAT_POLL_MS);
+  }
+  function closeChat() {
+    chatOverlay.classList.remove('show');
+    if (chatPollTimer) { clearInterval(chatPollTimer); chatPollTimer = null; }
+  }
+  chatBtn.addEventListener('click', openChat);
+  chatClose.addEventListener('click', closeChat);
+  chatOverlay.addEventListener('click', (e) => {
+    if (e.target === chatOverlay) closeChat();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && chatOverlay.classList.contains('show')) closeChat();
   });
 </script>
 </body>
