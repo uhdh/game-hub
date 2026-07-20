@@ -212,6 +212,10 @@
     return chosen;
   }
 
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
   function createAiProfiles(rng) {
     var random = rng || Math.random;
     var order = shuffle(AI_ARCHETYPES, random);
@@ -238,7 +242,20 @@
   }
 
   function decideAiAction(player, round, profile, poolTotal, remainingRounds, rng) {
-    var willingness = computeAiWillingness(profile, poolTotal, rng);
+    var random = rng || Math.random;
+    var willingness = computeAiWillingness(profile, poolTotal, random);
+
+    var avgValue = poolTotal / POOL_SIZE;
+    var pressureThreshold = profile.pressureThreshold != null ? profile.pressureThreshold : 1.2;
+    var pressureRatio = avgValue > 0 ? round.highestTotal / avgValue : 0;
+    if (pressureRatio > pressureThreshold) {
+      willingness = willingness * 0.6;
+    }
+
+    var rivals = activeIds(round).filter(function (id) { return id !== player.id; }).length;
+    var rivalsAdjustment = clamp((2 - rivals) * 0.04, -0.16, 0.16);
+    willingness = willingness * (1 + rivalsAdjustment);
+
     var remaining = remainingCubesInRound(player, round);
     var remainingHandTotal = remaining.reduce(function (a, b) { return a + b; }, 0);
     var budgetCap = remainingRounds > 0 ? (remainingHandTotal / remainingRounds) * 1.6 : remainingHandTotal;

@@ -230,3 +230,43 @@ test('createAiProfiles sets pressureThreshold/paceCoefficient/gambleChance per a
     assert.equal(p.gambleChance, exp.gambleChance);
   });
 });
+
+test('decideAiAction applies the archetype pressure cut once highestTotal exceeds the pressure threshold', () => {
+  const players = L.createPlayers();
+  const ai1 = L.findPlayer(players, 'ai1');
+  const round = L.createRound('user');
+  round.highestPlayerId = 'user';
+  round.highestTotal = 13; // avg=10 -> pressureRatio=1.3
+  const profile = { aggressiveness: 2.0, pressureThreshold: 1.2 };
+  const action = L.decideAiAction(ai1, round, profile, 220, 11, () => 1);
+  assert.equal(action.action, 'pass');
+});
+
+test('decideAiAction does not apply the pressure cut below the archetype threshold', () => {
+  const players = L.createPlayers();
+  const ai1 = L.findPlayer(players, 'ai1');
+  const round = L.createRound('user');
+  round.highestPlayerId = 'user';
+  round.highestTotal = 13;
+  const profile = { aggressiveness: 2.0, pressureThreshold: 999 };
+  const action = L.decideAiAction(ai1, round, profile, 220, 11, () => 1);
+  assert.equal(action.action, 'bid');
+});
+
+test('decideAiAction becomes more willing to bid when fewer rivals remain active this round', () => {
+  const players = L.createPlayers();
+  const ai1 = L.findPlayer(players, 'ai1');
+  const round = L.createRound('user');
+  round.highestPlayerId = 'user';
+  round.highestTotal = 9; // extraNeeded = 10
+  const profile = { aggressiveness: 1.0 };
+
+  const crowdedAction = L.decideAiAction(ai1, round, profile, 220, 11, () => 0.5);
+  assert.equal(crowdedAction.action, 'pass');
+
+  round.active.ai2 = false;
+  round.active.ai3 = false;
+  round.active.ai4 = false;
+  const lenientAction = L.decideAiAction(ai1, round, profile, 220, 11, () => 0.5);
+  assert.equal(lenientAction.action, 'bid');
+});
