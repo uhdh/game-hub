@@ -944,10 +944,13 @@
       return null;
     }
     function checkWinOf(stacks, player) {
-      if (checkFiveInRowOf(stacks, player)) return true;
-      if (checkFiveAtTop3Of(stacks, player)) return true;
-      if (checkTriangleTop3Of(stacks, player)) return true;
-      return false;
+      const row = checkFiveInRowOf(stacks, player);
+      if (row) return { cells: row, reason: "오목 완성 (5개 일직선 연결)" };
+      const top5 = checkFiveAtTop3Of(stacks, player);
+      if (top5) return { cells: top5, reason: "돌 5개 3층 쌓기 완성" };
+      const tri = checkTriangleTop3Of(stacks, player);
+      if (tri) return { cells: tri, reason: "인접한 돌 3개 3층 쌓기 완성" };
+      return null;
     }
     function placeStoneOf(stacks, key, player) {
       const next = Object.assign({}, stacks);
