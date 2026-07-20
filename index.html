@@ -85,11 +85,15 @@
     display: inline-block;
   }
 
-  .request-board-btn {
+  .floating-actions {
     position: fixed;
     right: 16px;
     bottom: 20px;
     z-index: 40;
+    display: flex;
+    gap: 8px;
+  }
+  .floating-btn {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -102,7 +106,7 @@
     padding: 8px 14px;
     box-shadow: 0 4px 14px rgba(0, 0, 0, .35);
   }
-  .request-board-btn:hover {
+  .floating-btn:hover {
     border-color: rgba(95, 184, 176, .4);
     color: #c3c9d1;
   }
@@ -405,9 +409,14 @@
   </div>
 </div>
 
-<a href="./requests.html" class="request-board-btn">
-  <span>📝 요청 게시판</span>
-</a>
+<div class="floating-actions">
+  <a href="./predict.html" class="floating-btn">
+    <span>🏆 우승자 예측</span>
+  </a>
+  <a href="./requests.html" class="floating-btn">
+    <span>📝 요청 게시판</span>
+  </a>
+</div>
 
 <div id="announcement-overlay" class="ann-overlay">
   <div class="ann-box">
@@ -473,13 +482,6 @@
       href: 'https://cockroach-gambling-board.web.app/',
       target: '_self',
       image: './assets/donbeolle-1.png',
-    },
-    {
-      name: '우승자 예측',
-      desc: '매주 한 명씩 탈락, 최종 우승자를 예측해보세요',
-      href: './predict.html',
-      target: '_self',
-      emoji: '🏆',
     },
   ];
 

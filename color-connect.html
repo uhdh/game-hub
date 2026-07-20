@@ -42,11 +42,12 @@
     background: #242a30; color: #5fb8b0; border: 1px solid rgba(255,255,255,.07);
     white-space: nowrap; flex-shrink: 0;
   }
-  a.nav-link {
+  .nav-link {
     font-size: 11px; font-weight: 600; padding: 6px 10px; min-height: 28px;
     border-radius: 8px; border: 1px solid rgba(255,255,255,.1);
     background: #1c2024; color: #8992a0; white-space: nowrap; flex-shrink: 0;
     text-decoration: none; display: inline-flex; align-items: center;
+    font-family: inherit; cursor: pointer;
   }
   #score-row { display: flex; align-items: center; gap: 16px; }
   #total-score { font-size: 32px; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -99,6 +100,14 @@
 
   #hint { text-align: center; font-size: 12px; color: #8992a0; }
 
+  #nickname-row { display: flex; align-items: center; gap: 8px; }
+  #nickname-row label { font-size: 12.5px; color: #8992a0; flex-shrink: 0; }
+  #nickname-input {
+    flex: 1; min-width: 0; background: #1c2024; border: 1px solid rgba(255,255,255,.1);
+    border-radius: 8px; padding: 8px 10px; color: #e7ebee; font-size: 13px; font-family: inherit;
+  }
+  #nickname-input::placeholder { color: #565c66; font-weight: 500; }
+
   #upcoming-row { display: flex; gap: 8px; justify-content: center; overflow-x: auto; }
   .upcoming-tile {
     flex: 0 0 auto; width: 38px; height: 38px; border-radius: 8px; overflow: hidden;
@@ -135,9 +144,10 @@
   #leaderboard-list { display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto; }
   .lb-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06); }
   .lb-row.new { background: rgba(95,184,176,.16); border-color: #5fb8b0; }
-  .lb-rank { font-size: 12px; font-weight: 700; color: #8992a0; width: 18px; text-align: center; }
-  .lb-score { flex: 1; font-size: 14px; font-weight: 700; color: #e7ebee; font-variant-numeric: tabular-nums; }
-  .lb-date { font-size: 11px; color: #8992a0; }
+  .lb-rank { font-size: 12px; font-weight: 700; color: #8992a0; width: 18px; text-align: center; flex-shrink: 0; }
+  .lb-nickname { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600; color: #e7ebee; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb-score { flex-shrink: 0; font-size: 14px; font-weight: 700; color: #e7ebee; font-variant-numeric: tabular-nums; }
+  .lb-date { flex-shrink: 0; font-size: 11px; color: #8992a0; }
 </style>
 </head>
 <body>
@@ -147,7 +157,7 @@
       <span class="app-title">Color Connect Solo</span>
       <div class="right">
         <span id="stage-badge">배치 · 0/15</span>
-        <a class="nav-link" href="rearrange.html">피의게임 재배치</a>
+        <button type="button" class="nav-link" id="ranking-btn">랭킹 보기</button>
         <a class="nav-link" href="index.html">홈</a>
       </div>
     </div>
@@ -164,6 +174,11 @@
     <div id="hint"></div>
     <div id="upcoming-row"></div>
 
+    <div id="nickname-row">
+      <label for="nickname-input">닉네임</label>
+      <input id="nickname-input" type="text" placeholder="리더보드에 표시할 이름" maxlength="12">
+    </div>
+
     <div id="action-row">
       <button class="btn btn-primary" id="register-btn" style="display:none;">점수 등록</button>
       <button class="btn btn-ghost" id="restart-btn">새 게임</button>
@@ -173,7 +188,7 @@
 
 <div id="modal-overlay">
   <div id="modal-box">
-    <h2>점수 등록 완료!</h2>
+    <h2 id="modal-title">점수 등록 완료!</h2>
     <div id="modal-total">0</div>
     <div id="modal-top"></div>
     <div id="leaderboard-section">
@@ -193,7 +208,29 @@
   const ACCENT = "#5fb8b0";
   const BOARD_SIZE = 4;
   const TOTAL_TILES = 15;
-  const LB_KEY = "colorConnectSoloLeaderboard";
+  const SUPABASE_URL = "https://paktzmofotvwfdxcpmzv.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_jWbstEn2pKJTNDxLTR4Jig_asglvzGW";
+  const SUPABASE_TABLE = "color_connect_leaderboard";
+  const NICKNAME_KEY = "colorConnectNickname";
+
+  // ---- 랜덤 닉네임 시작 ----
+  const NICKNAME_POOL = [
+    "이상민", "정근우", "박지민", "이태균", "하승진", "현성주", "윤비", "이진형", "홍진호", "서출구",
+    "최혜선", "허성범", "김경훈", "김유현", "김남희", "강지후", "곽범", "이관희", "신승용", "최연청", "덕후",
+  ];
+  function randomNickname() {
+    const word = NICKNAME_POOL[Math.floor(Math.random() * NICKNAME_POOL.length)];
+    const num = Math.floor(Math.random() * 999) + 1;
+    return `${word}#${num}`;
+  }
+  function getOrCreateStoredNickname(key) {
+    const saved = localStorage.getItem(key);
+    if (saved) return saved;
+    const generated = randomNickname();
+    localStorage.setItem(key, generated);
+    return generated;
+  }
+  // ---- 랜덤 닉네임 끝 ----
 
   let queue = [];
   let selectedMarketIdx = null;
@@ -203,7 +240,8 @@
   let emptyIndex = -1;
   let placedCount = 0;
   let stage = "placement";
-  let justAddedTs = null;
+  let justAddedId = null;
+  let modalMode = "register";
 
   function shuffle(arr) {
     const a = arr.slice();
@@ -243,11 +281,30 @@
     return q;
   }
 
-  function loadLeaderboard() {
-    try { return JSON.parse(localStorage.getItem(LB_KEY) || "[]"); }
-    catch (e) { return []; }
+  async function fetchLeaderboard() {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?select=id,score,nickname,created_at&order=score.desc,created_at.asc&limit=10`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) throw new Error("리더보드 조회 실패");
+    const rows = await res.json();
+    return rows.map(r => ({ id: r.id, score: r.score, nickname: r.nickname, ts: new Date(r.created_at).getTime() }));
   }
-  function saveLeaderboard(list) { localStorage.setItem(LB_KEY, JSON.stringify(list)); }
+  async function submitScore(score, nickname) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+        Prefer: "return=representation"
+      },
+      body: JSON.stringify({ score, nickname })
+    });
+    if (!res.ok) throw new Error("점수 등록 실패");
+    const [row] = await res.json();
+    return { id: row.id, score: row.score, nickname: row.nickname, ts: new Date(row.created_at).getTime() };
+  }
   function formatTs(ts) {
     const d = new Date(ts);
     const pad = n => String(n).padStart(2, "0");
@@ -263,7 +320,7 @@
     emptyIndex = -1;
     placedCount = 0;
     stage = "placement";
-    justAddedTs = null;
+    justAddedId = null;
     document.getElementById("modal-overlay").classList.remove("show");
     render();
   }
@@ -336,17 +393,42 @@
     render();
   }
 
-  function registerScore() {
+  async function registerScore() {
     const result = computeScore();
-    const entry = { score: result.total, ts: Date.now() };
-    let lb = loadLeaderboard();
-    lb.push(entry);
-    lb.sort((a, b) => b.score - a.score || a.ts - b.ts);
-    lb = lb.slice(0, 10);
-    saveLeaderboard(lb);
-    justAddedTs = entry.ts;
-    renderModal(result, lb);
-    document.getElementById("modal-overlay").classList.add("show");
+    const nicknameInput = document.getElementById("nickname-input");
+    const nickname = nicknameInput.value.trim() || getOrCreateStoredNickname(NICKNAME_KEY);
+    localStorage.setItem(NICKNAME_KEY, nickname);
+    const btn = document.getElementById("register-btn");
+    btn.disabled = true;
+    btn.textContent = "등록 중...";
+    try {
+      const entry = await submitScore(result.total, nickname);
+      justAddedId = entry.id;
+      const lb = await fetchLeaderboard();
+      modalMode = "register";
+      renderModal(result, lb);
+      document.getElementById("modal-overlay").classList.add("show");
+    } catch (e) {
+      alert("점수 등록에 실패했습니다. 네트워크 연결을 확인해주세요.");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "점수 등록";
+    }
+  }
+
+  async function showRanking() {
+    const btn = document.getElementById("ranking-btn");
+    btn.disabled = true;
+    try {
+      const lb = await fetchLeaderboard();
+      modalMode = "view";
+      renderModal(null, lb);
+      document.getElementById("modal-overlay").classList.add("show");
+    } catch (e) {
+      alert("랭킹을 불러오지 못했습니다. 네트워크 연결을 확인해주세요.");
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   function makeQuadsEl(quads, extraClass) {
@@ -502,30 +584,57 @@
   }
 
   function renderModal(result, leaderboard) {
-    document.getElementById("modal-total").textContent = result.total;
+    const title = document.getElementById("modal-title");
+    const totalEl = document.getElementById("modal-total");
     const top = document.getElementById("modal-top");
-    top.innerHTML = "";
-    result.topTwo.forEach(l => {
-      const chip = document.createElement("div");
-      chip.className = "modal-top-chip";
-      const sw = document.createElement("div");
-      sw.className = "swatch";
-      sw.style.background = PALETTE[l];
-      const val = document.createElement("div");
-      val.className = "val";
-      val.textContent = result.sizes[l];
-      chip.appendChild(sw);
-      chip.appendChild(val);
-      top.appendChild(chip);
-    });
+    const restartBtn = document.getElementById("modal-restart-btn");
+
+    if (result) {
+      title.textContent = "점수 등록 완료!";
+      totalEl.style.display = "";
+      top.style.display = "";
+      restartBtn.textContent = "다시하기";
+      totalEl.textContent = result.total;
+      top.innerHTML = "";
+      result.topTwo.forEach(l => {
+        const chip = document.createElement("div");
+        chip.className = "modal-top-chip";
+        const sw = document.createElement("div");
+        sw.className = "swatch";
+        sw.style.background = PALETTE[l];
+        const val = document.createElement("div");
+        val.className = "val";
+        val.textContent = result.sizes[l];
+        chip.appendChild(sw);
+        chip.appendChild(val);
+        top.appendChild(chip);
+      });
+    } else {
+      title.textContent = "랭킹";
+      totalEl.style.display = "none";
+      top.style.display = "none";
+      restartBtn.textContent = "닫기";
+    }
+
     const list = document.getElementById("leaderboard-list");
     list.innerHTML = "";
+    if (!leaderboard.length) {
+      const empty = document.createElement("div");
+      empty.className = "lb-date";
+      empty.style.textAlign = "center";
+      empty.textContent = "아직 등록된 점수가 없어요.";
+      list.appendChild(empty);
+      return;
+    }
     leaderboard.forEach((e, i) => {
       const row = document.createElement("div");
-      row.className = "lb-row" + (e.ts === justAddedTs ? " new" : "");
+      row.className = "lb-row" + (e.id === justAddedId ? " new" : "");
       const rank = document.createElement("span");
       rank.className = "lb-rank";
       rank.textContent = i + 1;
+      const nickname = document.createElement("span");
+      nickname.className = "lb-nickname";
+      nickname.textContent = e.nickname || "익명";
       const score = document.createElement("span");
       score.className = "lb-score";
       score.textContent = e.score + "점";
@@ -533,6 +642,7 @@
       date.className = "lb-date";
       date.textContent = formatTs(e.ts);
       row.appendChild(rank);
+      row.appendChild(nickname);
       row.appendChild(score);
       row.appendChild(date);
       list.appendChild(row);
@@ -550,7 +660,16 @@
     if (stage === "sliding") registerScore();
   });
   document.getElementById("restart-btn").addEventListener("click", initGame);
-  document.getElementById("modal-restart-btn").addEventListener("click", initGame);
+  document.getElementById("ranking-btn").addEventListener("click", showRanking);
+  document.getElementById("modal-restart-btn").addEventListener("click", () => {
+    if (modalMode === "view") {
+      document.getElementById("modal-overlay").classList.remove("show");
+    } else {
+      initGame();
+    }
+  });
+
+  document.getElementById("nickname-input").value = getOrCreateStoredNickname(NICKNAME_KEY);
 
   initGame();
 })();
