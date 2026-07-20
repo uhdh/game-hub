@@ -181,3 +181,46 @@ test('computeFinalRanking sorts players by total won value, descending', () => {
   assert.equal(ranking[0].total, 30);
   assert.equal(ranking[1].total, 10);
 });
+
+test('createAiProfiles assigns each of the 4 archetypes to exactly one ai player', () => {
+  const rng = mulberry32(7);
+  const profiles = L.createAiProfiles(rng);
+  const archetypes = ['ai1', 'ai2', 'ai3', 'ai4'].map((id) => profiles[id].archetype);
+  assert.equal(archetypes.length, 4);
+  assert.equal(new Set(archetypes).size, 4);
+  archetypes.forEach((a) => assert.ok(L.AI_ARCHETYPES.includes(a)));
+});
+
+test('createAiProfiles keeps aggressiveness within the assigned archetype\'s range', () => {
+  const rng = mulberry32(7);
+  const profiles = L.createAiProfiles(rng);
+  const ranges = {
+    '테토남': [1.05, 1.3],
+    '에겐남': [0.75, 0.95],
+    '욜로족': [0.9, 1.1],
+    '안정형': [0.9, 1.1],
+  };
+  ['ai1', 'ai2', 'ai3', 'ai4'].forEach((id) => {
+    const p = profiles[id];
+    const [min, max] = ranges[p.archetype];
+    assert.ok(p.aggressiveness >= min && p.aggressiveness <= max, `${p.archetype}: ${p.aggressiveness}`);
+  });
+});
+
+test('createAiProfiles sets pressureThreshold/paceCoefficient/gambleChance per archetype spec', () => {
+  const rng = mulberry32(7);
+  const profiles = L.createAiProfiles(rng);
+  const expected = {
+    '테토남': { pressureThreshold: 1.4, paceCoefficient: 0.4, gambleChance: 0 },
+    '에겐남': { pressureThreshold: 1.05, paceCoefficient: 0.4, gambleChance: 0 },
+    '욜로족': { pressureThreshold: 1.4, paceCoefficient: 0, gambleChance: 0.15 },
+    '안정형': { pressureThreshold: 1.2, paceCoefficient: 1.0, gambleChance: 0 },
+  };
+  ['ai1', 'ai2', 'ai3', 'ai4'].forEach((id) => {
+    const p = profiles[id];
+    const exp = expected[p.archetype];
+    assert.equal(p.pressureThreshold, exp.pressureThreshold);
+    assert.equal(p.paceCoefficient, exp.paceCoefficient);
+    assert.equal(p.gambleChance, exp.gambleChance);
+  });
+});

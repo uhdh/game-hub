@@ -11,6 +11,22 @@
   var TOTAL_ROUNDS = 11;
   var POOL_SIZE = 22;
 
+  var AI_ARCHETYPES = ['테토남', '에겐남', '욜로족', '안정형'];
+
+  var ARCHETYPE_PARAMS = {
+    '테토남': { aggressivenessMin: 1.05, aggressivenessMax: 1.3, pressureThreshold: 1.4, paceCoefficient: 0.4, gambleChance: 0 },
+    '에겐남': { aggressivenessMin: 0.75, aggressivenessMax: 0.95, pressureThreshold: 1.05, paceCoefficient: 0.4, gambleChance: 0 },
+    '욜로족': { aggressivenessMin: 0.9, aggressivenessMax: 1.1, pressureThreshold: 1.4, paceCoefficient: 0, gambleChance: 0.15 },
+    '안정형': { aggressivenessMin: 0.9, aggressivenessMax: 1.1, pressureThreshold: 1.2, paceCoefficient: 1.0, gambleChance: 0 }
+  };
+
+  var ARCHETYPE_DESCRIPTIONS = {
+    '테토남': '경쟁자가 많아도 잘 버팁니다.',
+    '에겐남': '판이 과열되면 빠르게 손을 뗍니다.',
+    '욜로족': '가끔 몰빵을 합니다.',
+    '안정형': '성과에 따라 스스로 페이스를 조절합니다.'
+  };
+
   function createPlayers() {
     return PLAYER_ORDER.map(function (id) {
       return { id: id, cubes: CUBE_VALUES.slice(), wonItems: [] };
@@ -190,9 +206,18 @@
 
   function createAiProfiles(rng) {
     var random = rng || Math.random;
+    var order = shuffle(AI_ARCHETYPES, random);
     var profiles = {};
-    ['ai1', 'ai2', 'ai3', 'ai4'].forEach(function (id) {
-      profiles[id] = { aggressiveness: 0.8 + random() * 0.5 };
+    ['ai1', 'ai2', 'ai3', 'ai4'].forEach(function (id, idx) {
+      var archetype = order[idx];
+      var params = ARCHETYPE_PARAMS[archetype];
+      profiles[id] = {
+        archetype: archetype,
+        aggressiveness: params.aggressivenessMin + random() * (params.aggressivenessMax - params.aggressivenessMin),
+        pressureThreshold: params.pressureThreshold,
+        paceCoefficient: params.paceCoefficient,
+        gambleChance: params.gambleChance
+      };
     });
     return profiles;
   }
@@ -235,6 +260,8 @@
     PLAYER_ORDER: PLAYER_ORDER,
     TOTAL_ROUNDS: TOTAL_ROUNDS,
     POOL_SIZE: POOL_SIZE,
+    AI_ARCHETYPES: AI_ARCHETYPES,
+    ARCHETYPE_DESCRIPTIONS: ARCHETYPE_DESCRIPTIONS,
     createPlayers: createPlayers,
     findPlayer: findPlayer,
     shuffle: shuffle,
