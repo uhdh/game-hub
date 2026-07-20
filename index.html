@@ -370,6 +370,31 @@
     min-height: 14px;
   }
 
+  @media (min-width: 900px) {
+    #chat-overlay {
+      background: transparent;
+      justify-content: flex-end;
+      align-items: stretch;
+      padding: 24px 24px 24px 0;
+      pointer-events: none;
+    }
+    #chat-overlay .ann-box {
+      pointer-events: auto;
+      width: 340px;
+      max-width: 340px;
+      max-height: none;
+      box-shadow: -12px 0 40px rgba(0, 0, 0, .4), 0 20px 60px rgba(0, 0, 0, .5);
+    }
+    #chat-overlay .chat-modal-body {
+      flex: 1;
+      min-height: 0;
+    }
+    #chat-overlay .chat-box {
+      flex: 1;
+      height: auto;
+    }
+  }
+
   .game-list {
     display: flex;
     flex-direction: column;
