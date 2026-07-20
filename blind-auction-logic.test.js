@@ -301,3 +301,50 @@ test('decideAiAction keeps the gamble roll fixed for the rest of the round once 
   L.decideAiAction(ai1, round, profile, 220, 11, () => 0.9);
   assert.equal(round.gambleRolls.ai1, true);
 });
+
+test('decideAiAction raises the effective budget cap for an AI that is behind its expected win pace', () => {
+  const players = L.createPlayers();
+  const ai1 = L.findPlayer(players, 'ai1');
+  ai1.wonItems = [];
+  const round = L.createRound('user');
+  round.highestPlayerId = 'user';
+  round.highestTotal = 31; // extraNeeded = 32
+  round.active.ai2 = false;
+  round.active.ai3 = false;
+  round.active.ai4 = false;
+  const profile = { aggressiveness: 5.0, pressureThreshold: 999, paceCoefficient: 1.0 };
+  const action = L.decideAiAction(ai1, round, profile, 220, 6, () => 1);
+  assert.equal(action.action, 'bid');
+});
+
+test('decideAiAction lowers the effective budget cap for an AI that is ahead of its expected win pace', () => {
+  const players = L.createPlayers();
+  const ai1 = L.findPlayer(players, 'ai1');
+  ai1.wonItems = [
+    { itemId: 1, itemName: 'a', value: 5 },
+    { itemId: 2, itemName: 'b', value: 5 },
+  ];
+  const round = L.createRound('user');
+  round.highestPlayerId = 'user';
+  round.highestTotal = 24; // extraNeeded = 25
+  round.active.ai2 = false;
+  round.active.ai3 = false;
+  round.active.ai4 = false;
+  const profile = { aggressiveness: 5.0, pressureThreshold: 999, paceCoefficient: 1.0 };
+  const action = L.decideAiAction(ai1, round, profile, 220, 6, () => 1);
+  assert.equal(action.action, 'pass');
+});
+
+test('decideAiAction relaxes the budget cap during the final two rounds', () => {
+  const players = L.createPlayers();
+  const ai1 = L.findPlayer(players, 'ai1');
+  const round = L.createRound('user');
+  round.highestPlayerId = 'user';
+  round.highestTotal = 89; // extraNeeded = 90
+  round.active.ai2 = false;
+  round.active.ai3 = false;
+  round.active.ai4 = false;
+  const profile = { aggressiveness: 10.0, pressureThreshold: 999, paceCoefficient: 0 };
+  const action = L.decideAiAction(ai1, round, profile, 220, 2, () => 1);
+  assert.equal(action.action, 'bid');
+});

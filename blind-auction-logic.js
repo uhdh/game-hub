@@ -269,6 +269,20 @@
     var remaining = remainingCubesInRound(player, round);
     var remainingHandTotal = remaining.reduce(function (a, b) { return a + b; }, 0);
     var budgetCap = remainingRounds > 0 ? (remainingHandTotal / remainingRounds) * 1.6 : remainingHandTotal;
+
+    var roundsPlayedSoFar = TOTAL_ROUNDS - remainingRounds;
+    if (roundsPlayedSoFar > 0) {
+      var paceCoefficient = profile.paceCoefficient != null ? profile.paceCoefficient : 1.0;
+      var expectedWinsSoFar = roundsPlayedSoFar / PLAYER_ORDER.length;
+      var paceRatio = player.wonItems.length / expectedWinsSoFar;
+      var paceAdjustment = clamp((1 - paceRatio) * paceCoefficient, -0.3, 0.3);
+      budgetCap = budgetCap * (1 + paceAdjustment);
+    }
+
+    if (remainingRounds <= 2) {
+      budgetCap = Math.max(budgetCap, remainingHandTotal * 0.9);
+    }
+
     var maxWillingness = Math.min(willingness, budgetCap);
     var extraNeeded = round.highestTotal - round.submitted[player.id] + 1;
     var prospectiveTotal = round.submitted[player.id] + extraNeeded;
