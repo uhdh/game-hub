@@ -85,6 +85,28 @@
     display: inline-block;
   }
 
+  .request-board-btn {
+    position: fixed;
+    right: 16px;
+    bottom: 20px;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #c3c9d1;
+    background: #15181c;
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 999px;
+    padding: 8px 14px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .35);
+  }
+  .request-board-btn:hover {
+    border-color: rgba(95, 184, 176, .4);
+    color: #c3c9d1;
+  }
+
   @keyframes ann-pop { 0% { transform: scale(.94); opacity: 0 } 100% { transform: scale(1); opacity: 1 } }
   .ann-overlay {
     position: fixed; inset: 0;
@@ -383,6 +405,10 @@
   </div>
 </div>
 
+<a href="./requests.html" class="request-board-btn">
+  <span>📝 요청 게시판</span>
+</a>
+
 <div id="announcement-overlay" class="ann-overlay">
   <div class="ann-box">
     <div class="ann-head">
@@ -454,13 +480,6 @@
       href: './predict.html',
       target: '_self',
       emoji: '🏆',
-    },
-    {
-      name: '요청 게시판',
-      desc: '만들어줬으면 하는 게임, 버그 제보, 기능 제안을 남겨보세요',
-      href: './requests.html',
-      target: '_self',
-      emoji: '📝',
     },
   ];
 
