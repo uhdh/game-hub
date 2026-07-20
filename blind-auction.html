@@ -103,7 +103,7 @@
 
   .modal { position: fixed; inset: 0; background: rgba(6,7,9,.75); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 50; }
   .modal.hidden { display: none; }
-  .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; padding: 28px 24px; max-width: 340px; width: 100%; display: flex; flex-direction: column; gap: 10px; text-align: center; }
+  .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; padding: 28px 24px; max-width: 340px; width: 100%; display: flex; flex-direction: column; gap: 10px; text-align: center; color: var(--text); }
   .modal-item-name { font-size: 19px; font-weight: 800; }
   .modal-value { font-size: 26px; font-weight: 800; color: var(--gold); }
   .modal-memo { font-size: 12.5px; color: var(--text-dim); }
@@ -135,7 +135,10 @@
     <div class="header-row">
       <a href="./index.html" class="home-link">← 홈</a>
       <span class="title">블라인드 경매</span>
-      <button type="button" class="rules-btn" id="rules-btn">규칙</button>
+      <div style="display:flex;gap:6px;">
+        <button type="button" class="rules-btn" id="rules-btn">규칙</button>
+        <button type="button" class="rules-btn" id="ranking-btn">랭킹</button>
+      </div>
     </div>
 
     <div id="screen-start" class="screen"></div>
@@ -227,6 +230,14 @@
       <li>11라운드 종료 후 낙찰 물품 가치 합계가 가장 높은 사람이 승리합니다.</li>
     </ul>
     <button type="button" class="btn-secondary" id="rules-close-btn">닫기</button>
+  </div>
+</div>
+
+<div id="modal-ranking" class="modal hidden">
+  <div class="modal-box">
+    <div class="leaderboard-title">리더보드</div>
+    <div id="ranking-modal-list"></div>
+    <button type="button" class="btn-secondary" id="ranking-close-btn">닫기</button>
   </div>
 </div>
 
@@ -360,6 +371,23 @@
   });
   document.getElementById("rules-close-btn").addEventListener("click", () => {
     document.getElementById("modal-rules").classList.add("hidden");
+  });
+
+  async function openRankingModal() {
+    const listEl = document.getElementById("ranking-modal-list");
+    document.getElementById("modal-ranking").classList.remove("hidden");
+    listEl.innerHTML = '<div class="status-banner show ok">불러오는 중...</div>';
+    try {
+      const rows = await fetchLeaderboard();
+      listEl.innerHTML = rows.length ? buildLeaderboardHtml(rows) : '<div class="status-banner show ok">아직 등록된 기록이 없습니다.</div>';
+    } catch (err) {
+      listEl.innerHTML = '<div class="status-banner show err">리더보드를 불러오지 못했습니다.</div>';
+    }
+  }
+
+  document.getElementById("ranking-btn").addEventListener("click", openRankingModal);
+  document.getElementById("ranking-close-btn").addEventListener("click", () => {
+    document.getElementById("modal-ranking").classList.add("hidden");
   });
 
   function beginGame(items) {
@@ -594,15 +622,14 @@
     return res.json();
   }
 
+  function buildLeaderboardHtml(rows) {
+    return rows
+      .map((row, i) => `<div class="leaderboard-row"><span class="lb-rank">${i + 1}</span><span class="lb-nickname">${row.nickname || "익명"}</span><span class="lb-score">${row.score}%</span></div>`)
+      .join("");
+  }
+
   function renderLeaderboard(rows) {
-    const wrap = document.getElementById("leaderboard-list");
-    wrap.innerHTML = "";
-    rows.forEach((row, i) => {
-      const line = document.createElement("div");
-      line.className = "leaderboard-row";
-      line.innerHTML = `<span class="lb-rank">${i + 1}</span><span class="lb-nickname">${row.nickname || "익명"}</span><span class="lb-score">${row.score}%</span>`;
-      wrap.appendChild(line);
-    });
+    document.getElementById("leaderboard-list").innerHTML = buildLeaderboardHtml(rows);
   }
 
   // 물품 22개(총 poolTotal) 중 내가 낙찰받은 금액이 몇 %인지를 리더보드 점수로 쓴다
