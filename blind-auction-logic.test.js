@@ -270,3 +270,34 @@ test('decideAiAction becomes more willing to bid when fewer rivals remain active
   const lenientAction = L.decideAiAction(ai1, round, profile, 220, 11, () => 0.5);
   assert.equal(lenientAction.action, 'bid');
 });
+
+test('decideAiAction amplifies willingness when the gamble roll succeeds for a gambleChance archetype', () => {
+  const players = L.createPlayers();
+  const ai1 = L.findPlayer(players, 'ai1');
+  const round = L.createRound('user');
+  round.highestPlayerId = 'user';
+  round.highestTotal = 10; // extraNeeded = 11
+  round.active.ai2 = false;
+  round.active.ai3 = false;
+  round.active.ai4 = false;
+  const profile = { aggressiveness: 1.0, pressureThreshold: 999, gambleChance: 0.5 };
+  let calls = 0;
+  const rng = () => { calls++; return calls === 1 ? 0.5 : (calls === 2 ? 0.1 : 0.5); };
+  const action = L.decideAiAction(ai1, round, profile, 220, 11, rng);
+  assert.equal(action.action, 'bid');
+});
+
+test('decideAiAction keeps the gamble roll fixed for the rest of the round once decided', () => {
+  const players = L.createPlayers();
+  const ai1 = L.findPlayer(players, 'ai1');
+  const round = L.createRound('user');
+  round.highestPlayerId = 'user';
+  round.highestTotal = 5;
+  const profile = { aggressiveness: 1.0, gambleChance: 0.5 };
+
+  L.decideAiAction(ai1, round, profile, 220, 11, () => 0.1);
+  assert.equal(round.gambleRolls.ai1, true);
+
+  L.decideAiAction(ai1, round, profile, 220, 11, () => 0.9);
+  assert.equal(round.gambleRolls.ai1, true);
+});

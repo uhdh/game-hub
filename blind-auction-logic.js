@@ -256,6 +256,16 @@
     var rivalsAdjustment = clamp((2 - rivals) * 0.04, -0.16, 0.16);
     willingness = willingness * (1 + rivalsAdjustment);
 
+    if (profile.gambleChance) {
+      if (!round.gambleRolls) round.gambleRolls = {};
+      if (round.gambleRolls[player.id] === undefined) {
+        round.gambleRolls[player.id] = random() < profile.gambleChance;
+      }
+      if (round.gambleRolls[player.id]) {
+        willingness = willingness * (1.8 + random() * 0.4);
+      }
+    }
+
     var remaining = remainingCubesInRound(player, round);
     var remainingHandTotal = remaining.reduce(function (a, b) { return a + b; }, 0);
     var budgetCap = remainingRounds > 0 ? (remainingHandTotal / remainingRounds) * 1.6 : remainingHandTotal;
