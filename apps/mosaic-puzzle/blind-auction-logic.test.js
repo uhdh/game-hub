@@ -138,8 +138,14 @@ test('nextStartPlayer follows the winner, or rotates past the previous starter w
   assert.equal(L.nextStartPlayer(L.PLAYER_ORDER, 'ai4', { type: 'unsold' }), 'user');
 });
 
-test('pickMinimalRaise prefers the single smallest cube that clears the target', () => {
-  assert.deepEqual(L.pickMinimalRaise([1, 2, 3, 4, 6, 8, 10, 12, 15, 20, 25], 7), [8]);
+test('pickMinimalRaise prefers the combination with the smallest total that clears the target, even over a single larger cube', () => {
+  // {3,4}=7이 정확히 맞아떨어지므로, 초과분이 1인 단일 큐브 8보다 우선한다.
+  assert.deepEqual(L.pickMinimalRaise([1, 2, 3, 4, 6, 8, 10, 12, 15, 20, 25], 7), [3, 4]);
+});
+
+test('pickMinimalRaise breaks a same-total tie by choosing fewer cubes', () => {
+  // 목표 4: 단일 큐브 [4]와 조합 [1,3]이 둘 다 합계가 정확히 4로 동일하다 -> 큐브 개수가 적은 [4]를 선택한다.
+  assert.deepEqual(L.pickMinimalRaise([1, 3, 4], 4), [4]);
 });
 
 test('pickMinimalRaise falls back to a combination when no single cube suffices', () => {
@@ -180,4 +186,165 @@ test('computeFinalRanking sorts players by total won value, descending', () => {
   assert.equal(ranking[0].id, 'ai1');
   assert.equal(ranking[0].total, 30);
   assert.equal(ranking[1].total, 10);
+});
+
+test('createAiProfiles assigns each of the 4 archetypes to exactly one ai player', () => {
+  const rng = mulberry32(7);
+  const profiles = L.createAiProfiles(rng);
+  const archetypes = ['ai1', 'ai2', 'ai3', 'ai4'].map((id) => profiles[id].archetype);
+  assert.equal(archetypes.length, 4);
+  assert.equal(new Set(archetypes).size, 4);
+  archetypes.forEach((a) => assert.ok(L.AI_ARCHETYPES.includes(a)));
+});
+
+test('createAiProfiles keeps aggressiveness within the assigned archetype\'s range', () => {
+  const rng = mulberry32(7);
+  const profiles = L.createAiProfiles(rng);
+  const ranges = {
+    '테토남': [1.05, 1.3],
+    '에겐남': [0.75, 0.95],
+    '욜로족': [0.9, 1.1],
+    '안정형': [0.9, 1.1],
+  };
+  ['ai1', 'ai2', 'ai3', 'ai4'].forEach((id) => {
+    const p = profiles[id];
+    const [min, max] = ranges[p.archetype];
+    assert.ok(p.aggressiveness >= min && p.aggressiveness <= max, `${p.archetype}: ${p.aggressiveness}`);
+  });
+});
+
+test('createAiProfiles sets pressureThreshold/paceCoefficient/gambleChance per archetype spec', () => {
+  const rng = mulberry32(7);
+  const profiles = L.createAiProfiles(rng);
+  const expected = {
+    '테토남': { pressureThreshold: 1.4, paceCoefficient: 0.4, gambleChance: 0 },
+    '에겐남': { pressureThreshold: 1.05, paceCoefficient: 0.4, gambleChance: 0 },
+    '욜로족': { pressureThreshold: 1.4, paceCoefficient: 0, gambleChance: 0.15 },
+    '안정형': { pressureThreshold: 1.2, paceCoefficient: 1.0, gambleChance: 0 },
+  };
+  ['ai1', 'ai2', 'ai3', 'ai4'].forEach((id) => {
+    const p = profiles[id];
+    const exp = expected[p.archetype];
+    assert.equal(p.pressureThreshold, exp.pressureThreshold);
+    assert.equal(p.paceCoefficient, exp.paceCoefficient);
+    assert.equal(p.gambleChance, exp.gambleChance);
+  });
+});
+
+test('decideAiAction applies the archetype pressure cut once highestTotal exceeds the pressure threshold', () => {
+  const players = L.createPlayers();
+  const ai1 = L.findPlayer(players, 'ai1');
+  const round = L.createRound('user');
+  round.highestPlayerId = 'user';
+  round.highestTotal = 13; // avg=10 -> pressureRatio=1.3
+  const profile = { aggressiveness: 2.0, pressureThreshold: 1.2 };
+  const action = L.decideAiAction(ai1, round, profile, 220, 11, () => 1);
+  assert.equal(action.action, 'pass');
+});
+
+test('decideAiAction does not apply the pressure cut below the archetype threshold', () => {
+  const players = L.createPlayers();
+  const ai1 = L.findPlayer(players, 'ai1');
+  const round = L.createRound('user');
+  round.highestPlayerId = 'user';
+  round.highestTotal = 13;
+  const profile = { aggressiveness: 2.0, pressureThreshold: 999 };
+  const action = L.decideAiAction(ai1, round, profile, 220, 11, () => 1);
+  assert.equal(action.action, 'bid');
+});
+
+test('decideAiAction becomes more willing to bid when fewer rivals remain active this round', () => {
+  const players = L.createPlayers();
+  const ai1 = L.findPlayer(players, 'ai1');
+  const round = L.createRound('user');
+  round.highestPlayerId = 'user';
+  round.highestTotal = 9; // extraNeeded = 10
+  const profile = { aggressiveness: 1.0 };
+
+  const crowdedAction = L.decideAiAction(ai1, round, profile, 220, 11, () => 0.5);
+  assert.equal(crowdedAction.action, 'pass');
+
+  round.active.ai2 = false;
+  round.active.ai3 = false;
+  round.active.ai4 = false;
+  const lenientAction = L.decideAiAction(ai1, round, profile, 220, 11, () => 0.5);
+  assert.equal(lenientAction.action, 'bid');
+});
+
+test('decideAiAction amplifies willingness when the gamble roll succeeds for a gambleChance archetype', () => {
+  const players = L.createPlayers();
+  const ai1 = L.findPlayer(players, 'ai1');
+  const round = L.createRound('user');
+  round.highestPlayerId = 'user';
+  round.highestTotal = 10; // extraNeeded = 11
+  round.active.ai2 = false;
+  round.active.ai3 = false;
+  round.active.ai4 = false;
+  const profile = { aggressiveness: 1.0, pressureThreshold: 999, gambleChance: 0.5 };
+  let calls = 0;
+  const rng = () => { calls++; return calls === 1 ? 0.5 : (calls === 2 ? 0.1 : 0.5); };
+  const action = L.decideAiAction(ai1, round, profile, 220, 11, rng);
+  assert.equal(action.action, 'bid');
+});
+
+test('decideAiAction keeps the gamble roll fixed for the rest of the round once decided', () => {
+  const players = L.createPlayers();
+  const ai1 = L.findPlayer(players, 'ai1');
+  const round = L.createRound('user');
+  round.highestPlayerId = 'user';
+  round.highestTotal = 5;
+  const profile = { aggressiveness: 1.0, gambleChance: 0.5 };
+
+  L.decideAiAction(ai1, round, profile, 220, 11, () => 0.1);
+  assert.equal(round.gambleRolls.ai1, true);
+
+  L.decideAiAction(ai1, round, profile, 220, 11, () => 0.9);
+  assert.equal(round.gambleRolls.ai1, true);
+});
+
+test('decideAiAction raises the effective budget cap for an AI that is behind its expected win pace', () => {
+  const players = L.createPlayers();
+  const ai1 = L.findPlayer(players, 'ai1');
+  ai1.wonItems = [];
+  const round = L.createRound('user');
+  round.highestPlayerId = 'user';
+  round.highestTotal = 31; // extraNeeded = 32
+  round.active.ai2 = false;
+  round.active.ai3 = false;
+  round.active.ai4 = false;
+  const profile = { aggressiveness: 5.0, pressureThreshold: 999, paceCoefficient: 1.0 };
+  const action = L.decideAiAction(ai1, round, profile, 220, 6, () => 1);
+  assert.equal(action.action, 'bid');
+});
+
+test('decideAiAction lowers the effective budget cap for an AI that is ahead of its expected win pace', () => {
+  const players = L.createPlayers();
+  const ai1 = L.findPlayer(players, 'ai1');
+  ai1.wonItems = [
+    { itemId: 1, itemName: 'a', value: 5 },
+    { itemId: 2, itemName: 'b', value: 5 },
+  ];
+  const round = L.createRound('user');
+  round.highestPlayerId = 'user';
+  round.highestTotal = 24; // extraNeeded = 25
+  round.active.ai2 = false;
+  round.active.ai3 = false;
+  round.active.ai4 = false;
+  const profile = { aggressiveness: 5.0, pressureThreshold: 999, paceCoefficient: 1.0 };
+  const action = L.decideAiAction(ai1, round, profile, 220, 6, () => 1);
+  assert.equal(action.action, 'pass');
+});
+
+test('decideAiAction relaxes the budget cap during the final two rounds', () => {
+  const players = L.createPlayers();
+  const ai1 = L.findPlayer(players, 'ai1');
+  const round = L.createRound('user');
+  round.highestPlayerId = 'user';
+  round.highestTotal = 89; // extraNeeded = 90
+  round.active.ai2 = false;
+  round.active.ai3 = false;
+  round.active.ai4 = false;
+  const profile = { aggressiveness: 10.0, pressureThreshold: 999, paceCoefficient: 0 };
+  const action = L.decideAiAction(ai1, round, profile, 220, 2, () => 1);
+  assert.equal(action.action, 'bid');
 });
