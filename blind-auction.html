@@ -83,6 +83,7 @@
   .player-chip.leading { border-color: var(--gold); background: rgba(255,209,102,.1); }
   .player-chip.passed { opacity: .45; }
   .player-name { font-weight: 700; font-size: 12.5px; }
+  .player-archetype { display: inline-block; margin-left: 4px; font-size: 10px; font-weight: 700; color: var(--accent-hover); background: rgba(95,184,176,.14); border-radius: 6px; padding: 1px 5px; cursor: help; }
   .player-status { color: var(--text-dim); }
   .player-cubes { color: var(--text-dim); }
   .submitted-cubes { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
@@ -391,7 +392,11 @@
       const cubesLabel = id === "user" ? `큐브 ${player.cubes.reduce((a, b) => a + b, 0)}` : "";
       const submitted = state.round.usedCubes[id] || [];
       const tilesHtml = submitted.map((v) => `<span class="submitted-cube-tile">${v}</span>`).join("");
-      div.innerHTML = `<span class="player-name">${PLAYER_LABELS[id]}</span><span class="player-status">${active ? (isLeader ? "최고가" : "대기") : "포기"}</span><span class="player-cubes">${cubesLabel}</span><div class="submitted-cubes">${tilesHtml}</div>`;
+      const archetype = id !== "user" ? state.aiProfiles[id].archetype : null;
+      const badgeHtml = archetype
+        ? `<span class="player-archetype" title="${L.ARCHETYPE_DESCRIPTIONS[archetype]}">${archetype}</span>`
+        : "";
+      div.innerHTML = `<span class="player-name">${PLAYER_LABELS[id]}</span>${badgeHtml}<span class="player-status">${active ? (isLeader ? "최고가" : "대기") : "포기"}</span><span class="player-cubes">${cubesLabel}</span><div class="submitted-cubes">${tilesHtml}</div>`;
       wrap.appendChild(div);
     });
   }

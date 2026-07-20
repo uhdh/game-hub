@@ -11,6 +11,22 @@
   var TOTAL_ROUNDS = 11;
   var POOL_SIZE = 22;
 
+  var AI_ARCHETYPES = ['테토남', '에겐남', '욜로족', '안정형'];
+
+  var ARCHETYPE_PARAMS = {
+    '테토남': { aggressivenessMin: 1.05, aggressivenessMax: 1.3, pressureThreshold: 1.4, paceCoefficient: 0.4, gambleChance: 0 },
+    '에겐남': { aggressivenessMin: 0.75, aggressivenessMax: 0.95, pressureThreshold: 1.05, paceCoefficient: 0.4, gambleChance: 0 },
+    '욜로족': { aggressivenessMin: 0.9, aggressivenessMax: 1.1, pressureThreshold: 1.4, paceCoefficient: 0, gambleChance: 0.15 },
+    '안정형': { aggressivenessMin: 0.9, aggressivenessMax: 1.1, pressureThreshold: 1.2, paceCoefficient: 1.0, gambleChance: 0 }
+  };
+
+  var ARCHETYPE_DESCRIPTIONS = {
+    '테토남': '경쟁자가 많아도 잘 버팁니다.',
+    '에겐남': '판이 과열되면 빠르게 손을 뗍니다.',
+    '욜로족': '가끔 몰빵을 합니다.',
+    '안정형': '성과에 따라 스스로 페이스를 조절합니다.'
+  };
+
   function createPlayers() {
     return PLAYER_ORDER.map(function (id) {
       return { id: id, cubes: CUBE_VALUES.slice(), wonItems: [] };
@@ -173,26 +189,47 @@
 
   function pickMinimalRaise(availableCubeValues, extraNeeded) {
     if (extraNeeded <= 0) return [];
-    var sorted = availableCubeValues.slice().sort(function (a, b) { return a - b; });
-    for (var i = 0; i < sorted.length; i++) {
-      if (sorted[i] >= extraNeeded) return [sorted[i]];
+    var n = availableCubeValues.length;
+    var best = null;
+    for (var mask = 1; mask < (1 << n); mask++) {
+      var sum = 0;
+      var count = 0;
+      for (var i = 0; i < n; i++) {
+        if (mask & (1 << i)) {
+          sum += availableCubeValues[i];
+          count++;
+        }
+      }
+      if (sum >= extraNeeded && (!best || sum < best.sum || (sum === best.sum && count < best.count))) {
+        best = { sum: sum, count: count, mask: mask };
+      }
     }
-    var desc = sorted.slice().reverse();
+    if (!best) return null;
     var chosen = [];
-    var sum = 0;
-    for (var j = 0; j < desc.length; j++) {
-      chosen.push(desc[j]);
-      sum += desc[j];
-      if (sum >= extraNeeded) return chosen;
+    for (var j = 0; j < n; j++) {
+      if (best.mask & (1 << j)) chosen.push(availableCubeValues[j]);
     }
-    return null;
+    return chosen;
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
   }
 
   function createAiProfiles(rng) {
     var random = rng || Math.random;
+    var order = shuffle(AI_ARCHETYPES, random);
     var profiles = {};
-    ['ai1', 'ai2', 'ai3', 'ai4'].forEach(function (id) {
-      profiles[id] = { aggressiveness: 0.8 + random() * 0.5 };
+    ['ai1', 'ai2', 'ai3', 'ai4'].forEach(function (id, idx) {
+      var archetype = order[idx];
+      var params = ARCHETYPE_PARAMS[archetype];
+      profiles[id] = {
+        archetype: archetype,
+        aggressiveness: params.aggressivenessMin + random() * (params.aggressivenessMax - params.aggressivenessMin),
+        pressureThreshold: params.pressureThreshold,
+        paceCoefficient: params.paceCoefficient,
+        gambleChance: params.gambleChance
+      };
     });
     return profiles;
   }
@@ -205,10 +242,47 @@
   }
 
   function decideAiAction(player, round, profile, poolTotal, remainingRounds, rng) {
-    var willingness = computeAiWillingness(profile, poolTotal, rng);
+    var random = rng || Math.random;
+    var willingness = computeAiWillingness(profile, poolTotal, random);
+
+    var avgValue = poolTotal / POOL_SIZE;
+    var pressureThreshold = profile.pressureThreshold != null ? profile.pressureThreshold : 1.2;
+    var pressureRatio = avgValue > 0 ? round.highestTotal / avgValue : 0;
+    if (pressureRatio > pressureThreshold) {
+      willingness = willingness * 0.6;
+    }
+
+    var rivals = activeIds(round).filter(function (id) { return id !== player.id; }).length;
+    var rivalsAdjustment = clamp((2 - rivals) * 0.04, -0.16, 0.16);
+    willingness = willingness * (1 + rivalsAdjustment);
+
+    if (profile.gambleChance) {
+      if (!round.gambleRolls) round.gambleRolls = {};
+      if (round.gambleRolls[player.id] === undefined) {
+        round.gambleRolls[player.id] = random() < profile.gambleChance;
+      }
+      if (round.gambleRolls[player.id]) {
+        willingness = willingness * (1.8 + random() * 0.4);
+      }
+    }
+
     var remaining = remainingCubesInRound(player, round);
     var remainingHandTotal = remaining.reduce(function (a, b) { return a + b; }, 0);
     var budgetCap = remainingRounds > 0 ? (remainingHandTotal / remainingRounds) * 1.6 : remainingHandTotal;
+
+    var roundsPlayedSoFar = TOTAL_ROUNDS - remainingRounds;
+    if (roundsPlayedSoFar > 0) {
+      var paceCoefficient = profile.paceCoefficient != null ? profile.paceCoefficient : 1.0;
+      var expectedWinsSoFar = roundsPlayedSoFar / PLAYER_ORDER.length;
+      var paceRatio = player.wonItems.length / expectedWinsSoFar;
+      var paceAdjustment = clamp((1 - paceRatio) * paceCoefficient, -0.3, 0.3);
+      budgetCap = budgetCap * (1 + paceAdjustment);
+    }
+
+    if (remainingRounds <= 2) {
+      budgetCap = Math.max(budgetCap, remainingHandTotal * 0.9);
+    }
+
     var maxWillingness = Math.min(willingness, budgetCap);
     var extraNeeded = round.highestTotal - round.submitted[player.id] + 1;
     var prospectiveTotal = round.submitted[player.id] + extraNeeded;
@@ -235,6 +309,8 @@
     PLAYER_ORDER: PLAYER_ORDER,
     TOTAL_ROUNDS: TOTAL_ROUNDS,
     POOL_SIZE: POOL_SIZE,
+    AI_ARCHETYPES: AI_ARCHETYPES,
+    ARCHETYPE_DESCRIPTIONS: ARCHETYPE_DESCRIPTIONS,
     createPlayers: createPlayers,
     findPlayer: findPlayer,
     shuffle: shuffle,
