@@ -38,6 +38,12 @@
     gap: 6px;
     padding: 4px 4px 0;
   }
+  .header-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
   .header .title {
     font-size: 26px;
     font-weight: 800;
@@ -47,6 +53,177 @@
     font-size: 13px;
     color: #8992a0;
   }
+
+  .announcement-btn {
+    flex: 0 0 auto;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #c3c9d1;
+    background: #15181c;
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 999px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-family: inherit;
+    margin-top: 2px;
+  }
+  .announcement-btn:hover {
+    border-color: rgba(95, 184, 176, .4);
+  }
+  .announcement-dot {
+    display: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #e3675a;
+  }
+  .announcement-dot.show {
+    display: inline-block;
+  }
+
+  @keyframes ann-pop { 0% { transform: scale(.94); opacity: 0 } 100% { transform: scale(1); opacity: 1 } }
+  .ann-overlay {
+    position: fixed; inset: 0;
+    background: rgba(10, 10, 14, .72);
+    display: none;
+    align-items: center; justify-content: center;
+    z-index: 60;
+    padding: 20px;
+  }
+  .ann-overlay.show { display: flex; }
+  .ann-box {
+    width: 100%;
+    max-width: 420px;
+    max-height: 82vh;
+    display: flex;
+    flex-direction: column;
+    background: #1c2024;
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+    animation: ann-pop .18s ease;
+    overflow: hidden;
+  }
+  .ann-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 20px 20px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, .06);
+  }
+  .ann-head-title {
+    display: block;
+    font-size: 19px;
+    font-weight: 800;
+    color: #e7ebee;
+  }
+  .ann-meta {
+    display: block;
+    margin-top: 4px;
+    font-size: 11.5px;
+    color: #8992a0;
+  }
+  .ann-close {
+    flex: 0 0 auto;
+    background: none;
+    border: none;
+    color: #8992a0;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px;
+  }
+  .ann-close:hover { color: #e7ebee; }
+  .ann-body {
+    overflow-y: auto;
+    padding: 18px 20px 24px;
+  }
+  .ann-intro {
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: #c3c9d1;
+    margin: 0 0 12px;
+  }
+  .ann-link-btn {
+    display: inline-block;
+    background: none;
+    border: none;
+    color: #5fb8b0;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 0;
+    font-family: inherit;
+  }
+  .ann-link-btn:hover { color: #7fcac3; }
+  .ann-intro-more {
+    margin-top: 10px;
+    font-size: 13px;
+    line-height: 1.65;
+    color: #a9b0bb;
+  }
+  .ann-intro-more p { margin: 0 0 8px; }
+  .ann-intro-more p:last-child { margin-bottom: 0; }
+  .ann-info-box {
+    margin-top: 16px;
+    background: #15181c;
+    border: 1px solid rgba(255, 255, 255, .06);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: #a9b0bb;
+  }
+  .ann-info-box strong { color: #e7ebee; }
+  .ann-history-head {
+    margin: 22px 0 12px;
+    font-size: 15px;
+    font-weight: 800;
+    color: #e7ebee;
+  }
+  .ann-history-item {
+    padding: 12px 0;
+    border-top: 1px solid rgba(255, 255, 255, .06);
+  }
+  .ann-history-item:first-child { border-top: none; }
+  .ann-history-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #e7ebee;
+    margin-bottom: 6px;
+  }
+  .ann-new-badge {
+    flex: 0 0 auto;
+    background: #2f6f63;
+    color: #d5f3ec;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 999px;
+    letter-spacing: .02em;
+  }
+  .ann-history-date {
+    color: #8992a0;
+    font-weight: 600;
+  }
+  .ann-history-bullets {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: #a9b0bb;
+  }
+  .ann-history-bullets li { margin-bottom: 4px; }
+  .ann-history-bullets li:last-child { margin-bottom: 0; }
 
   .game-list {
     display: flex;
@@ -185,11 +362,52 @@
 <div id="app">
   <div class="col">
     <div class="header">
-      <span class="title">피의 게임 X 시뮬레이터</span>
-      <span class="subtitle">계속 새로운 게임이 추가됩니다.</span>
+      <div class="header-top">
+        <div>
+          <span class="title">피의 게임 X 시뮬레이터</span>
+          <div class="subtitle">계속 새로운 게임이 추가됩니다.</div>
+        </div>
+        <button type="button" id="announcement-btn" class="announcement-btn">
+          <span>📢 공지사항</span>
+          <span id="announcement-dot" class="announcement-dot"></span>
+        </button>
+      </div>
     </div>
 
     <div class="game-list" id="game-list"></div>
+  </div>
+</div>
+
+<div id="announcement-overlay" class="ann-overlay">
+  <div class="ann-box">
+    <div class="ann-head">
+      <div>
+        <span class="ann-head-title">공지사항</span>
+        <span class="ann-meta">v<span id="ann-version"></span> · 배포 <span id="ann-date"></span></span>
+      </div>
+      <button type="button" id="ann-close" class="ann-close" aria-label="닫기">✕</button>
+    </div>
+    <div class="ann-body">
+      <p class="ann-intro">
+        피의 게임 X 시뮬레이터는 친구들과 가볍게 즐길 수 있는 미니게임을 모아둔 공간입니다.
+        오목, 경매, 퍼즐 같은 게임을 랭킹과 함께 즐겨보세요.
+      </p>
+      <button type="button" id="ann-intro-toggle" class="ann-link-btn">사이트 소개 보기 →</button>
+      <div id="ann-intro-more" class="ann-intro-more" hidden>
+        <p>
+          별도의 회원가입 없이 누구나 바로 게임을 즐길 수 있고, 기록은 각 게임별 리더보드에 자동으로 남습니다.
+        </p>
+        <p>
+          만들어졌으면 하는 게임이나 버그, 개선 아이디어가 있다면 "요청 게시판"에 남겨주세요. 순차적으로 반영하고 있습니다.
+        </p>
+      </div>
+      <div class="ann-info-box">
+        <strong>서비스 안내</strong> 본 사이트는 개인이 취미로 만든 실험적인 서비스입니다. 게임은 계속 다듬어지는 중이라 예고 없이 변경되거나 일시적으로 불안정할 수 있는 점 양해 부탁드립니다.
+      </div>
+
+      <div class="ann-history-head">업데이트 내역</div>
+      <div id="ann-history-list" class="ann-history-list"></div>
+    </div>
   </div>
 </div>
 
@@ -296,6 +514,91 @@
   more.className = 'more-soon';
   more.textContent = '더 많은 게임이 곧 추가됩니다';
   list.appendChild(more);
+
+  // ---- 공지사항 ----
+  const ANNOUNCEMENT_VERSION = '1.0.0';
+  const ANNOUNCEMENT_DATE = '2026-07-20';
+  const ANNOUNCEMENT_SEEN_KEY = 'gamehub_announcement_seen_version';
+
+  const UPDATE_HISTORY = [
+    {
+      date: '2026-07-20',
+      title: '오목 AI 안정성 개선',
+      bullets: [
+        '오목 AI가 상대의 승리 위협을 판단하던 도중 오류로 멈추던 문제를 수정했습니다.',
+      ],
+    },
+    {
+      date: '2026-07-19',
+      title: '요청 게시판 신설 · 관리자 기능 강화',
+      bullets: [
+        '만들어졌으면 하는 게임, 버그 제보, 개선 아이디어를 남길 수 있는 요청 게시판을 추가했습니다.',
+        '관리자 페이지 쓰기 보호를 비밀번호 확인 방식으로 강화했습니다.',
+      ],
+    },
+    {
+      date: '2026-07-19',
+      title: '지각변동 · 블라인드 경매 개선',
+      bullets: [
+        '지각변동 랭킹에 평균 점수를 함께 표시합니다.',
+        '블라인드 경매가 참여 인원이 모이면 자동으로 시작되도록 했습니다.',
+      ],
+    },
+  ];
+
+  const annBtn = document.getElementById('announcement-btn');
+  const annDot = document.getElementById('announcement-dot');
+  const annOverlay = document.getElementById('announcement-overlay');
+  const annClose = document.getElementById('ann-close');
+  const annIntroToggle = document.getElementById('ann-intro-toggle');
+  const annIntroMore = document.getElementById('ann-intro-more');
+  const annHistoryList = document.getElementById('ann-history-list');
+
+  document.getElementById('ann-version').textContent = ANNOUNCEMENT_VERSION;
+  document.getElementById('ann-date').textContent = ANNOUNCEMENT_DATE;
+
+  UPDATE_HISTORY.forEach((entry, idx) => {
+    const item = document.createElement('div');
+    item.className = 'ann-history-item';
+    item.innerHTML = `
+      <div class="ann-history-title-row">
+        ${idx === 0 ? '<span class="ann-new-badge">NEW</span>' : ''}
+        <span class="ann-history-date">${entry.date}</span>
+        <span>${entry.title}</span>
+      </div>
+      <ul class="ann-history-bullets">
+        ${entry.bullets.map(b => `<li>${b}</li>`).join('')}
+      </ul>
+    `;
+    annHistoryList.appendChild(item);
+  });
+
+  function openAnnouncement() {
+    annOverlay.classList.add('show');
+    localStorage.setItem(ANNOUNCEMENT_SEEN_KEY, ANNOUNCEMENT_VERSION);
+    annDot.classList.remove('show');
+  }
+  function closeAnnouncement() {
+    annOverlay.classList.remove('show');
+  }
+
+  if (localStorage.getItem(ANNOUNCEMENT_SEEN_KEY) !== ANNOUNCEMENT_VERSION) {
+    annDot.classList.add('show');
+  }
+
+  annBtn.addEventListener('click', openAnnouncement);
+  annClose.addEventListener('click', closeAnnouncement);
+  annOverlay.addEventListener('click', (e) => {
+    if (e.target === annOverlay) closeAnnouncement();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && annOverlay.classList.contains('show')) closeAnnouncement();
+  });
+  annIntroToggle.addEventListener('click', () => {
+    const isHidden = annIntroMore.hidden;
+    annIntroMore.hidden = !isHidden;
+    annIntroToggle.textContent = isHidden ? '사이트 소개 접기 ↑' : '사이트 소개 보기 →';
+  });
 </script>
 </body>
 </html>
