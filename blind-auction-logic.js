@@ -189,19 +189,27 @@
 
   function pickMinimalRaise(availableCubeValues, extraNeeded) {
     if (extraNeeded <= 0) return [];
-    var sorted = availableCubeValues.slice().sort(function (a, b) { return a - b; });
-    for (var i = 0; i < sorted.length; i++) {
-      if (sorted[i] >= extraNeeded) return [sorted[i]];
+    var n = availableCubeValues.length;
+    var best = null;
+    for (var mask = 1; mask < (1 << n); mask++) {
+      var sum = 0;
+      var count = 0;
+      for (var i = 0; i < n; i++) {
+        if (mask & (1 << i)) {
+          sum += availableCubeValues[i];
+          count++;
+        }
+      }
+      if (sum >= extraNeeded && (!best || sum < best.sum || (sum === best.sum && count < best.count))) {
+        best = { sum: sum, count: count, mask: mask };
+      }
     }
-    var desc = sorted.slice().reverse();
+    if (!best) return null;
     var chosen = [];
-    var sum = 0;
-    for (var j = 0; j < desc.length; j++) {
-      chosen.push(desc[j]);
-      sum += desc[j];
-      if (sum >= extraNeeded) return chosen;
+    for (var j = 0; j < n; j++) {
+      if (best.mask & (1 << j)) chosen.push(availableCubeValues[j]);
     }
-    return null;
+    return chosen;
   }
 
   function createAiProfiles(rng) {

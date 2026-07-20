@@ -138,8 +138,14 @@ test('nextStartPlayer follows the winner, or rotates past the previous starter w
   assert.equal(L.nextStartPlayer(L.PLAYER_ORDER, 'ai4', { type: 'unsold' }), 'user');
 });
 
-test('pickMinimalRaise prefers the single smallest cube that clears the target', () => {
-  assert.deepEqual(L.pickMinimalRaise([1, 2, 3, 4, 6, 8, 10, 12, 15, 20, 25], 7), [8]);
+test('pickMinimalRaise prefers the combination with the smallest total that clears the target, even over a single larger cube', () => {
+  // {3,4}=7이 정확히 맞아떨어지므로, 초과분이 1인 단일 큐브 8보다 우선한다.
+  assert.deepEqual(L.pickMinimalRaise([1, 2, 3, 4, 6, 8, 10, 12, 15, 20, 25], 7), [3, 4]);
+});
+
+test('pickMinimalRaise breaks a same-total tie by choosing fewer cubes', () => {
+  // 목표 4: 단일 큐브 [4]와 조합 [1,3]이 둘 다 합계가 정확히 4로 동일하다 -> 큐브 개수가 적은 [4]를 선택한다.
+  assert.deepEqual(L.pickMinimalRaise([1, 3, 4], 4), [4]);
 });
 
 test('pickMinimalRaise falls back to a combination when no single cube suffices', () => {
