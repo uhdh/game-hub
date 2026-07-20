@@ -224,6 +224,11 @@
   }
   .ann-history-bullets li { margin-bottom: 4px; }
   .ann-history-bullets li:last-child { margin-bottom: 0; }
+  .ann-empty {
+    font-size: 12.5px;
+    color: #5b6270;
+    padding: 8px 0;
+  }
 
   .game-list {
     display: flex;
@@ -388,25 +393,15 @@
       <button type="button" id="ann-close" class="ann-close" aria-label="닫기">✕</button>
     </div>
     <div class="ann-body">
-      <p class="ann-intro">
-        피의 게임 X 시뮬레이터는 친구들과 가볍게 즐길 수 있는 미니게임을 모아둔 공간입니다.
-        오목, 경매, 퍼즐 같은 게임을 랭킹과 함께 즐겨보세요.
-      </p>
-      <button type="button" id="ann-intro-toggle" class="ann-link-btn">사이트 소개 보기 →</button>
-      <div id="ann-intro-more" class="ann-intro-more" hidden>
-        <p>
-          별도의 회원가입 없이 누구나 바로 게임을 즐길 수 있고, 기록은 각 게임별 리더보드에 자동으로 남습니다.
-        </p>
-        <p>
-          만들어졌으면 하는 게임이나 버그, 개선 아이디어가 있다면 "요청 게시판"에 남겨주세요. 순차적으로 반영하고 있습니다.
-        </p>
-      </div>
-      <div class="ann-info-box">
-        <strong>서비스 안내</strong> 본 사이트는 개인이 취미로 만든 실험적인 서비스입니다. 게임은 계속 다듬어지는 중이라 예고 없이 변경되거나 일시적으로 불안정할 수 있는 점 양해 부탁드립니다.
-      </div>
+      <p class="ann-intro" id="ann-intro"></p>
+      <button type="button" id="ann-intro-toggle" class="ann-link-btn" hidden>사이트 소개 보기 →</button>
+      <div id="ann-intro-more" class="ann-intro-more" hidden></div>
+      <div class="ann-info-box" id="ann-info-box" hidden></div>
 
       <div class="ann-history-head">업데이트 내역</div>
-      <div id="ann-history-list" class="ann-history-list"></div>
+      <div id="ann-history-list" class="ann-history-list">
+        <div class="ann-empty">불러오는 중...</div>
+      </div>
     </div>
   </div>
 </div>
@@ -516,74 +511,92 @@
   list.appendChild(more);
 
   // ---- 공지사항 ----
-  const ANNOUNCEMENT_VERSION = '1.0.0';
-  const ANNOUNCEMENT_DATE = '2026-07-20';
+  const ANNOUNCEMENT_SUPABASE_URL = 'https://paktzmofotvwfdxcpmzv.supabase.co';
+  const ANNOUNCEMENT_SUPABASE_ANON_KEY = 'sb_publishable_jWbstEn2pKJTNDxLTR4Jig_asglvzGW';
   const ANNOUNCEMENT_SEEN_KEY = 'gamehub_announcement_seen_version';
-
-  const UPDATE_HISTORY = [
-    {
-      date: '2026-07-20',
-      title: '오목 AI 안정성 개선',
-      bullets: [
-        '오목 AI가 상대의 승리 위협을 판단하던 도중 오류로 멈추던 문제를 수정했습니다.',
-      ],
-    },
-    {
-      date: '2026-07-19',
-      title: '요청 게시판 신설 · 관리자 기능 강화',
-      bullets: [
-        '만들어졌으면 하는 게임, 버그 제보, 개선 아이디어를 남길 수 있는 요청 게시판을 추가했습니다.',
-        '관리자 페이지 쓰기 보호를 비밀번호 확인 방식으로 강화했습니다.',
-      ],
-    },
-    {
-      date: '2026-07-19',
-      title: '지각변동 · 블라인드 경매 개선',
-      bullets: [
-        '지각변동 랭킹에 평균 점수를 함께 표시합니다.',
-        '블라인드 경매가 참여 인원이 모이면 자동으로 시작되도록 했습니다.',
-      ],
-    },
-  ];
 
   const annBtn = document.getElementById('announcement-btn');
   const annDot = document.getElementById('announcement-dot');
   const annOverlay = document.getElementById('announcement-overlay');
   const annClose = document.getElementById('ann-close');
+  const annIntro = document.getElementById('ann-intro');
   const annIntroToggle = document.getElementById('ann-intro-toggle');
   const annIntroMore = document.getElementById('ann-intro-more');
+  const annInfoBox = document.getElementById('ann-info-box');
   const annHistoryList = document.getElementById('ann-history-list');
 
-  document.getElementById('ann-version').textContent = ANNOUNCEMENT_VERSION;
-  document.getElementById('ann-date').textContent = ANNOUNCEMENT_DATE;
+  let announcementVersion = '';
 
-  UPDATE_HISTORY.forEach((entry, idx) => {
-    const item = document.createElement('div');
-    item.className = 'ann-history-item';
-    item.innerHTML = `
-      <div class="ann-history-title-row">
-        ${idx === 0 ? '<span class="ann-new-badge">NEW</span>' : ''}
-        <span class="ann-history-date">${entry.date}</span>
-        <span>${entry.title}</span>
-      </div>
-      <ul class="ann-history-bullets">
-        ${entry.bullets.map(b => `<li>${b}</li>`).join('')}
-      </ul>
-    `;
-    annHistoryList.appendChild(item);
-  });
+  function annHeaders() {
+    return {
+      apikey: ANNOUNCEMENT_SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${ANNOUNCEMENT_SUPABASE_ANON_KEY}`,
+    };
+  }
+
+  async function loadAnnouncement() {
+    try {
+      const [headRes, historyRes] = await Promise.all([
+        fetch(`${ANNOUNCEMENT_SUPABASE_URL}/rest/v1/site_announcement?select=version,deploy_date,intro,intro_more,service_info&id=eq.1`, { headers: annHeaders() }),
+        fetch(`${ANNOUNCEMENT_SUPABASE_URL}/rest/v1/site_announcement_history?select=id,entry_date,title,bullets&order=entry_date.desc,id.desc&limit=30`, { headers: annHeaders() }),
+      ]);
+      if (!headRes.ok || !historyRes.ok) throw new Error('공지사항을 불러오지 못했습니다');
+      const [head] = await headRes.json();
+      const history = await historyRes.json();
+      if (!head) throw new Error('공지사항이 비어 있습니다');
+
+      announcementVersion = head.version;
+      document.getElementById('ann-version').textContent = head.version;
+      document.getElementById('ann-date').textContent = head.deploy_date;
+      annIntro.textContent = head.intro || '';
+
+      if (head.intro_more) {
+        annIntroToggle.hidden = false;
+        annIntroMore.innerHTML = head.intro_more.split('\n').filter(Boolean).map(p => `<p>${p}</p>`).join('');
+      }
+      if (head.service_info) {
+        annInfoBox.hidden = false;
+        annInfoBox.innerHTML = `<strong>서비스 안내</strong> ${head.service_info}`;
+      }
+
+      annHistoryList.innerHTML = '';
+      if (!history.length) {
+        annHistoryList.innerHTML = '<div class="ann-empty">아직 등록된 업데이트 내역이 없습니다.</div>';
+      } else {
+        history.forEach((entry, idx) => {
+          const bullets = Array.isArray(entry.bullets) ? entry.bullets : [];
+          const item = document.createElement('div');
+          item.className = 'ann-history-item';
+          item.innerHTML = `
+            <div class="ann-history-title-row">
+              ${idx === 0 ? '<span class="ann-new-badge">NEW</span>' : ''}
+              <span class="ann-history-date">${entry.entry_date}</span>
+              <span>${entry.title}</span>
+            </div>
+            <ul class="ann-history-bullets">
+              ${bullets.map(b => `<li>${b}</li>`).join('')}
+            </ul>
+          `;
+          annHistoryList.appendChild(item);
+        });
+      }
+
+      if (localStorage.getItem(ANNOUNCEMENT_SEEN_KEY) !== announcementVersion) {
+        annDot.classList.add('show');
+      }
+    } catch (e) {
+      annHistoryList.innerHTML = '<div class="ann-empty">공지사항을 불러오지 못했습니다.</div>';
+    }
+  }
+  loadAnnouncement();
 
   function openAnnouncement() {
     annOverlay.classList.add('show');
-    localStorage.setItem(ANNOUNCEMENT_SEEN_KEY, ANNOUNCEMENT_VERSION);
+    if (announcementVersion) localStorage.setItem(ANNOUNCEMENT_SEEN_KEY, announcementVersion);
     annDot.classList.remove('show');
   }
   function closeAnnouncement() {
     annOverlay.classList.remove('show');
-  }
-
-  if (localStorage.getItem(ANNOUNCEMENT_SEEN_KEY) !== ANNOUNCEMENT_VERSION) {
-    annDot.classList.add('show');
   }
 
   annBtn.addEventListener('click', openAnnouncement);

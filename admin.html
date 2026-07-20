@@ -206,6 +206,7 @@
     <div class="tab-bar">
       <button type="button" class="tab-btn active" data-tab="elim">탈락자 관리</button>
       <button type="button" class="tab-btn" data-tab="auction">경매 물품 관리</button>
+      <button type="button" class="tab-btn" data-tab="announcement">공지사항 관리</button>
     </div>
 
     <div id="tab-elim" class="tab-panel">
@@ -239,6 +240,30 @@
       </div>
 
       <div id="auction-list"></div>
+    </div>
+
+    <div id="tab-announcement" class="tab-panel hidden">
+      <div class="status-banner" id="announcement-status-banner"></div>
+
+      <div class="auction-form-card">
+        <div class="card-title">공지 헤더</div>
+        <input id="ann-admin-version" type="text" placeholder="버전 (예: 1.0.0)">
+        <input id="ann-admin-date" type="text" placeholder="배포일 (예: 2026-07-20)">
+        <textarea id="ann-admin-intro" rows="3" placeholder="소개 문구"></textarea>
+        <textarea id="ann-admin-intro-more" rows="4" placeholder="사이트 소개 상세 (문단은 줄바꿈으로 구분, 비워두면 '사이트 소개 보기' 버튼이 숨겨집니다)"></textarea>
+        <textarea id="ann-admin-service-info" rows="3" placeholder="서비스 안내 문구 (비워두면 안내 박스가 숨겨집니다)"></textarea>
+        <button type="button" class="btn" id="ann-admin-save-btn">저장</button>
+      </div>
+
+      <div class="auction-form-card">
+        <div class="card-title">업데이트 내역 추가</div>
+        <input id="ann-admin-history-date" type="text" placeholder="날짜 (예: 2026-07-20)">
+        <input id="ann-admin-history-title" type="text" placeholder="제목">
+        <textarea id="ann-admin-history-bullets" rows="4" placeholder="항목을 한 줄에 하나씩 입력"></textarea>
+        <button type="button" class="btn" id="ann-admin-history-add-btn">등록</button>
+      </div>
+
+      <div id="ann-admin-history-list"></div>
     </div>
   </div>
 </div>
@@ -599,6 +624,174 @@
     });
   }
 
+  const ANNOUNCEMENT_TABLE = "site_announcement";
+  const ANNOUNCEMENT_HISTORY_TABLE = "site_announcement_history";
+  let ANNOUNCEMENT_HISTORY = [];
+  let announcementTabInitialized = false;
+
+  function showAnnouncementStatus(msg, isErr) {
+    const el = document.getElementById("announcement-status-banner");
+    el.textContent = msg;
+    el.className = "status-banner show " + (isErr ? "err" : "ok");
+  }
+
+  async function fetchAnnouncement() {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${ANNOUNCEMENT_TABLE}?select=version,deploy_date,intro,intro_more,service_info&id=eq.1`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) throw new Error("공지사항 조회 실패");
+    const [row] = await res.json();
+    return row;
+  }
+
+  async function saveAnnouncement() {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/admin_upsert_announcement`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        p_version: document.getElementById("ann-admin-version").value.trim(),
+        p_deploy_date: document.getElementById("ann-admin-date").value.trim(),
+        p_intro: document.getElementById("ann-admin-intro").value.trim(),
+        p_intro_more: document.getElementById("ann-admin-intro-more").value.trim(),
+        p_service_info: document.getElementById("ann-admin-service-info").value.trim(),
+        p_password: ADMIN_PW,
+      }),
+    });
+    if (!res.ok) throw new Error("공지사항 저장 실패");
+  }
+
+  async function fetchAnnouncementHistory() {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${ANNOUNCEMENT_HISTORY_TABLE}?select=id,entry_date,title,bullets&order=entry_date.desc,id.desc`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) throw new Error("업데이트 내역 조회 실패");
+    ANNOUNCEMENT_HISTORY = await res.json();
+  }
+
+  async function addAnnouncementHistory(entryDate, title, bullets) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/admin_add_announcement_history`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ p_entry_date: entryDate, p_title: title, p_bullets: bullets, p_password: ADMIN_PW }),
+    });
+    if (!res.ok) throw new Error("업데이트 내역 등록 실패");
+  }
+
+  async function deleteAnnouncementHistory(id) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/admin_delete_announcement_history`, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ p_id: id, p_password: ADMIN_PW }),
+    });
+    if (!res.ok) throw new Error("업데이트 내역 삭제 실패");
+  }
+
+  function renderAnnouncementHistoryList() {
+    const wrap = document.getElementById("ann-admin-history-list");
+    wrap.innerHTML = "";
+    wrap.style.display = "flex";
+    wrap.style.flexDirection = "column";
+    wrap.style.gap = "8px";
+
+    for (const entry of ANNOUNCEMENT_HISTORY) {
+      const bullets = Array.isArray(entry.bullets) ? entry.bullets : [];
+      const row = document.createElement("div");
+      row.className = "participant-row";
+      row.innerHTML = `
+        <span class="p-name">${entry.entry_date} · ${entry.title}</span>
+        <span class="p-meta">${bullets.length}개 항목</span>
+      `;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn btn-danger";
+      btn.textContent = "삭제";
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        try {
+          await deleteAnnouncementHistory(entry.id);
+          await fetchAnnouncementHistory();
+          renderAnnouncementHistoryList();
+          showAnnouncementStatus("업데이트 내역을 삭제했습니다.");
+        } catch (err) {
+          showAnnouncementStatus("삭제에 실패했습니다.", true);
+          btn.disabled = false;
+        }
+      });
+      row.appendChild(btn);
+      wrap.appendChild(row);
+    }
+  }
+
+  async function initAnnouncementTab() {
+    try {
+      const head = await fetchAnnouncement();
+      if (head) {
+        document.getElementById("ann-admin-version").value = head.version || "";
+        document.getElementById("ann-admin-date").value = head.deploy_date || "";
+        document.getElementById("ann-admin-intro").value = head.intro || "";
+        document.getElementById("ann-admin-intro-more").value = head.intro_more || "";
+        document.getElementById("ann-admin-service-info").value = head.service_info || "";
+      }
+      await fetchAnnouncementHistory();
+      renderAnnouncementHistoryList();
+    } catch (err) {
+      showAnnouncementStatus("공지사항을 불러오지 못했습니다.", true);
+    }
+
+    document.getElementById("ann-admin-save-btn").addEventListener("click", async () => {
+      const btn = document.getElementById("ann-admin-save-btn");
+      btn.disabled = true;
+      try {
+        await saveAnnouncement();
+        showAnnouncementStatus("공지 헤더를 저장했습니다.");
+      } catch (err) {
+        showAnnouncementStatus("저장에 실패했습니다.", true);
+      }
+      btn.disabled = false;
+    });
+
+    document.getElementById("ann-admin-history-add-btn").addEventListener("click", async () => {
+      const dateInput = document.getElementById("ann-admin-history-date");
+      const titleInput = document.getElementById("ann-admin-history-title");
+      const bulletsInput = document.getElementById("ann-admin-history-bullets");
+      const entryDate = dateInput.value.trim();
+      const title = titleInput.value.trim();
+      const bullets = bulletsInput.value.split("\n").map(s => s.trim()).filter(Boolean);
+      if (!entryDate || !title || !bullets.length) {
+        showAnnouncementStatus("날짜, 제목, 항목을 모두 입력해주세요.", true);
+        return;
+      }
+      const btn = document.getElementById("ann-admin-history-add-btn");
+      btn.disabled = true;
+      try {
+        await addAnnouncementHistory(entryDate, title, bullets);
+        dateInput.value = "";
+        titleInput.value = "";
+        bulletsInput.value = "";
+        await fetchAnnouncementHistory();
+        renderAnnouncementHistoryList();
+        showAnnouncementStatus("업데이트 내역을 등록했습니다.");
+      } catch (err) {
+        showAnnouncementStatus("등록에 실패했습니다.", true);
+      }
+      btn.disabled = false;
+    });
+  }
+
   document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
@@ -606,9 +799,14 @@
       const tab = btn.dataset.tab;
       document.getElementById("tab-elim").classList.toggle("hidden", tab !== "elim");
       document.getElementById("tab-auction").classList.toggle("hidden", tab !== "auction");
+      document.getElementById("tab-announcement").classList.toggle("hidden", tab !== "announcement");
       if (tab === "auction" && !auctionTabInitialized) {
         auctionTabInitialized = true;
         initAuctionTab();
+      }
+      if (tab === "announcement" && !announcementTabInitialized) {
+        announcementTabInitialized = true;
+        initAnnouncementTab();
       }
     });
   });
