@@ -99,6 +99,7 @@
   }
 
   #hint { text-align: center; font-size: 12px; color: #8992a0; }
+  #optimal-path { text-align: center; font-size: 12.5px; color: #e7ebee; min-height: 16px; word-break: break-all; }
 
   #nickname-row { display: flex; align-items: center; gap: 8px; }
   #nickname-row label { font-size: 12.5px; color: #8992a0; flex-shrink: 0; }
@@ -173,6 +174,7 @@
     <div id="market-row"></div>
     <div id="hint"></div>
     <div id="upcoming-row"></div>
+    <div id="optimal-path"></div>
 
     <div id="nickname-row">
       <label for="nickname-input">닉네임</label>
@@ -181,6 +183,7 @@
 
     <div id="action-row">
       <button class="btn btn-primary" id="register-btn" style="display:none;">점수 등록</button>
+      <button class="btn btn-ghost" id="optimal-btn" style="display:none;">옵티멀</button>
       <button class="btn btn-ghost" id="restart-btn">새 게임</button>
     </div>
   </div>
@@ -242,6 +245,9 @@
   let stage = "placement";
   let justAddedId = null;
   let modalMode = "register";
+  let animating = false;
+
+  function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
   function shuffle(arr) {
     const a = arr.slice();
@@ -321,6 +327,8 @@
     placedCount = 0;
     stage = "placement";
     justAddedId = null;
+    animating = false;
+    document.getElementById("optimal-path").textContent = "";
     document.getElementById("modal-overlay").classList.remove("show");
     render();
   }
@@ -332,10 +340,10 @@
     return (Math.abs(r - er) + Math.abs(c - ec)) === 1;
   }
 
-  function computeScore() {
+  function computeScoreForBoard(testBoard) {
     const N = BOARD_SIZE * 2;
     const grid = new Array(N * N).fill(null);
-    board.forEach((tile, ti) => {
+    testBoard.forEach((tile, ti) => {
       if (!tile) return;
       const tr = Math.floor(ti / BOARD_SIZE), tc = ti % BOARD_SIZE;
       const baseR = tr * 2, baseC = tc * 2;
@@ -366,6 +374,112 @@
     const topTwo = sorted.slice(0, 2);
     const total = topTwo.reduce((sum, c) => sum + bestByColor[c], 0);
     return { sizes: bestByColor, topTwo, total };
+  }
+
+  function computeScore() {
+    return computeScoreForBoard(board);
+  }
+
+  // 빈칸과 인접한 타일을 하나씩 슬라이드하는 실제 규칙만으로 도달 가능한 상태들을
+  // 빔 서치(beam search)로 탐색해, 점수가 가장 높은 상태와 거기까지의 이동 경로
+  // (빈칸으로 밀려 들어가는 타일의 칸 번호 목록)를 찾는다.
+  function findOptimalPath() {
+    const BEAM_WIDTH = 200;
+    const MAX_DEPTH = 80;
+    const NO_IMPROVE_LIMIT = 25;
+
+    function boardKey(b) {
+      return b.map(t => (t ? t.quads.join("") : "_")).join("|");
+    }
+
+    const startBoard = board.slice();
+    const startState = {
+      board: startBoard,
+      emptyIndex: emptyIndex,
+      path: [],
+      score: computeScoreForBoard(startBoard).total
+    };
+
+    let beam = [startState];
+    const visited = new Set([boardKey(startBoard)]);
+    let best = startState;
+    let noImproveStreak = 0;
+
+    for (let depth = 0; depth < MAX_DEPTH; depth++) {
+      const candidates = [];
+      for (const state of beam) {
+        const r = Math.floor(state.emptyIndex / BOARD_SIZE), c = state.emptyIndex % BOARD_SIZE;
+        const neighbors = [[r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]]
+          .filter(([nr, nc]) => nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE)
+          .map(([nr, nc]) => nr * BOARD_SIZE + nc);
+        for (const ni of neighbors) {
+          const nb = state.board.slice();
+          nb[state.emptyIndex] = nb[ni];
+          nb[ni] = null;
+          const key = boardKey(nb);
+          if (visited.has(key)) continue;
+          visited.add(key);
+          candidates.push({
+            board: nb,
+            emptyIndex: ni,
+            path: state.path.concat(ni),
+            score: computeScoreForBoard(nb).total
+          });
+        }
+      }
+      if (candidates.length === 0) break;
+      candidates.sort((a, b) => b.score - a.score);
+      beam = candidates.slice(0, BEAM_WIDTH);
+      if (beam[0].score > best.score) {
+        best = beam[0];
+        noImproveStreak = 0;
+      } else {
+        noImproveStreak++;
+      }
+      if (noImproveStreak >= NO_IMPROVE_LIMIT) break;
+    }
+    return best;
+  }
+
+  async function showOptimal() {
+    if (stage !== "sliding" || animating) return;
+    const registerBtn = document.getElementById("register-btn");
+    const optimalBtn = document.getElementById("optimal-btn");
+    const restartBtn = document.getElementById("restart-btn");
+    const pathEl = document.getElementById("optimal-path");
+
+    optimalBtn.disabled = true;
+    optimalBtn.textContent = "계산 중...";
+    pathEl.textContent = "";
+    await sleep(20);
+
+    const result = findOptimalPath();
+
+    if (result.path.length === 0) {
+      pathEl.textContent = "이미 이 배치가 도달 가능한 최고 점수입니다.";
+      optimalBtn.disabled = false;
+      optimalBtn.textContent = "옵티멀";
+      return;
+    }
+
+    animating = true;
+    registerBtn.disabled = true;
+    restartBtn.disabled = true;
+    optimalBtn.textContent = "이동 중...";
+    render();
+
+    for (const step of result.path) {
+      slideTile(step);
+      await sleep(350);
+    }
+
+    animating = false;
+    registerBtn.disabled = false;
+    restartBtn.disabled = false;
+    optimalBtn.disabled = false;
+    optimalBtn.textContent = "옵티멀";
+    render();
+    pathEl.textContent = "정답: " + result.path.join(" → ");
   }
 
   function placeTile(marketIdx, cellIndex) {
@@ -475,7 +589,7 @@
       cell.className = "cell";
       const tile = board[i];
       if (tile) {
-        const slidable = stage === "sliding" && isAdjacentToEmpty(i);
+        const slidable = stage === "sliding" && !animating && isAdjacentToEmpty(i);
         const quadsEl = makeQuadsEl(tile.quads, slidable ? "slidable" : "");
         if (slidable) quadsEl.addEventListener("click", () => slideTile(i));
         cell.appendChild(quadsEl);
@@ -581,6 +695,7 @@
 
   function renderActionRow() {
     document.getElementById("register-btn").style.display = stage === "sliding" ? "inline-block" : "none";
+    document.getElementById("optimal-btn").style.display = stage === "sliding" ? "inline-block" : "none";
   }
 
   function renderModal(result, leaderboard) {
@@ -659,6 +774,7 @@
   document.getElementById("register-btn").addEventListener("click", () => {
     if (stage === "sliding") registerScore();
   });
+  document.getElementById("optimal-btn").addEventListener("click", showOptimal);
   document.getElementById("restart-btn").addEventListener("click", initGame);
   document.getElementById("ranking-btn").addEventListener("click", showRanking);
   document.getElementById("modal-restart-btn").addEventListener("click", () => {
