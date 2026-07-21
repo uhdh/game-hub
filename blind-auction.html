@@ -52,6 +52,8 @@
   .btn-secondary:disabled { opacity: .4; cursor: not-allowed; }
   .action-row { display: flex; gap: 10px; }
   .action-row > * { flex: 1; }
+  .category-actions { flex-wrap: wrap; }
+  .category-actions > * { flex: 1 1 calc(50% - 5px); }
 
   .reveal-card { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 28px; text-align: center; display: flex; flex-direction: column; gap: 6px; }
   .reveal-label { font-size: 12.5px; color: var(--text-dim); }
@@ -201,10 +203,11 @@
 <div id="modal-category" class="modal">
   <div class="modal-box">
     <div class="modal-item-name">카테고리를 골라주세요</div>
-    <div class="action-row">
+    <div class="action-row category-actions">
       <button type="button" class="btn-primary category-choice-btn" data-category="art">미술품</button>
       <button type="button" class="btn-primary category-choice-btn" data-category="collectible">소장품</button>
       <button type="button" class="btn-primary category-choice-btn" data-category="coupang">쿠팡 인기상품</button>
+      <button type="button" class="btn-primary category-choice-btn" data-category="youtube">유튜브 조회수</button>
     </div>
     <div id="category-status" class="status-banner"></div>
   </div>
@@ -294,7 +297,13 @@
     };
   }
 
-  const CATEGORY_UNIT = { art: "억원", collectible: "억원", coupang: "만원" };
+  const CATEGORY_UNIT = { art: "억원", collectible: "억원", coupang: "만원", youtube: "억회" };
+  const META_LABELS = {
+    art: { artist: "작가", created_year: "제작년도" },
+    collectible: { artist: "작가", created_year: "제작년도" },
+    coupang: { artist: "브랜드", created_year: "제작년도" },
+    youtube: { artist: "채널", created_year: "업로드" },
+  };
 
   async function fetchAllItems(category) {
     const res = await fetch(
@@ -326,10 +335,10 @@
   }
 
   function renderArtworkMeta(item) {
-    const artistLabel = state.category === "coupang" ? "브랜드" : "작가";
+    const labels = META_LABELS[state.category] || META_LABELS.art;
     const parts = [];
-    if (item.artist) parts.push(`<b>${artistLabel}</b> ${item.artist}`);
-    if (item.created_year) parts.push(`<b>제작년도</b> ${item.created_year}년`);
+    if (item.artist) parts.push(`<b>${labels.artist}</b> ${item.artist}`);
+    if (item.created_year) parts.push(`<b>${labels.created_year}</b> ${item.created_year}년`);
     if (item.auction_year) parts.push(`<b>경매년도</b> ${item.auction_year}년`);
     if (item.auction_house) parts.push(`<b>경매장</b> ${item.auction_house}`);
     return parts.map((p) => `<span>${p}</span>`).join("");
