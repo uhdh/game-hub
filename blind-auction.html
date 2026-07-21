@@ -307,6 +307,7 @@
 
   function buildImageSrc(filename) {
     if (!filename) return null;
+    if (/^https?:\/\//i.test(filename)) return filename;
     return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}`;
   }
 
@@ -325,8 +326,9 @@
   }
 
   function renderArtworkMeta(item) {
+    const artistLabel = state.category === "coupang" ? "브랜드" : "작가";
     const parts = [];
-    if (item.artist) parts.push(`<b>작가</b> ${item.artist}`);
+    if (item.artist) parts.push(`<b>${artistLabel}</b> ${item.artist}`);
     if (item.created_year) parts.push(`<b>제작년도</b> ${item.created_year}년`);
     if (item.auction_year) parts.push(`<b>경매년도</b> ${item.auction_year}년`);
     if (item.auction_house) parts.push(`<b>경매장</b> ${item.auction_house}`);
