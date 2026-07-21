@@ -110,16 +110,13 @@
   .modal-winner { font-size: 13.5px; font-weight: 700; color: var(--accent); }
 
   .results-title { font-size: 19px; font-weight: 800; text-align: center; }
+  .results-pct { font-size: 14px; font-weight: 700; color: var(--accent-hover); text-align: center; }
   .ranking-row { display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; font-size: 12.5px; }
   .ranking-row.winner { border-color: var(--gold); background: rgba(255,209,102,.08); }
   .rank-no { width: 18px; font-weight: 800; color: var(--text-dim); }
   .rank-name { width: 44px; font-weight: 700; }
   .rank-total { width: 50px; font-weight: 800; color: var(--accent-hover); }
   .rank-items { flex: 1; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-  .nickname-row { display: flex; gap: 8px; align-items: center; }
-  .nickname-row label { font-size: 12.5px; color: var(--text-dim); flex-shrink: 0; }
-  #nickname-input { flex: 1; background: var(--panel-light); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 9px 10px; font-size: 13.5px; }
 
   #leaderboard-section { display: flex; flex-direction: column; gap: 8px; }
   .leaderboard-title { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .06em; text-align: center; }
@@ -180,12 +177,8 @@
 
     <div id="screen-results" class="screen hidden">
       <div class="results-title">최종 결과</div>
+      <div class="results-pct" id="results-pct"></div>
       <div id="ranking-list"></div>
-      <div class="nickname-row">
-        <label for="nickname-input">닉네임</label>
-        <input id="nickname-input" type="text" maxlength="12" placeholder="리더보드에 표시할 이름">
-        <button type="button" class="btn-primary" id="submit-score-btn">등록</button>
-      </div>
       <div id="rank-register-status" class="reveal-hint" style="text-align:center"></div>
       <div id="leaderboard-section">
         <div class="leaderboard-title">리더보드</div>
@@ -266,7 +259,10 @@
   const ITEMS_TABLE = "auction_items";
 
   const L = window.BlindAuctionLogic;
-  const PLAYER_LABELS = { user: "나", ai1: "AI 1", ai2: "AI 2", ai3: "AI 3", ai4: "AI 4" };
+
+  function playerLabel(id) {
+    return id === "user" ? "나" : state.aiProfiles[id].archetype;
+  }
 
   function showScreen(id) {
     document.querySelectorAll(".screen").forEach((el) => el.classList.add("hidden"));
@@ -427,9 +423,9 @@
       const tilesHtml = submitted.map((v) => `<span class="submitted-cube-tile">${v}</span>`).join("");
       const archetype = id !== "user" ? state.aiProfiles[id].archetype : null;
       const badgeHtml = archetype
-        ? `<span class="player-archetype" title="${L.ARCHETYPE_DESCRIPTIONS[archetype]}">${archetype}</span>`
+        ? `<span class="player-archetype" title="${L.ARCHETYPE_DESCRIPTIONS[archetype]}">ℹ</span>`
         : "";
-      div.innerHTML = `<span class="player-name">${PLAYER_LABELS[id]}</span>${badgeHtml}<span class="player-status">${active ? (isLeader ? "최고가" : "대기") : "포기"}</span><span class="player-cubes">${cubesLabel}</span><div class="submitted-cubes">${tilesHtml}</div>`;
+      div.innerHTML = `<span class="player-name">${playerLabel(id)}</span>${badgeHtml}<span class="player-status">${active ? (isLeader ? "최고가" : "대기") : "포기"}</span><span class="player-cubes">${cubesLabel}</span><div class="submitted-cubes">${tilesHtml}</div>`;
       wrap.appendChild(div);
     });
   }
@@ -469,8 +465,8 @@
       const line = document.createElement("div");
       line.className = "log-line";
       line.textContent = entry.type === "bid"
-        ? `${PLAYER_LABELS[entry.playerId]} → ${entry.total} (+${entry.cubes.join(",")})`
-        : `${PLAYER_LABELS[entry.playerId]} 포기`;
+        ? `${playerLabel(entry.playerId)} → ${entry.total} (+${entry.cubes.join(",")})`
+        : `${playerLabel(entry.playerId)} 포기`;
       wrap.appendChild(line);
     });
   }
@@ -480,7 +476,7 @@
     document.getElementById("item-name-label").textContent = state.currentItem.item_name;
     document.getElementById("highest-value").textContent = `${state.round.highestTotal}큐브`;
     document.getElementById("highest-bidder").textContent =
-      state.round.highestPlayerId ? PLAYER_LABELS[state.round.highestPlayerId] : "-";
+      state.round.highestPlayerId ? playerLabel(state.round.highestPlayerId) : "-";
 
     renderArtworkVisual(state.currentItem, document.getElementById("artwork-image"), document.getElementById("artwork-placeholder"));
     document.getElementById("artwork-meta").innerHTML = renderArtworkMeta(state.currentItem);
@@ -498,7 +494,7 @@
       selectedSum > 0 ? `선택한 큐브 합계: ${selectedSum} (누적 ${prospective})` : "큐브를 선택해 입찰액을 만드세요";
 
     const turnBanner = document.getElementById("turn-banner");
-    turnBanner.textContent = isUserTurn ? "당신의 차례입니다" : (actor ? `${PLAYER_LABELS[actor]} 진행 중...` : "");
+    turnBanner.textContent = isUserTurn ? "당신의 차례입니다" : (actor ? `${playerLabel(actor)} 진행 중...` : "");
 
     document.getElementById("bid-btn").disabled = !isUserTurn || selectedSum === 0 || prospective <= state.round.highestTotal;
     document.getElementById("pass-btn").disabled = !isUserTurn;
@@ -561,7 +557,7 @@
     document.getElementById("resolve-memo").textContent = state.currentItem.memo || "";
     document.getElementById("resolve-winner").textContent =
       result.type === "won"
-        ? `${PLAYER_LABELS[result.winnerId]}님이 큐브 ${result.amount}로 낙찰받았습니다.`
+        ? `${playerLabel(result.winnerId)}님이 큐브 ${result.amount}로 낙찰받았습니다.`
         : "유찰 — 아무도 낙찰받지 못했습니다.";
     modal.classList.remove("hidden");
 
@@ -661,24 +657,17 @@
       const row = document.createElement("div");
       row.className = "ranking-row" + (i === 0 ? " winner" : "");
       const items = entry.wonItems.map((it) => it.itemName).join(", ") || "낙찰 없음";
-      row.innerHTML = `<span class="rank-no">${i + 1}</span><span class="rank-name">${PLAYER_LABELS[entry.id]}</span><span class="rank-total">${entry.total}억</span><span class="rank-items">${items}</span>`;
+      row.innerHTML = `<span class="rank-no">${i + 1}</span><span class="rank-name">${playerLabel(entry.id)}</span><span class="rank-total">${entry.total}억</span><span class="rank-items">${items}</span>`;
       wrap.appendChild(row);
     });
 
     const userEntry = ranking.find((r) => r.id === "user");
     const pct = winPercent(userEntry.total, state.poolTotal);
-    const nicknameInput = document.getElementById("nickname-input");
+    document.getElementById("results-pct").textContent = `획득 가치 비율 ${pct}% (${userEntry.total}억 / ${state.poolTotal}억)`;
     const storedNickname = getOrCreateStoredNickname(NICKNAME_KEY);
-    nicknameInput.value = storedNickname;
 
-    document.getElementById("submit-score-btn").onclick = async () => {
-      const nickname = nicknameInput.value.trim() || getOrCreateStoredNickname(NICKNAME_KEY);
-      localStorage.setItem(NICKNAME_KEY, nickname);
-      await registerScore(nickname, pct);
-    };
-
-    // 게임이 끝나면 별도 버튼 클릭 없이 바로 리더보드에 등록한다. 닉네임을 바꿔서
-    // 다시 등록하고 싶으면 입력값을 고친 뒤 "등록" 버튼으로 재등록할 수 있다.
+    // 게임이 끝나면 자동으로 한 번만 리더보드에 등록한다. 재등록 버튼은 중복 등록을
+    // 유발해 제거했다.
     await registerScore(storedNickname, pct);
   }
 

@@ -281,6 +281,9 @@
   </div>
 </div>
 
+<script src="./gomoku-board.js"></script>
+<script src="./gomoku-ai.js"></script>
+<script src="./gomoku-rating.js"></script>
 <script>
 (function () {
   "use strict";
@@ -289,26 +292,19 @@
   const PAD = 44;
   const HIT = 84;
 
-  const NEIGHBOR_DIRS = [
-    { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
-    { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 },
-  ];
-  const LINE_DIRS = [{ q: 1, r: 0 }, { q: 0, r: 1 }, { q: 1, r: -1 }];
+  // 보드 좌표계·순수 규칙 함수는 gomoku-board.js로 옮겨서 AI 웹 워커와
+  // 공유한다(전에는 이 내용 전체가 워커 문자열 안에 따로 복사돼 있었다).
+  const { NEIGHBOR_DIRS, LINE_DIRS, RAW_BOARD, BOARD_MAP, otherPlayer, neighbors,
+    topColorOf, isValidInitialPlacementOf, isValidMoveTargetOf, checkWinOf,
+    placeStoneOf, moveStoneOf, applyMoveToStacks, getAllLegalMainMoves,
+    isNearAnyStone, getSearchMoves, applyMoveWithSupply, moveIdKey } = window.GomokuBoard;
+  const { setPlayers: setAIPlayers, evaluatePosition, contestedSquareBonus,
+    orderedCandidates, minimax, findOpenThreeBlockCells, pickBestBlock } = window.GomokuAI;
 
   function toPixel(q, r) {
     return { x: SIZE * 1.5 * q, y: SIZE * Math.sqrt(3) * (r + q / 2) };
   }
 
-  const RAW_BOARD = [];
-  for (let q = -5; q <= 5; q++) {
-    for (let r = -5; r <= 5; r++) {
-      const s = -q - r;
-      if (Math.abs(s) > 5) continue;
-      const isCorner = [Math.abs(q), Math.abs(r), Math.abs(s)].filter(v => v === 5).length >= 2;
-      if (isCorner) continue;
-      RAW_BOARD.push({ q, r, s });
-    }
-  }
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   RAW_BOARD.forEach(c => {
     const p = toPixel(c.q, c.r);
@@ -319,10 +315,7 @@
   const OFFX = PAD - minX, OFFY = PAD - minY;
   const BOARD_W = maxX - minX + PAD * 2;
   const BOARD_H = maxY - minY + PAD * 2;
-  RAW_BOARD.forEach(c => { c.left = c.px + OFFX; c.top = c.py + OFFY; c.key = c.q + "_" + c.r; });
-
-  const BOARD_MAP = {};
-  RAW_BOARD.forEach(c => { BOARD_MAP[c.key] = c; });
+  RAW_BOARD.forEach(c => { c.left = c.px + OFFX; c.top = c.py + OFFY; });
 
   const GRID_LINES = [];
   RAW_BOARD.forEach(c => {
@@ -341,283 +334,13 @@
   let HUMAN_PLAYER = 1;
   let AI_PLAYER = 2;
 
-  function otherPlayer(p) { return p === 1 ? 2 : 1; }
   function colorName(p) { return p === 1 ? "흑돌" : "백돌"; }
   function stoneColor(p) { return p === 1 ? "#000000" : "#ffffff"; }
   function stoneBorder(p) { return p === 1 ? "2px solid #f0ece2" : "2px solid #1c1c1c"; }
   function randomInt(n) { return Math.floor(Math.random() * n); }
 
-  // ---- 순수 로직 (임의의 stacks 스냅샷에 대해 동작 — AI 시뮬레이션에도 재사용) ----
-
-  function neighbors(key) {
-    const c = BOARD_MAP[key];
-    return NEIGHBOR_DIRS.map(d => BOARD_MAP[(c.q + d.q) + "_" + (c.r + d.r)]).filter(Boolean);
-  }
-
-  function topColorOf(stacks, key) {
-    const st = stacks[key];
-    return st && st.length ? st[st.length - 1] : null;
-  }
-
-  function isValidInitialPlacementOf(stacks, key, player) {
-    if (key === "0_0") return false;
-    const st = stacks[key];
-    if (st && st.length) return false;
-    return !neighbors(key).some(n => topColorOf(stacks, n.key) === player);
-  }
-
-  function isValidMoveTargetOf(stacks, originKey, destKey, player) {
-    if (originKey === destKey) return false;
-    const origin = BOARD_MAP[originKey];
-    const dest = BOARD_MAP[destKey];
-    const isAdj = NEIGHBOR_DIRS.some(d => (origin.q + d.q) === dest.q && (origin.r + d.r) === dest.r);
-    if (!isAdj) return false;
-    const originH = (stacks[originKey] || []).length;
-    const destH = (stacks[destKey] || []).length;
-    return destH <= originH && destH + 1 <= 3;
-  }
-
-  function checkFiveInRowOf(stacks, color) {
-    for (const key in BOARD_MAP) {
-      if (topColorOf(stacks, key) !== color) continue;
-      const c = BOARD_MAP[key];
-      for (const dir of LINE_DIRS) {
-        const prevKey = (c.q - dir.q) + "_" + (c.r - dir.r);
-        if (topColorOf(stacks, prevKey) === color) continue;
-        const run = [key];
-        let cq = c.q + dir.q, cr = c.r + dir.r;
-        while (topColorOf(stacks, cq + "_" + cr) === color) { run.push(cq + "_" + cr); cq += dir.q; cr += dir.r; }
-        if (run.length === 5) return run;
-      }
-    }
-    return null;
-  }
-
-  function checkFiveAtTop3Of(stacks, color) {
-    const found = [];
-    for (const key in BOARD_MAP) {
-      const st = stacks[key];
-      if (st && st.length === 3 && st[2] === color) found.push(key);
-    }
-    return found.length >= 5 ? found.slice(0, 5) : null;
-  }
-
-  function checkTriangleTop3Of(stacks, color) {
-    const isTop3 = k => { const st = stacks[k]; return st && st.length === 3 && st[2] === color; };
-    for (const key in BOARD_MAP) {
-      if (!isTop3(key)) continue;
-      const c = BOARD_MAP[key];
-      for (let i = 0; i < 6; i++) {
-        const d1 = NEIGHBOR_DIRS[i];
-        const n1Key = (c.q + d1.q) + "_" + (c.r + d1.r);
-        if (!isTop3(n1Key)) continue;
-        const n1 = BOARD_MAP[n1Key];
-        for (let j = 0; j < 6; j++) {
-          const d2 = NEIGHBOR_DIRS[j];
-          const n2Key = (n1.q + d2.q) + "_" + (n1.r + d2.r);
-          if (n2Key === key) continue;
-          if (isTop3(n2Key)) return [key, n1Key, n2Key];
-        }
-      }
-    }
-    return null;
-  }
-
-  function checkWinOf(stacks, player) {
-    const row = checkFiveInRowOf(stacks, player);
-    if (row) return { cells: row, reason: "오목 완성 (5개 일직선 연결)" };
-    const top5 = checkFiveAtTop3Of(stacks, player);
-    if (top5) return { cells: top5, reason: "돌 5개 3층 쌓기 완성" };
-    const tri = checkTriangleTop3Of(stacks, player);
-    if (tri) return { cells: tri, reason: "인접한 돌 3개 3층 쌓기 완성" };
-    return null;
-  }
-
-  function placeStoneOf(stacks, key, player) {
-    const next = Object.assign({}, stacks);
-    next[key] = (next[key] || []).concat([player]);
-    return next;
-  }
-
-  function moveStoneOf(stacks, originKey, destKey, player) {
-    const next = Object.assign({}, stacks);
-    const originStack = next[originKey].slice();
-    originStack.pop();
-    next[originKey] = originStack;
-    next[destKey] = (next[destKey] || []).concat([player]);
-    return next;
-  }
-
-  function applyMoveToStacks(stacks, move, player) {
-    return move.type === "place" ? placeStoneOf(stacks, move.key, player) : moveStoneOf(stacks, move.origin, move.dest, player);
-  }
-
-  function getAllLegalMainMoves(stacks, player, supply) {
-    const moves = [];
-    if (supply > 0) {
-      RAW_BOARD.forEach(c => {
-        const st = stacks[c.key];
-        if (!st || !st.length) moves.push({ type: "place", key: c.key });
-      });
-    }
-    RAW_BOARD.forEach(c => {
-      if (topColorOf(stacks, c.key) !== player) return;
-      neighbors(c.key).forEach(n => {
-        if (isValidMoveTargetOf(stacks, c.key, n.key, player)) moves.push({ type: "move", origin: c.key, dest: n.key });
-      });
-    });
-    return moves;
-  }
-
-  // ---- AI 평가 함수 ----
-
-  // 상대 돌이 칸을 막고 있어도, 그 돌이 높이 1~2층이고 옆(인접)에 내 돌이
-  // 있어서 "쌓기 이동"으로 그 위에 올라타 색을 뒤집을 수 있다면 진짜 차단이
-  // 아니다. 실전에서 이 "무른 차단"을 방치했다가 상대가 되찾아 오목을
-  // 완성한 사고가 있었음(2026-07-19, 테스트유저 기보) — 평가 함수가 이런
-  // 자리를 계속 "안전"으로 오판하지 않도록 확인한다.
-  function isRestackableBlock(stacks, key, byColor) {
-    const st = stacks[key];
-    if (!st || !st.length) return false;
-    const h = st.length;
-    if (h + 1 > 3) return false;
-    return neighbors(key).some(n => {
-      const os = stacks[n.key];
-      return !!os && os.length > 0 && os[os.length - 1] === byColor && os.length >= h;
-    });
-  }
-
-  function lineThreatScore(stacks, color) {
-    let score = 0;
-    for (const key in BOARD_MAP) {
-      if (topColorOf(stacks, key) !== color) continue;
-      const c = BOARD_MAP[key];
-      for (const dir of LINE_DIRS) {
-        const prevKey = (c.q - dir.q) + "_" + (c.r - dir.r);
-        if (topColorOf(stacks, prevKey) === color) continue;
-        let length = 1;
-        let cq = c.q + dir.q, cr = c.r + dir.r;
-        while (topColorOf(stacks, cq + "_" + cr) === color) { length++; cq += dir.q; cr += dir.r; }
-        if (length >= 5) continue;
-        const afterKey = cq + "_" + cr;
-        const beforeOpen = !!BOARD_MAP[prevKey] && (!topColorOf(stacks, prevKey) || isRestackableBlock(stacks, prevKey, color));
-        const afterOpen = !!BOARD_MAP[afterKey] && (!topColorOf(stacks, afterKey) || isRestackableBlock(stacks, afterKey, color));
-        const openEnds = (beforeOpen ? 1 : 0) + (afterOpen ? 1 : 0);
-        const base = [0, 2, 14, 90, 550][length] || 0;
-        score += base * (1 + openEnds);
-      }
-    }
-    return score;
-  }
-
-  function stackThreatScore(stacks, color) {
-    let score = 0;
-    const top3Cells = [];
-    for (const key in BOARD_MAP) {
-      const st = stacks[key];
-      if (!st || !st.length) continue;
-      const h = st.length;
-      if (st[h - 1] !== color) continue;
-      if (h === 3) { top3Cells.push(key); score += 30; }
-      else if (h === 2) score += 9;
-      else score += 1;
-    }
-    const top3Set = new Set(top3Cells);
-    let adjPairs = 0;
-    top3Cells.forEach(k => {
-      const c = BOARD_MAP[k];
-      NEIGHBOR_DIRS.forEach(d => {
-        if (top3Set.has((c.q + d.q) + "_" + (c.r + d.r))) adjPairs++;
-      });
-    });
-    score += adjPairs * 25;
-    return score;
-  }
-
-  // lineThreatScore는 "끊기지 않은" 연속 구간만 스캔하므로, 예를 들어 X_XXX처럼
-  // 한 칸이 빈 채로 끊긴 패턴은 고립된 돌 여러 개로만 보여 위험도가 거의 0으로
-  // 평가된다. 실제로는 그 빈 칸 하나만 채우면(또는 인접 칸에서 그 위로 쌓으면)
-  // 바로 5개가 완성되는 매우 위험한 모양이다. 상대 돌이 하나도 섞이지 않은
-  // 5칸 구간마다 자기 돌 개수로 점수를 매겨, 끊긴 패턴도 이어진 패턴과 동등하게
-  // "완성까지 몇 칸 남았는지" 기준으로 평가되게 한다.
-  function windowThreatScore(stacks, color) {
-    let score = 0;
-    const WEIGHTS = [0, 0, 10, 70, 450, 3000];
-    for (const key in BOARD_MAP) {
-      const c = BOARD_MAP[key];
-      for (const dir of LINE_DIRS) {
-        const cells = [];
-        let offBoard = false;
-        for (let i = 0; i < 5; i++) {
-          const k = (c.q + dir.q * i) + "_" + (c.r + dir.r * i);
-          if (!BOARD_MAP[k]) { offBoard = true; break; }
-          cells.push(k);
-        }
-        if (offBoard) continue;
-        let mine = 0, blocked = false;
-        for (const k of cells) {
-          const top = topColorOf(stacks, k);
-          if (top === color) mine++;
-          // 상대 돌이 있어도 "무른 차단"(쌓기로 되찾을 수 있음)이면 실제로는
-          // 막힌 게 아니다 — 그렇다고 이미 내 돌이 있는 것처럼 mine을 올리면
-          // 안 된다(빈 칸보다 더 유리하게 취급하는 오류였음: 상대 관점에서
-          // 빈 칸=아직 안 셈, 무른 차단=이미 다 채운 것처럼 셈 → 오히려
-          // 그 자리를 직접 막는 게 손해로 평가되는 역효과가 있었다). 빈 칸과
-          // 완전히 동일하게 "세지도 막지도 않음"으로 처리한다.
-          else if (top && !isRestackableBlock(stacks, k, color)) {
-            blocked = true; break;
-          }
-        }
-        if (blocked) continue;
-        score += WEIGHTS[mine];
-      }
-    }
-    return score;
-  }
-
-  function evaluatePosition(stacks, forPlayer) {
-    const opp = otherPlayer(forPlayer);
-    if (checkWinOf(stacks, forPlayer)) return 1e7;
-    if (checkWinOf(stacks, opp)) return -1e7;
-    const mine = lineThreatScore(stacks, forPlayer) + stackThreatScore(stacks, forPlayer) + windowThreatScore(stacks, forPlayer);
-    const theirs = lineThreatScore(stacks, opp) + stackThreatScore(stacks, opp) + windowThreatScore(stacks, opp);
-    return mine - theirs * 1.15;
-  }
-
-  // 초기 배치는 딱 한 수만 보고 평가하는 얕은 판단이라, 상대가 이미 위험한
-  // 5칸 구간(같은 색 3개 이상, 하드 블록 없음)을 만들어 놓았을 때 그 구간 안의
-  // 칸을 선점하는 가치를 windowThreatScore만으로는 못 알아본다. 실전에서
-  // 이 때문에 AI가 명백히 위험한 자리를 놔두고 다른 데를 두는 사고가 실제로
-  // 있었다(2026-07-19, 테스트유저 기보 — 그 자리를 두는 게 오히려 손해로
-  // 잘못 평가되기까지 했음). 그 칸이 상대의 위험한 구간 안에 있으면 선점
-  // 가산점을 직접 준다.
-  function contestedSquareBonus(stacks, key, defender) {
-    const opp = otherPlayer(defender);
-    const c = BOARD_MAP[key];
-    let bonus = 0;
-    LINE_DIRS.forEach(dir => {
-      for (let start = -4; start <= 0; start++) {
-        const cells = [];
-        let onBoard = true;
-        for (let i = 0; i < 5; i++) {
-          const cq = c.q + dir.q * (start + i), cr = c.r + dir.r * (start + i);
-          const k2 = cq + "_" + cr;
-          if (!BOARD_MAP[k2]) { onBoard = false; break; }
-          cells.push(k2);
-        }
-        if (!onBoard || !cells.includes(key)) continue;
-        let oppCount = 0, hasDefenderStone = false;
-        cells.forEach(k2 => {
-          if (k2 === key) return;
-          const top = topColorOf(stacks, k2);
-          if (top === opp) oppCount++;
-          else if (top === defender) hasDefenderStone = true;
-        });
-        if (!hasDefenderStone && oppCount >= 3) bonus += oppCount * 40;
-      }
-    });
-    return bonus;
-  }
+  // 보드 규칙(checkWinOf 등)과 AI 평가 함수(evaluatePosition 등)는
+  // gomoku-board.js / gomoku-ai.js에서 가져와 쓴다(상단 destructuring 참고).
 
   function computeAIInitialMove() {
     const candidates = RAW_BOARD.filter(c => isValidInitialPlacementOf(state.stacks, c.key, AI_PLAYER));
@@ -649,148 +372,12 @@
   }
 
   // ---- 상 난이도: 알파-베타 미니맥스 탐색 ----
+  // isNearAnyStone/getSearchMoves/applyMoveWithSupply/orderedCandidates/minimax/
+  // moveIdKey/findOpenThreeBlockCells/pickBestBlock은 모두 gomoku-board.js /
+  // gomoku-ai.js에서 가져와 쓴다(상단 destructuring 참고).
 
   const HARD_ROOT_BEAM = 16;   // 루트에서 검토하는 후보 수 (전체 합법수 기준 1수 평가로 추림)
-  const HARD_INNER_BEAM = 8;   // 탐색 도중 각 노드에서 검토하는 후보 수
   const HARD_SEARCH_PLIES = 3; // 루트 수 이후 추가로 내다보는 수 (상대→나→상대)
-  const HARD_NEAR_RADIUS = 2;  // 탐색용 후보 수를 기존 돌 주변으로 제한하는 반경
-
-  function isNearAnyStone(stacks, key, radius) {
-    const c = BOARD_MAP[key];
-    for (const k in stacks) {
-      if (!stacks[k] || !stacks[k].length) continue;
-      const c2 = BOARD_MAP[k];
-      if (Math.max(Math.abs(c.q - c2.q), Math.abs(c.r - c2.r), Math.abs(c.s - c2.s)) <= radius) return true;
-    }
-    return false;
-  }
-
-  // 탐색 내부용: 관련 없는(기존 돌과 멀리 떨어진) 배치 후보는 제외해 비용을 줄인다
-  function getSearchMoves(stacks, player, supply) {
-    const moves = [];
-    if (supply > 0) {
-      RAW_BOARD.forEach(c => {
-        const st = stacks[c.key];
-        if (st && st.length) return;
-        if (isNearAnyStone(stacks, c.key, HARD_NEAR_RADIUS)) moves.push({ type: "place", key: c.key });
-      });
-    }
-    RAW_BOARD.forEach(c => {
-      if (topColorOf(stacks, c.key) !== player) return;
-      neighbors(c.key).forEach(n => {
-        if (isValidMoveTargetOf(stacks, c.key, n.key, player)) moves.push({ type: "move", origin: c.key, dest: n.key });
-      });
-    });
-    return moves;
-  }
-
-  function applyMoveWithSupply(stacks, supply, move, player) {
-    const nextStacks = applyMoveToStacks(stacks, move, player);
-    const nextSupply = move.type === "place" ? Object.assign({}, supply, { [player]: supply[player] - 1 }) : supply;
-    return { stacks: nextStacks, supply: nextSupply };
-  }
-
-  function orderedCandidates(stacks, player, supply, moves, isMaximizing, limit) {
-    const scored = moves.map(m => ({ m, s: evaluatePosition(applyMoveToStacks(stacks, m, player), AI_PLAYER) }));
-    scored.sort((a, b) => (isMaximizing ? b.s - a.s : a.s - b.s));
-    return scored.slice(0, limit).map(o => o.m);
-  }
-
-  function minimax(stacks, supply, ply, isMaximizing, alpha, beta) {
-    if (checkWinOf(stacks, AI_PLAYER)) return 1e7 + ply;
-    if (checkWinOf(stacks, HUMAN_PLAYER)) return -1e7 - ply;
-    if (ply === 0) return evaluatePosition(stacks, AI_PLAYER);
-
-    const player = isMaximizing ? AI_PLAYER : HUMAN_PLAYER;
-    const rawMoves = getSearchMoves(stacks, player, supply[player]);
-    if (!rawMoves.length) return evaluatePosition(stacks, AI_PLAYER);
-    const moves = orderedCandidates(stacks, player, supply, rawMoves, isMaximizing, HARD_INNER_BEAM);
-
-    if (isMaximizing) {
-      let best = -Infinity;
-      for (const m of moves) {
-        const { stacks: ns, supply: nsup } = applyMoveWithSupply(stacks, supply, m, player);
-        const val = minimax(ns, nsup, ply - 1, false, alpha, beta);
-        if (val > best) best = val;
-        if (best > alpha) alpha = best;
-        if (alpha >= beta) break;
-      }
-      return best;
-    }
-    let best = Infinity;
-    for (const m of moves) {
-      const { stacks: ns, supply: nsup } = applyMoveWithSupply(stacks, supply, m, player);
-      const val = minimax(ns, nsup, ply - 1, true, alpha, beta);
-      if (val < best) best = val;
-      if (best < beta) beta = best;
-      if (alpha >= beta) break;
-    }
-    return best;
-  }
-
-  function moveIdKey(m) {
-    return m.type === "place" ? "p:" + m.key : "m:" + m.origin + ">" + m.dest;
-  }
-
-  // 상대가 이미 "열린 3"(양 끝이 모두 빈 연속 3개)을 갖고 있으면, 막지 않을 경우
-  // 다음 턴에 열린 4(양끝이 다 뚫린 더블 스레트)가 되어 무조건 진다. 이 두 칸 중
-  // 하나를 반환한다(둘 다 막아야 하는 칸 후보).
-  function findOpenThreeBlockCells(stacks, color) {
-    const cells = new Set();
-    for (const key in BOARD_MAP) {
-      if (topColorOf(stacks, key) !== color) continue;
-      const c = BOARD_MAP[key];
-      for (const dir of LINE_DIRS) {
-        const prevKey = (c.q - dir.q) + "_" + (c.r - dir.r);
-        if (topColorOf(stacks, prevKey) === color) continue;
-        let length = 1;
-        let cq = c.q + dir.q, cr = c.r + dir.r;
-        while (topColorOf(stacks, cq + "_" + cr) === color) { length++; cq += dir.q; cr += dir.r; }
-        if (length !== 3) continue;
-        const afterKey = cq + "_" + cr;
-        const beforeOpen = !!BOARD_MAP[prevKey] && !topColorOf(stacks, prevKey);
-        const afterOpen = !!BOARD_MAP[afterKey] && !topColorOf(stacks, afterKey);
-        if (beforeOpen && afterOpen) {
-          cells.add(prevKey);
-          cells.add(afterKey);
-        }
-      }
-    }
-    return cells;
-  }
-
-  // targetCells(반드시 막아야 하는 칸들) 중 하나를 두는 수만 추려서, 그 안에서
-  // 1수 평가로 가장 나은 것을 고른다. 시간 예산에 따라 결과가 흔들리는 탐색에
-  // 맡기지 않고 결정적으로(항상 같은 국면이면 같은 수) 고르기 위한 함수.
-  //
-  // 위협 칸이 여러 개(예: "그냥 이어붙이면 이김" 칸과 "무른 차단을 쌓기로
-  // 되찾으면 이김" 칸이 동시에 존재하는 겹사 형태)일 때, 예전에는 targetCells
-  // 중 아무 하나만 막는 수를 점수 위주로 골라서 — 정작 그 수가 다른 위협은
-  // 하나도 막지 못하는데도 "막았다"고 착각하고 반환하는 사고가 있었다(2026-07-19,
-  // 덕후#912 기보 — 이어붙이는 칸과 무른 차단 되찾기 칸이 동시에 위협이었는데
-  // 무른 차단 보강만 하고 이어붙이는 칸은 그대로 열어둬서 다음 수에 그대로 짐).
-  // 그래서 후보들 중 "두고 나면 상대에게 즉시 이기는 수가 하나도 안 남는" 것을
-  // 먼저 걸러 그 안에서 고르고, 그런 후보가 하나도 없을 때만(진짜 못 막는 겹사)
-  // 기존처럼 점수 위주로 고른다.
-  function pickBestBlock(stacks, supply, allMoves, targetCells, opponent) {
-    const blockMoves = allMoves.filter(m => targetCells.has(m.type === "place" ? m.key : m.dest));
-    // 상대의 위협 칸이라도 내가 실제로 둘 수 있는 수(놓기/쌓기)가 하나도 없으면
-    // (서플라이가 바닥났거나 인접 칸이 없는 등) 막을 방법 자체가 없는 것이므로
-    // null을 반환해 호출부가 일반 탐색으로 넘어가게 한다.
-    if (!blockMoves.length) return null;
-    const fullyBlocking = blockMoves.filter(m => {
-      const { stacks: ns, supply: nsup } = applyMoveWithSupply(stacks, supply, m, AI_PLAYER);
-      const oppNextMoves = getAllLegalMainMoves(ns, opponent, nsup[opponent]);
-      return !oppNextMoves.some(om => checkWinOf(applyMoveToStacks(ns, om, opponent), opponent));
-    });
-    const pool = fullyBlocking.length ? fullyBlocking : blockMoves;
-    let best = pool[0], bestScore = -Infinity;
-    pool.forEach(m => {
-      const score = evaluatePosition(applyMoveToStacks(stacks, m, AI_PLAYER), AI_PLAYER) + (Math.random() - 0.5) * 6;
-      if (score > bestScore) { bestScore = score; best = m; }
-    });
-    return best;
-  }
 
   function computeAIMainMoveHard() {
     const stacks = state.stacks;
@@ -834,7 +421,7 @@
     }
 
     // 4. 급한 위협이 없거나(또는 막을 방법이 없어서) 기존 탐색으로 결정한다.
-    const rootCandidates = orderedCandidates(stacks, AI_PLAYER, supply, allMoves, true, HARD_ROOT_BEAM);
+    const rootCandidates = orderedCandidates(stacks, AI_PLAYER, allMoves, true, HARD_ROOT_BEAM);
     let bestMove = rootCandidates[0], bestScore = -Infinity, bestJittered = -Infinity;
     let alpha = -Infinity;
     const beta = Infinity;
@@ -858,345 +445,18 @@
   const HARD_TIME_BUDGET_MS = 3000;
 
   const AI_WORKER_SOURCE = "(" + function () {
-    const NEIGHBOR_DIRS = [
-      { q: 1, r: 0 }, { q: 1, r: -1 }, { q: 0, r: -1 },
-      { q: -1, r: 0 }, { q: -1, r: 1 }, { q: 0, r: 1 },
-    ];
-    const LINE_DIRS = [{ q: 1, r: 0 }, { q: 0, r: 1 }, { q: 1, r: -1 }];
-    const HARD_NEAR_RADIUS = 2;
-    const HARD_INNER_BEAM = 8;
+    // 보드 규칙과 AI 평가 함수는 gomoku-board.js / gomoku-ai.js를 그대로 불러와
+    // 쓴다(이 워커와 같은 디렉터리에서 서빙됨). 예전에는 이 파일들 전체가 여기
+    // 문자열로 복사돼 있어 메인 스레드 사본과 어긋날 위험이 있었다.
+    importScripts("gomoku-board.js", "gomoku-ai.js");
+    const { getAllLegalMainMoves, applyMoveToStacks, applyMoveWithSupply, checkWinOf } = self.GomokuBoard;
+    const { setPlayers, orderedCandidates, minimax, moveIdKey, findOpenThreeBlockCells, pickBestBlock } = self.GomokuAI;
+
     const ROOT_BEAM = 16;
     const MAX_PLIES = 12;
 
-    const RAW_BOARD = [];
-    for (let q = -5; q <= 5; q++) {
-      for (let r = -5; r <= 5; r++) {
-        const s = -q - r;
-        if (Math.abs(s) > 5) continue;
-        const isCorner = [Math.abs(q), Math.abs(r), Math.abs(s)].filter(v => v === 5).length >= 2;
-        if (isCorner) continue;
-        RAW_BOARD.push({ q, r, s, key: q + "_" + r });
-      }
-    }
-    const BOARD_MAP = {};
-    RAW_BOARD.forEach(c => { BOARD_MAP[c.key] = c; });
-
-    function otherPlayer(p) { return p === 1 ? 2 : 1; }
-    function neighbors(key) {
-      const c = BOARD_MAP[key];
-      return NEIGHBOR_DIRS.map(d => BOARD_MAP[(c.q + d.q) + "_" + (c.r + d.r)]).filter(Boolean);
-    }
-    function topColorOf(stacks, key) {
-      const st = stacks[key];
-      return st && st.length ? st[st.length - 1] : null;
-    }
-    function isValidMoveTargetOf(stacks, originKey, destKey, player) {
-      if (originKey === destKey) return false;
-      const origin = BOARD_MAP[originKey];
-      const dest = BOARD_MAP[destKey];
-      const isAdj = NEIGHBOR_DIRS.some(d => (origin.q + d.q) === dest.q && (origin.r + d.r) === dest.r);
-      if (!isAdj) return false;
-      const originH = (stacks[originKey] || []).length;
-      const destH = (stacks[destKey] || []).length;
-      return destH <= originH && destH + 1 <= 3;
-    }
-    function checkFiveInRowOf(stacks, color) {
-      for (const key in BOARD_MAP) {
-        if (topColorOf(stacks, key) !== color) continue;
-        const c = BOARD_MAP[key];
-        for (const dir of LINE_DIRS) {
-          const prevKey = (c.q - dir.q) + "_" + (c.r - dir.r);
-          if (topColorOf(stacks, prevKey) === color) continue;
-          const run = [key];
-          let cq = c.q + dir.q, cr = c.r + dir.r;
-          while (topColorOf(stacks, cq + "_" + cr) === color) { run.push(cq + "_" + cr); cq += dir.q; cr += dir.r; }
-          if (run.length === 5) return run;
-        }
-      }
-      return null;
-    }
-    function checkFiveAtTop3Of(stacks, color) {
-      const found = [];
-      for (const key in BOARD_MAP) {
-        const st = stacks[key];
-        if (st && st.length === 3 && st[2] === color) found.push(key);
-      }
-      return found.length >= 5 ? found.slice(0, 5) : null;
-    }
-    function checkTriangleTop3Of(stacks, color) {
-      const isTop3 = k => { const st = stacks[k]; return st && st.length === 3 && st[2] === color; };
-      for (const key in BOARD_MAP) {
-        if (!isTop3(key)) continue;
-        const c = BOARD_MAP[key];
-        for (let i = 0; i < 6; i++) {
-          const d1 = NEIGHBOR_DIRS[i];
-          const n1Key = (c.q + d1.q) + "_" + (c.r + d1.r);
-          if (!isTop3(n1Key)) continue;
-          const n1 = BOARD_MAP[n1Key];
-          for (let j = 0; j < 6; j++) {
-            const d2 = NEIGHBOR_DIRS[j];
-            const n2Key = (n1.q + d2.q) + "_" + (n1.r + d2.r);
-            if (n2Key === key) continue;
-            if (isTop3(n2Key)) return [key, n1Key, n2Key];
-          }
-        }
-      }
-      return null;
-    }
-    function checkWinOf(stacks, player) {
-      const row = checkFiveInRowOf(stacks, player);
-      if (row) return { cells: row, reason: "오목 완성 (5개 일직선 연결)" };
-      const top5 = checkFiveAtTop3Of(stacks, player);
-      if (top5) return { cells: top5, reason: "돌 5개 3층 쌓기 완성" };
-      const tri = checkTriangleTop3Of(stacks, player);
-      if (tri) return { cells: tri, reason: "인접한 돌 3개 3층 쌓기 완성" };
-      return null;
-    }
-    function placeStoneOf(stacks, key, player) {
-      const next = Object.assign({}, stacks);
-      next[key] = (next[key] || []).concat([player]);
-      return next;
-    }
-    function moveStoneOf(stacks, originKey, destKey, player) {
-      const next = Object.assign({}, stacks);
-      const originStack = next[originKey].slice();
-      originStack.pop();
-      next[originKey] = originStack;
-      next[destKey] = (next[destKey] || []).concat([player]);
-      return next;
-    }
-    function applyMoveToStacks(stacks, move, player) {
-      return move.type === "place" ? placeStoneOf(stacks, move.key, player) : moveStoneOf(stacks, move.origin, move.dest, player);
-    }
-    function getAllLegalMainMoves(stacks, player, supply) {
-      const moves = [];
-      if (supply > 0) {
-        RAW_BOARD.forEach(c => {
-          const st = stacks[c.key];
-          if (!st || !st.length) moves.push({ type: "place", key: c.key });
-        });
-      }
-      RAW_BOARD.forEach(c => {
-        if (topColorOf(stacks, c.key) !== player) return;
-        neighbors(c.key).forEach(n => {
-          if (isValidMoveTargetOf(stacks, c.key, n.key, player)) moves.push({ type: "move", origin: c.key, dest: n.key });
-        });
-      });
-      return moves;
-    }
-    function isNearAnyStone(stacks, key, radius) {
-      const c = BOARD_MAP[key];
-      for (const k in stacks) {
-        if (!stacks[k] || !stacks[k].length) continue;
-        const c2 = BOARD_MAP[k];
-        if (Math.max(Math.abs(c.q - c2.q), Math.abs(c.r - c2.r), Math.abs(c.s - c2.s)) <= radius) return true;
-      }
-      return false;
-    }
-    function getSearchMoves(stacks, player, supply) {
-      const moves = [];
-      if (supply > 0) {
-        RAW_BOARD.forEach(c => {
-          const st = stacks[c.key];
-          if (st && st.length) return;
-          if (isNearAnyStone(stacks, c.key, HARD_NEAR_RADIUS)) moves.push({ type: "place", key: c.key });
-        });
-      }
-      RAW_BOARD.forEach(c => {
-        if (topColorOf(stacks, c.key) !== player) return;
-        neighbors(c.key).forEach(n => {
-          if (isValidMoveTargetOf(stacks, c.key, n.key, player)) moves.push({ type: "move", origin: c.key, dest: n.key });
-        });
-      });
-      return moves;
-    }
-    function isRestackableBlock(stacks, key, byColor) {
-      const st = stacks[key];
-      if (!st || !st.length) return false;
-      const h = st.length;
-      if (h + 1 > 3) return false;
-      return neighbors(key).some(n => {
-        const os = stacks[n.key];
-        return !!os && os.length > 0 && os[os.length - 1] === byColor && os.length >= h;
-      });
-    }
-    function lineThreatScore(stacks, color) {
-      let score = 0;
-      for (const key in BOARD_MAP) {
-        if (topColorOf(stacks, key) !== color) continue;
-        const c = BOARD_MAP[key];
-        for (const dir of LINE_DIRS) {
-          const prevKey = (c.q - dir.q) + "_" + (c.r - dir.r);
-          if (topColorOf(stacks, prevKey) === color) continue;
-          let length = 1;
-          let cq = c.q + dir.q, cr = c.r + dir.r;
-          while (topColorOf(stacks, cq + "_" + cr) === color) { length++; cq += dir.q; cr += dir.r; }
-          if (length >= 5) continue;
-          const afterKey = cq + "_" + cr;
-          const beforeOpen = !!BOARD_MAP[prevKey] && (!topColorOf(stacks, prevKey) || isRestackableBlock(stacks, prevKey, color));
-          const afterOpen = !!BOARD_MAP[afterKey] && (!topColorOf(stacks, afterKey) || isRestackableBlock(stacks, afterKey, color));
-          const openEnds = (beforeOpen ? 1 : 0) + (afterOpen ? 1 : 0);
-          const base = [0, 2, 14, 90, 550][length] || 0;
-          score += base * (1 + openEnds);
-        }
-      }
-      return score;
-    }
-    function stackThreatScore(stacks, color) {
-      let score = 0;
-      const top3Cells = [];
-      for (const key in BOARD_MAP) {
-        const st = stacks[key];
-        if (!st || !st.length) continue;
-        const h = st.length;
-        if (st[h - 1] !== color) continue;
-        if (h === 3) { top3Cells.push(key); score += 30; }
-        else if (h === 2) score += 9;
-        else score += 1;
-      }
-      const top3Set = new Set(top3Cells);
-      let adjPairs = 0;
-      top3Cells.forEach(k => {
-        const c = BOARD_MAP[k];
-        NEIGHBOR_DIRS.forEach(d => {
-          if (top3Set.has((c.q + d.q) + "_" + (c.r + d.r))) adjPairs++;
-        });
-      });
-      score += adjPairs * 25;
-      return score;
-    }
-
-    function windowThreatScore(stacks, color) {
-      let score = 0;
-      const WEIGHTS = [0, 0, 10, 70, 450, 3000];
-      for (const key in BOARD_MAP) {
-        const c = BOARD_MAP[key];
-        for (const dir of LINE_DIRS) {
-          const cells = [];
-          let offBoard = false;
-          for (let i = 0; i < 5; i++) {
-            const k = (c.q + dir.q * i) + "_" + (c.r + dir.r * i);
-            if (!BOARD_MAP[k]) { offBoard = true; break; }
-            cells.push(k);
-          }
-          if (offBoard) continue;
-          let mine = 0, blocked = false;
-          for (const k of cells) {
-            const top = topColorOf(stacks, k);
-            if (top === color) mine++;
-            else if (top && !isRestackableBlock(stacks, k, color)) {
-              blocked = true; break;
-            }
-          }
-          if (blocked) continue;
-          score += WEIGHTS[mine];
-        }
-      }
-      return score;
-    }
-
     let AI_PLAYER = 2, HUMAN_PLAYER = 1;
 
-    function evaluatePosition(stacks, forPlayer) {
-      const opp = otherPlayer(forPlayer);
-      if (checkWinOf(stacks, forPlayer)) return 1e7;
-      if (checkWinOf(stacks, opp)) return -1e7;
-      const mine = lineThreatScore(stacks, forPlayer) + stackThreatScore(stacks, forPlayer) + windowThreatScore(stacks, forPlayer);
-      const theirs = lineThreatScore(stacks, opp) + stackThreatScore(stacks, opp) + windowThreatScore(stacks, opp);
-      return mine - theirs * 1.15;
-    }
-    function orderedCandidates(stacks, player, moves, isMaximizing, limit) {
-      const scored = moves.map(m => ({ m, s: evaluatePosition(applyMoveToStacks(stacks, m, player), AI_PLAYER) }));
-      scored.sort((a, b) => (isMaximizing ? b.s - a.s : a.s - b.s));
-      return scored.slice(0, limit).map(o => o.m);
-    }
-    function applyMoveWithSupply(stacks, supply, move, player) {
-      const nextStacks = applyMoveToStacks(stacks, move, player);
-      const nextSupply = move.type === "place" ? Object.assign({}, supply, { [player]: supply[player] - 1 }) : supply;
-      return { stacks: nextStacks, supply: nextSupply };
-    }
-    function minimax(stacks, supply, ply, isMaximizing, alpha, beta, deadline) {
-      if (checkWinOf(stacks, AI_PLAYER)) return 1e7 + ply;
-      if (checkWinOf(stacks, HUMAN_PLAYER)) return -1e7 - ply;
-      if (ply === 0 || Date.now() > deadline) return evaluatePosition(stacks, AI_PLAYER);
-      const player = isMaximizing ? AI_PLAYER : HUMAN_PLAYER;
-      const rawMoves = getSearchMoves(stacks, player, supply[player]);
-      if (!rawMoves.length) return evaluatePosition(stacks, AI_PLAYER);
-      const moves = orderedCandidates(stacks, player, rawMoves, isMaximizing, HARD_INNER_BEAM);
-      if (isMaximizing) {
-        let best = -Infinity;
-        for (const m of moves) {
-          const r = applyMoveWithSupply(stacks, supply, m, player);
-          const val = minimax(r.stacks, r.supply, ply - 1, false, alpha, beta, deadline);
-          if (val > best) best = val;
-          if (best > alpha) alpha = best;
-          if (alpha >= beta) break;
-          if (Date.now() > deadline) break;
-        }
-        return best;
-      }
-      let best = Infinity;
-      for (const m of moves) {
-        const r = applyMoveWithSupply(stacks, supply, m, player);
-        const val = minimax(r.stacks, r.supply, ply - 1, true, alpha, beta, deadline);
-        if (val < best) best = val;
-        if (best < beta) beta = best;
-        if (alpha >= beta) break;
-        if (Date.now() > deadline) break;
-      }
-      return best;
-    }
-    function moveIdKey(m) {
-      return m.type === "place" ? "p:" + m.key : "m:" + m.origin + ">" + m.dest;
-    }
-    // 상대가 이미 "열린 3"(양 끝이 모두 빈 연속 3개)을 갖고 있으면, 막지 않을 경우
-    // 다음 턴에 열린 4가 되어 무조건 진다.
-    function findOpenThreeBlockCells(stacks, color) {
-      const cells = new Set();
-      for (const key in BOARD_MAP) {
-        if (topColorOf(stacks, key) !== color) continue;
-        const c = BOARD_MAP[key];
-        for (const dir of LINE_DIRS) {
-          const prevKey = (c.q - dir.q) + "_" + (c.r - dir.r);
-          if (topColorOf(stacks, prevKey) === color) continue;
-          let length = 1;
-          let cq = c.q + dir.q, cr = c.r + dir.r;
-          while (topColorOf(stacks, cq + "_" + cr) === color) { length++; cq += dir.q; cr += dir.r; }
-          if (length !== 3) continue;
-          const afterKey = cq + "_" + cr;
-          const beforeOpen = !!BOARD_MAP[prevKey] && !topColorOf(stacks, prevKey);
-          const afterOpen = !!BOARD_MAP[afterKey] && !topColorOf(stacks, afterKey);
-          if (beforeOpen && afterOpen) {
-            cells.add(prevKey);
-            cells.add(afterKey);
-          }
-        }
-      }
-      return cells;
-    }
-    // targetCells 중 하나를 두는 수만 추려서 1수 평가로 가장 나은 것을 결정적으로
-    // 고른다(시간 예산에 따라 흔들리는 탐색에 맡기지 않음).
-    //
-    // 위협 칸이 여러 개(예: 이어붙이는 칸과, 무른 차단을 쌓기로 되찾으면 이기는
-    // 칸이 동시에 있는 겹사)일 때 아무 하나만 막고 다른 위협은 그대로 열어두는
-    // 사고를 막기 위해, "두고 나면 상대에게 즉시 이기는 수가 하나도 안 남는"
-    // 후보를 먼저 고른다(2026-07-19, 덕후#912 기보에서 실제 확인).
-    function pickBestBlock(stacks, supply, allMoves, targetCells, opponent) {
-      const blockMoves = allMoves.filter(m => targetCells.has(m.type === "place" ? m.key : m.dest));
-      if (!blockMoves.length) return null;
-      const fullyBlocking = blockMoves.filter(m => {
-        const r = applyMoveWithSupply(stacks, supply, m, AI_PLAYER);
-        const oppNextMoves = getAllLegalMainMoves(r.stacks, opponent, r.supply[opponent]);
-        return !oppNextMoves.some(om => checkWinOf(applyMoveToStacks(r.stacks, om, opponent), opponent));
-      });
-      const pool = fullyBlocking.length ? fullyBlocking : blockMoves;
-      let best = pool[0], bestScore = -Infinity;
-      pool.forEach(m => {
-        const score = evaluatePosition(applyMoveToStacks(stacks, m, AI_PLAYER), AI_PLAYER) + (Math.random() - 0.5) * 6;
-        if (score > bestScore) { bestScore = score; best = m; }
-      });
-      return best;
-    }
     function searchAtDepth(stacks, supply, plies, deadline, allMoves, forceInclude) {
       const rootCandidates = orderedCandidates(stacks, AI_PLAYER, allMoves, true, ROOT_BEAM);
       const included = new Set(rootCandidates.map(moveIdKey));
@@ -1224,6 +484,7 @@
       const timeBudgetMs = msg.timeBudgetMs;
       AI_PLAYER = msg.aiPlayer;
       HUMAN_PLAYER = msg.humanPlayer;
+      setPlayers(AI_PLAYER, HUMAN_PLAYER);
 
       const startTime = Date.now();
       const deadline = startTime + timeBudgetMs;
@@ -1462,6 +723,7 @@
     if (gameMode === "ai_vs_ai") {
       AI_PLAYER = state.turn;
       HUMAN_PLAYER = otherPlayer(state.turn);
+      setAIPlayers(AI_PLAYER, HUMAN_PLAYER);
     }
     const move = await computeAIMove();
     if (epoch !== gameEpoch) return; // 그 사이 게임이 리셋/전환됐으면 이 결과는 버린다
@@ -1531,6 +793,7 @@
     if (state.winner || state.aiThinking) return;
     AI_PLAYER = state.turn;
     HUMAN_PLAYER = otherPlayer(state.turn);
+    setAIPlayers(AI_PLAYER, HUMAN_PLAYER);
     state.aiThinking = true;
     render();
     const epoch = gameEpoch;
@@ -1615,6 +878,7 @@
     document.getElementById("rank-submit-btn").textContent = "등록";
     HUMAN_PLAYER = humanIsBlackNext ? 1 : 2;
     AI_PLAYER = otherPlayer(HUMAN_PLAYER);
+    setAIPlayers(AI_PLAYER, HUMAN_PLAYER);
     setState({
       stacks: {}, turn: 1, phase: "initial", stepIndex: 0, placedInStep: 0,
       supply: { 1: 25, 2: 25 }, selected: null, winner: null, winReason: "", winCells: [], aiThinking: false, lastCell: null,
@@ -1884,8 +1148,7 @@
         return;
       }
       const current = await fetchPlayerRating(nickname, config.table);
-      const expected = 1 / (1 + Math.pow(10, (config.aiRating - current.rating) / 400));
-      const newRating = Math.round(current.rating + RANK_K_FACTOR * (actual - expected));
+      const newRating = window.GomokuRating.computeNewRating(current.rating, actual, config.aiRating, RANK_K_FACTOR);
       const wins = current.wins + (actual === 1 ? 1 : 0);
       const losses = current.losses + (actual === 0 ? 1 : 0);
       await upsertPlayerRating(nickname, newRating, wins, losses, config.table);
