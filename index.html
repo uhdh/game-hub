@@ -20,7 +20,7 @@
     min-height: 100vh;
     display: flex;
     justify-content: center;
-    padding: 32px 16px 48px;
+    padding: 32px 16px calc(96px + env(safe-area-inset-bottom));
   }
   .col {
     width: 100%;
@@ -43,6 +43,13 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
+  }
+  .header-actions {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
   }
   .header .title {
     font-size: 26px;
@@ -88,9 +95,12 @@
   .floating-actions {
     position: fixed;
     right: 16px;
-    bottom: 20px;
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    left: 16px;
     z-index: 40;
     display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     gap: 8px;
   }
   .floating-btn {
@@ -105,10 +115,22 @@
     border-radius: 999px;
     padding: 8px 14px;
     box-shadow: 0 4px 14px rgba(0, 0, 0, .35);
+    white-space: nowrap;
   }
   .floating-btn:hover {
     border-color: rgba(95, 184, 176, .4);
     color: #c3c9d1;
+  }
+
+  @media (max-width: 480px) {
+    .floating-actions {
+      gap: 6px;
+    }
+    .floating-btn {
+      font-size: 11.5px;
+      padding: 7px 10px;
+      gap: 4px;
+    }
   }
 
   @keyframes ann-pop { 0% { transform: scale(.94); opacity: 0 } 100% { transform: scale(1); opacity: 1 } }
@@ -396,6 +418,44 @@
     }
   }
 
+  .lb-section {
+    padding: 14px 0;
+    border-top: 1px solid rgba(255, 255, 255, .06);
+  }
+  .lb-section:first-child { border-top: none; padding-top: 0; }
+  .lb-section-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: #e7ebee;
+    margin-bottom: 8px;
+  }
+  .lb-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 12.5px;
+  }
+  .lb-row .no {
+    flex: 0 0 auto;
+    width: 16px;
+    color: #8992a0;
+    font-weight: 700;
+  }
+  .lb-row .nick {
+    flex: 1;
+    min-width: 0;
+    color: #e7ebee;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .lb-row .meta {
+    flex: 0 0 auto;
+    color: #a9b0bb;
+  }
+
   .game-list {
     display: flex;
     flex-direction: column;
@@ -538,10 +598,12 @@
           <span class="title">피의 게임 X 시뮬레이터</span>
           <div class="subtitle">계속 새로운 게임이 추가됩니다.</div>
         </div>
-        <button type="button" id="announcement-btn" class="announcement-btn">
-          <span>📢 공지사항</span>
-          <span id="announcement-dot" class="announcement-dot"></span>
-        </button>
+        <div class="header-actions">
+          <button type="button" id="announcement-btn" class="announcement-btn">
+            <span>📢 공지사항</span>
+            <span id="announcement-dot" class="announcement-dot"></span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -552,6 +614,9 @@
 <div class="floating-actions">
   <button type="button" class="floating-btn" id="chat-btn">
     <span>💬 채팅</span>
+  </button>
+  <button type="button" class="floating-btn" id="leaderboard-btn">
+    <span>🏆 전체 리더보드</span>
   </button>
   <a href="./predict.html" class="floating-btn">
     <span>🏆 우승자 예측</span>
@@ -605,6 +670,18 @@
       </div>
       <div class="chat-status-msg" id="chat-status-msg"></div>
     </div>
+  </div>
+</div>
+
+<div id="leaderboard-overlay" class="ann-overlay">
+  <div class="ann-box">
+    <div class="ann-head">
+      <div>
+        <span class="ann-head-title">전체 게임 리더보드</span>
+      </div>
+      <button type="button" id="lb-close" class="ann-close" aria-label="닫기">✕</button>
+    </div>
+    <div class="ann-body" id="lb-body"></div>
   </div>
 </div>
 
@@ -966,6 +1043,133 @@
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && chatOverlay.classList.contains('show')) closeChat();
+  });
+
+  // ---- 전체 게임 리더보드 ----
+  const LB_SUPABASE_URL = 'https://paktzmofotvwfdxcpmzv.supabase.co';
+  const LB_SUPABASE_ANON_KEY = 'sb_publishable_jWbstEn2pKJTNDxLTR4Jig_asglvzGW';
+
+  function lbHeaders() {
+    return { apikey: LB_SUPABASE_ANON_KEY, Authorization: `Bearer ${LB_SUPABASE_ANON_KEY}` };
+  }
+
+  async function fetchSimpleTop(table, selectFields, orderBy, limit) {
+    const res = await fetch(
+      `${LB_SUPABASE_URL}/rest/v1/${table}?select=${selectFields}&order=${orderBy}&limit=${limit}`,
+      { headers: lbHeaders() }
+    );
+    if (!res.ok) throw new Error('리더보드 조회 실패');
+    return res.json();
+  }
+
+  // 지각변동은 별도 랭킹 테이블이 없어, 대국 기록(1인 vs AI 2명, 사람은 항상 R)을
+  // 닉네임별로 직접 집계한다. tectonic-shift.html의 fetchRanking과 동일한 로직.
+  async function fetchTectonicTop(limit) {
+    const res = await fetch(
+      `${LB_SUPABASE_URL}/rest/v1/tectonic_shift_results?select=nicknames,winner_color,scores&mode=eq.vs_ai&order=created_at.desc&limit=2000`,
+      { headers: lbHeaders() }
+    );
+    if (!res.ok) throw new Error('리더보드 조회 실패');
+    const rows = await res.json();
+    const stats = new Map();
+    rows.forEach(r => {
+      const nickname = r.nicknames && r.nicknames.R;
+      if (!nickname) return;
+      const s = stats.get(nickname) || { games: 0, wins: 0, scoreSum: 0 };
+      s.games += 1;
+      if (r.winner_color === 'R') s.wins += 1;
+      s.scoreSum += (r.scores && typeof r.scores.R === 'number') ? r.scores.R : 0;
+      stats.set(nickname, s);
+    });
+    return Array.from(stats.entries())
+      .map(([nickname, s]) => ({
+        nickname,
+        wins: s.wins,
+        losses: s.games - s.wins,
+        winRate: s.games ? Math.round((s.wins / s.games) * 100) : 0,
+        avgScore: s.games ? Math.round(s.scoreSum / s.games) : 0,
+      }))
+      .sort((a, b) => b.wins - a.wins || b.winRate - a.winRate)
+      .slice(0, limit);
+  }
+
+  const LB_SECTIONS = [
+    {
+      label: '3단 오목 · 최상',
+      fetch: (limit) => fetchSimpleTop('gomoku_extreme_ranking', 'nickname,rating,wins,losses', 'rating.desc', limit),
+      format: r => `${r.wins}승 ${r.losses}패 · ${r.rating}점`,
+    },
+    {
+      label: '3단 오목 · 상',
+      fetch: (limit) => fetchSimpleTop('gomoku_hard_ranking', 'nickname,rating,wins,losses', 'rating.desc', limit),
+      format: r => `${r.wins}승 ${r.losses}패 · ${r.rating}점`,
+    },
+    {
+      label: '지각변동',
+      fetch: (limit) => fetchTectonicTop(limit),
+      format: r => `${r.wins}승 ${r.losses}패 · ${r.winRate}% · 평균 ${r.avgScore}점`,
+    },
+    {
+      label: '블라인드 경매',
+      fetch: (limit) => fetchSimpleTop('blind_auction_leaderboard', 'nickname,score', 'score.desc,created_at.asc', limit),
+      format: r => `${r.score}%`,
+    },
+    {
+      label: '모자이크 퍼즐',
+      fetch: (limit) => fetchSimpleTop('rearrange_leaderboard', 'nickname,score', 'score.desc,created_at.asc', limit),
+      format: r => `${r.score}점`,
+    },
+  ];
+
+  const lbBtn = document.getElementById('leaderboard-btn');
+  const lbOverlay = document.getElementById('leaderboard-overlay');
+  const lbClose = document.getElementById('lb-close');
+  const lbBody = document.getElementById('lb-body');
+
+  async function loadLeaderboards() {
+    lbBody.innerHTML = LB_SECTIONS.map((s, i) => `
+      <div class="lb-section">
+        <div class="lb-section-title">${s.label}</div>
+        <div class="lb-rows" data-idx="${i}"><div class="ann-empty">불러오는 중...</div></div>
+      </div>
+    `).join('');
+
+    await Promise.all(LB_SECTIONS.map(async (s, i) => {
+      const rowsEl = lbBody.querySelector(`.lb-rows[data-idx="${i}"]`);
+      try {
+        const rows = await s.fetch(5);
+        if (!rows.length) {
+          rowsEl.innerHTML = '<div class="ann-empty">아직 등록된 기록이 없습니다.</div>';
+          return;
+        }
+        rowsEl.innerHTML = rows.map((r, idx) => `
+          <div class="lb-row">
+            <span class="no">${idx + 1}</span>
+            <span class="nick">${r.nickname}</span>
+            <span class="meta">${s.format(r)}</span>
+          </div>
+        `).join('');
+      } catch (e) {
+        rowsEl.innerHTML = '<div class="ann-empty">불러오지 못했습니다.</div>';
+      }
+    }));
+  }
+
+  function openLeaderboard() {
+    lbOverlay.classList.add('show');
+    loadLeaderboards();
+  }
+  function closeLeaderboard() {
+    lbOverlay.classList.remove('show');
+  }
+
+  lbBtn.addEventListener('click', openLeaderboard);
+  lbClose.addEventListener('click', closeLeaderboard);
+  lbOverlay.addEventListener('click', (e) => {
+    if (e.target === lbOverlay) closeLeaderboard();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && lbOverlay.classList.contains('show')) closeLeaderboard();
   });
 </script>
 </body>
