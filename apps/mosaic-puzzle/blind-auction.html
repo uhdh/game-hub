@@ -670,6 +670,7 @@
 
   async function showResults() {
     showScreen("screen-results");
+    const unit = CATEGORY_UNIT[state.category] || "억원";
     const ranking = L.computeFinalRanking(state.players);
     const wrap = document.getElementById("ranking-list");
     wrap.innerHTML = "";
@@ -677,13 +678,13 @@
       const row = document.createElement("div");
       row.className = "ranking-row" + (i === 0 ? " winner" : "");
       const items = entry.wonItems.map((it) => it.itemName).join(", ") || "낙찰 없음";
-      row.innerHTML = `<span class="rank-no">${i + 1}</span><span class="rank-name">${playerLabel(entry.id)}</span><span class="rank-total">${entry.total}억</span><span class="rank-items">${items}</span>`;
+      row.innerHTML = `<span class="rank-no">${i + 1}</span><span class="rank-name">${playerLabel(entry.id)}</span><span class="rank-total">${entry.total}${unit}</span><span class="rank-items">${items}</span>`;
       wrap.appendChild(row);
     });
 
     const userEntry = ranking.find((r) => r.id === "user");
     const pct = winPercent(userEntry.total, state.poolTotal);
-    document.getElementById("results-pct").textContent = `획득 가치 비율 ${pct}% (${userEntry.total}억 / ${state.poolTotal}억)`;
+    document.getElementById("results-pct").textContent = `획득 가치 비율 ${pct}% (${userEntry.total}${unit} / ${state.poolTotal}${unit})`;
     const storedNickname = getOrCreateStoredNickname(NICKNAME_KEY);
 
     // 게임이 끝나면 자동으로 한 번만 리더보드에 등록한다. 재등록 버튼은 중복 등록을
