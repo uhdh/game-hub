@@ -1100,11 +1100,6 @@
       format: r => `${r.wins}승 ${r.losses}패 · ${r.rating}점`,
     },
     {
-      label: '3단 오목 · 상',
-      fetch: (limit) => fetchSimpleTop('gomoku_hard_ranking', 'nickname,rating,wins,losses', 'rating.desc', limit),
-      format: r => `${r.wins}승 ${r.losses}패 · ${r.rating}점`,
-    },
-    {
       label: '지각변동',
       fetch: (limit) => fetchTectonicTop(limit),
       format: r => `${r.wins}승 ${r.losses}패 · ${r.winRate}% · 평균 ${r.avgScore}점`,
@@ -1116,7 +1111,7 @@
     },
     {
       label: '모자이크 퍼즐',
-      fetch: (limit) => fetchSimpleTop('rearrange_leaderboard', 'nickname,score', 'score.desc,created_at.asc', limit),
+      fetch: (limit) => fetchSimpleTop('color_connect_leaderboard', 'nickname,score', 'score.desc,created_at.asc', limit),
       format: r => `${r.score}점`,
     },
   ];
