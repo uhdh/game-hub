@@ -198,6 +198,7 @@
   </div>
 </div>
 
+<script src="./gomoku-rating.js"></script>
 <script>
 (function () {
   "use strict";
@@ -726,7 +727,9 @@
     const alive = alivePlayersOf(state.board);
     const eliminated = PLAYER_ORDER.find(p => alive[p] === 0);
     if (eliminated) {
-      let best = PLAYER_ORDER.filter(p => p !== eliminated);
+      // 전멸한 플레이어도 승리 후보에서 제외하지 않는다 — 누적 점수가 가장 높으면
+      // 말이 먼저 전멸했더라도 승리한다(점수 최다 기준 규칙을 그대로 적용).
+      let best = PLAYER_ORDER;
       const top = Math.max(...best.map(p => state.scores[p]));
       let tied = best.filter(p => state.scores[p] === top);
       let tieBreak = false;
@@ -963,13 +966,19 @@
     }
   }
 
-  // 랭킹은 "1인 vs AI 2명" 대국만 대상(사람은 항상 빨강 자리). 승수만 보면
-  // 몇 판 해서 이긴 건지 알 수 없어서, 매번 같은 사람(nicknames.R)의 전체
-  // 대국을 모아 총 대국 수·승수·승률을 함께 계산한다.
+  // 랭킹은 "1인 vs AI 2명" 대국만 대상(사람은 항상 빨강 자리). 오목 랭킹과
+  // 동일한 Elo 계산식(gomoku-rating.js)을 재사용 — 별도 레이팅 테이블 없이,
+  // 매번 같은 사람(nicknames.R)의 전체 대국을 시간순으로 재생하며 고정
+  // AI_RATING을 상대로 레이팅을 누적 계산한다(기준값 자체는 임의값이라
+  // 랭킹 순위엔 영향 없음, 상대적 비교만 의미가 있음).
+  const RANK_BASE_RATING = 1000;
+  const RANK_AI_RATING = 1500;
+  const RANK_K_FACTOR = 32;
+
   async function fetchRanking() {
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/${RESULTS_TABLE}?select=nicknames,winner_color,scores&mode=eq.vs_ai&order=created_at.desc&limit=2000`,
+        `${SUPABASE_URL}/rest/v1/${RESULTS_TABLE}?select=nicknames,winner_color&mode=eq.vs_ai&order=created_at.asc&limit=2000`,
         { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
       );
       if (!res.ok) throw new Error('랭킹 조회 실패');
@@ -978,22 +987,15 @@
       rows.forEach(r => {
         const nickname = r.nicknames && r.nicknames.R;
         if (!nickname) return;
-        const s = stats.get(nickname) || { games: 0, wins: 0, scoreSum: 0 };
-        s.games += 1;
-        if (r.winner_color === 'R') s.wins += 1;
-        s.scoreSum += (r.scores && typeof r.scores.R === 'number') ? r.scores.R : 0;
+        const s = stats.get(nickname) || { wins: 0, losses: 0, rating: RANK_BASE_RATING };
+        const actual = r.winner_color === 'R' ? 1 : 0;
+        s.rating = window.GomokuRating.computeNewRating(s.rating, actual, RANK_AI_RATING, RANK_K_FACTOR);
+        if (actual) s.wins += 1; else s.losses += 1;
         stats.set(nickname, s);
       });
       const ranked = Array.from(stats.entries())
-        .map(([nickname, s]) => ({
-          nickname,
-          games: s.games,
-          wins: s.wins,
-          losses: s.games - s.wins,
-          winRate: s.games ? Math.round((s.wins / s.games) * 100) : 0,
-          avgScore: s.games ? Math.round(s.scoreSum / s.games) : 0,
-        }))
-        .sort((a, b) => b.wins - a.wins || b.winRate - a.winRate)
+        .map(([nickname, s]) => ({ nickname, wins: s.wins, losses: s.losses, rating: s.rating }))
+        .sort((a, b) => b.rating - a.rating)
         .slice(0, 10);
       renderRanking(ranked);
     } catch (err) {
@@ -1007,7 +1009,7 @@
     ranked.forEach((r, i) => {
       const row = document.createElement('div');
       row.className = 'ranking-row';
-      row.innerHTML = `<span class="rk-no">${i + 1}</span><span class="rk-name">${r.nickname}</span><span class="rk-wins">${r.wins}승 ${r.losses}패 · ${r.winRate}% · 평균 ${r.avgScore}점</span>`;
+      row.innerHTML = `<span class="rk-no">${i + 1}</span><span class="rk-name">${r.nickname}</span><span class="rk-wins">${r.wins}승 ${r.losses}패 · ${r.rating}점</span>`;
       wrap.appendChild(row);
     });
   }
