@@ -223,6 +223,7 @@
   let currentBoardName = BOARD_NAMES[0];
   let board = [];
   let emptyIndex = -1;
+  let initialScore = 0;
   let justAddedId = null;
   let animating = false;
 
@@ -247,14 +248,14 @@
 
   async function fetchLeaderboard() {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?select=id,score,nickname,created_at&board=eq.${encodeURIComponent(currentBoardName)}&order=score.desc,created_at.asc&limit=10`,
+      `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?select=id,score,initial_score,nickname,created_at&board=eq.${encodeURIComponent(currentBoardName)}&order=score.desc,created_at.asc&limit=10`,
       { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
     );
     if (!res.ok) throw new Error("리더보드 조회 실패");
     const rows = await res.json();
-    return rows.map(r => ({ id: r.id, score: r.score, nickname: r.nickname, ts: new Date(r.created_at).getTime() }));
+    return rows.map(r => ({ id: r.id, score: r.score, initialScore: r.initial_score, nickname: r.nickname, ts: new Date(r.created_at).getTime() }));
   }
-  async function submitScore(score, nickname) {
+  async function submitScore(score, nickname, initialScoreVal) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}`, {
       method: "POST",
       headers: {
@@ -263,11 +264,11 @@
         "Content-Type": "application/json",
         Prefer: "return=representation"
       },
-      body: JSON.stringify({ score, board: currentBoardName, nickname })
+      body: JSON.stringify({ score, board: currentBoardName, nickname, initial_score: initialScoreVal })
     });
     if (!res.ok) throw new Error("점수 등록 실패");
     const [row] = await res.json();
-    return { id: row.id, score: row.score, nickname: row.nickname, ts: new Date(row.created_at).getTime() };
+    return { id: row.id, score: row.score, initialScore: row.initial_score, nickname: row.nickname, ts: new Date(row.created_at).getTime() };
   }
   function formatTs(ts) {
     const d = new Date(ts);
@@ -278,6 +279,7 @@
   function resetGame() {
     board = buildInitialTiles();
     emptyIndex = board.indexOf(null);
+    initialScore = computeScoreForBoard(board).total;
     justAddedId = null;
     animating = false;
     document.getElementById("optimal-path").textContent = "";
@@ -486,7 +488,7 @@
     btn.disabled = true;
     btn.textContent = "등록 중...";
     try {
-      const entry = await submitScore(result.total, nickname);
+      const entry = await submitScore(result.total, nickname, initialScore);
       justAddedId = entry.id;
       const lb = await fetchLeaderboard();
       renderModal(result, lb);
@@ -571,7 +573,7 @@
   }
 
   function renderModal(result, leaderboard) {
-    document.getElementById("modal-total").textContent = result.total;
+    document.getElementById("modal-total").textContent = `${initialScore} → ${result.total}`;
     const top = document.getElementById("modal-top");
     top.innerHTML = "";
     result.topTwo.forEach(l => {
@@ -600,7 +602,7 @@
       nickname.textContent = e.nickname || "익명";
       const score = document.createElement("span");
       score.className = "lb-score";
-      score.textContent = e.score + "점";
+      score.textContent = (e.initialScore != null ? `${e.initialScore} → ${e.score}` : e.score) + "점";
       const date = document.createElement("span");
       date.className = "lb-date";
       date.textContent = formatTs(e.ts);
