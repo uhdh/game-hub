@@ -36,6 +36,7 @@
 
   .screen { display: flex; flex-direction: column; gap: 16px; }
   .screen.hidden { display: none; }
+  .hidden { display: none; }
 
   .rules-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
   .rules-title { font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .04em; }
@@ -52,8 +53,6 @@
   .btn-secondary:disabled { opacity: .4; cursor: not-allowed; }
   .action-row { display: flex; gap: 10px; }
   .action-row > * { flex: 1; }
-  .category-actions { flex-wrap: wrap; }
-  .category-actions > * { flex: 1 1 calc(50% - 5px); }
 
   .reveal-card { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 28px; text-align: center; display: flex; flex-direction: column; gap: 6px; }
   .reveal-label { font-size: 12.5px; color: var(--text-dim); }
@@ -202,15 +201,9 @@
 
 <div id="modal-category" class="modal">
   <div class="modal-box">
-    <div class="modal-item-name">카테고리를 골라주세요</div>
-    <div class="action-row category-actions">
-      <button type="button" class="btn-primary category-choice-btn" data-category="art">미술품</button>
-      <button type="button" class="btn-primary category-choice-btn" data-category="collectible">소장품</button>
-      <button type="button" class="btn-primary category-choice-btn" data-category="coupang">쿠팡 인기상품</button>
-      <button type="button" class="btn-primary category-choice-btn" data-category="youtube">유튜브 조회수</button>
-      <button type="button" class="btn-primary category-choice-btn" data-category="billionaires">포브스 억만장자</button>
-    </div>
+    <div class="modal-item-name" id="category-modal-title">경매를 준비하는 중...</div>
     <div id="category-status" class="status-banner"></div>
+    <button type="button" class="btn-primary hidden" id="category-retry-btn">다시 시도</button>
   </div>
 </div>
 
@@ -299,6 +292,11 @@
   }
 
   const CATEGORY_UNIT = { art: "억원", collectible: "억원", coupang: "만원", youtube: "억회", billionaires: "조원" };
+  const CATEGORY_LABELS = { art: "미술품", collectible: "소장품", coupang: "쿠팡 인기상품", youtube: "유튜브 조회수", billionaires: "포브스 억만장자" };
+  const CATEGORY_KEYS = Object.keys(CATEGORY_LABELS);
+  function randomCategory() {
+    return CATEGORY_KEYS[Math.floor(Math.random() * CATEGORY_KEYS.length)];
+  }
   const META_LABELS = {
     art: { artist: "작가", created_year: "제작년도" },
     collectible: { artist: "작가", created_year: "제작년도" },
@@ -352,37 +350,42 @@
     el.className = "status-banner show " + (isErr ? "err" : "ok");
   }
 
-  function setCategoryButtonsDisabled(disabled) {
-    document.querySelectorAll(".category-choice-btn").forEach((btn) => { btn.disabled = disabled; });
+  function setCategoryRetryVisible(visible) {
+    document.getElementById("category-retry-btn").classList.toggle("hidden", !visible);
   }
 
   function resetCategoryModal() {
     document.getElementById("modal-category").classList.remove("hidden");
-    setCategoryButtonsDisabled(false);
     document.getElementById("category-status").className = "status-banner";
+    startCategoryFlow();
   }
 
   async function chooseCategory(category) {
-    setCategoryButtonsDisabled(true);
+    setCategoryRetryVisible(false);
+    document.getElementById("category-modal-title").textContent = `${CATEGORY_LABELS[category]} 경매를 준비하는 중...`;
     showCategoryStatus("물품을 불러오는 중...");
     try {
       const items = await fetchAllItems(category);
       if (items.length < L.POOL_SIZE) {
         showCategoryStatus(`등록된 물품이 ${items.length}개뿐입니다. ${L.POOL_SIZE}개 이상 필요합니다. 관리자 페이지에서 등록해주세요.`, true);
-        setCategoryButtonsDisabled(false);
+        setCategoryRetryVisible(true);
         return;
       }
       document.getElementById("modal-category").classList.add("hidden");
       beginGame(items, category);
     } catch (err) {
       showCategoryStatus("물품 목록을 불러오지 못했습니다. 다시 시도해주세요.", true);
-      setCategoryButtonsDisabled(false);
+      setCategoryRetryVisible(true);
     }
   }
 
-  document.querySelectorAll(".category-choice-btn").forEach((btn) => {
-    btn.addEventListener("click", () => chooseCategory(btn.dataset.category));
-  });
+  function startCategoryFlow() {
+    setCategoryRetryVisible(false);
+    chooseCategory(randomCategory());
+  }
+
+  document.getElementById("category-retry-btn").addEventListener("click", startCategoryFlow);
+  startCategoryFlow();
 
   document.getElementById("rules-btn").addEventListener("click", () => {
     document.getElementById("modal-rules").classList.remove("hidden");
@@ -627,14 +630,14 @@
 
   async function fetchLeaderboard() {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/${LEADERBOARD_TABLE}?select=id,nickname,score,created_at&order=score.desc,created_at.asc&limit=10`,
+      `${SUPABASE_URL}/rest/v1/${LEADERBOARD_TABLE}?select=id,nickname,score,category,acquired,pool_total,created_at&order=score.desc,created_at.asc&limit=10`,
       { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
     );
     if (!res.ok) throw new Error("리더보드 조회 실패");
     return res.json();
   }
 
-  async function submitScore(score, nickname) {
+  async function submitScore(score, nickname, category, acquired, poolTotal) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${LEADERBOARD_TABLE}`, {
       method: "POST",
       headers: {
@@ -643,7 +646,7 @@
         "Content-Type": "application/json",
         Prefer: "return=representation",
       },
-      body: JSON.stringify({ score, nickname }),
+      body: JSON.stringify({ score, nickname, category, acquired, pool_total: poolTotal }),
     });
     if (!res.ok) throw new Error("리더보드 등록 실패");
     return res.json();
@@ -651,7 +654,12 @@
 
   function buildLeaderboardHtml(rows) {
     return rows
-      .map((row, i) => `<div class="leaderboard-row"><span class="lb-rank">${i + 1}</span><span class="lb-nickname">${row.nickname || "익명"}</span><span class="lb-score">${row.score}%</span></div>`)
+      .map((row, i) => {
+        const unit = CATEGORY_UNIT[row.category] || "억원";
+        const label = CATEGORY_LABELS[row.category];
+        const breakdown = label ? `${label}, ${row.score}%(${row.acquired}${unit}/${row.pool_total}${unit})` : `${row.score}%`;
+        return `<div class="leaderboard-row"><span class="lb-rank">${i + 1}</span><span class="lb-nickname">${row.nickname || "익명"}</span><span class="lb-score">${breakdown}</span></div>`;
+      })
       .join("");
   }
 
@@ -667,10 +675,10 @@
     return Math.round((userTotal / poolTotal) * 100);
   }
 
-  async function registerScore(nickname, pct) {
+  async function registerScore(nickname, pct, category, acquired, poolTotal) {
     const statusEl = document.getElementById("rank-register-status");
     try {
-      await submitScore(pct, nickname);
+      await submitScore(pct, nickname, category, acquired, poolTotal);
       const rows = await fetchLeaderboard();
       renderLeaderboard(rows);
       statusEl.textContent = `"${nickname}" 이름으로 ${pct}% 등록 완료`;
@@ -700,7 +708,7 @@
 
     // 게임이 끝나면 자동으로 한 번만 리더보드에 등록한다. 재등록 버튼은 중복 등록을
     // 유발해 제거했다.
-    await registerScore(storedNickname, pct);
+    await registerScore(storedNickname, pct, state.category, userEntry.total, state.poolTotal);
   }
 
   document.getElementById("restart-btn").addEventListener("click", () => {
