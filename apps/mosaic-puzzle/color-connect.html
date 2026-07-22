@@ -296,20 +296,34 @@
     const rows = await res.json();
     return rows.map(r => ({ id: r.id, score: r.score, nickname: r.nickname, ts: new Date(r.created_at).getTime() }));
   }
+  async function fetchOwnEntry(nickname) {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?nickname=eq.${encodeURIComponent(nickname)}&select=id,score,created_at`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+    );
+    if (!res.ok) throw new Error("리더보드 조회 실패");
+    const rows = await res.json();
+    if (!rows.length) return null;
+    return { id: rows[0].id, score: rows[0].score, ts: new Date(rows[0].created_at).getTime() };
+  }
   async function submitScore(score, nickname) {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}`, {
+    const existing = await fetchOwnEntry(nickname);
+    if (existing && existing.score >= score) {
+      return { id: existing.id, score: existing.score, nickname, ts: existing.ts, improved: false };
+    }
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?on_conflict=nickname`, {
       method: "POST",
       headers: {
         apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
         "Content-Type": "application/json",
-        Prefer: "return=representation"
+        Prefer: "resolution=merge-duplicates,return=representation"
       },
       body: JSON.stringify({ score, nickname })
     });
     if (!res.ok) throw new Error("점수 등록 실패");
     const [row] = await res.json();
-    return { id: row.id, score: row.score, nickname: row.nickname, ts: new Date(row.created_at).getTime() };
+    return { id: row.id, score: row.score, nickname: row.nickname, ts: new Date(row.created_at).getTime(), improved: true };
   }
   function formatTs(ts) {
     const d = new Date(ts);
@@ -520,7 +534,7 @@
       justAddedId = entry.id;
       const lb = await fetchLeaderboard();
       modalMode = "register";
-      renderModal(result, lb);
+      renderModal(result, lb, entry.improved);
       document.getElementById("modal-overlay").classList.add("show");
     } catch (e) {
       alert("점수 등록에 실패했습니다. 네트워크 연결을 확인해주세요.");
@@ -698,14 +712,14 @@
     document.getElementById("optimal-btn").style.display = stage === "sliding" ? "inline-block" : "none";
   }
 
-  function renderModal(result, leaderboard) {
+  function renderModal(result, leaderboard, improved) {
     const title = document.getElementById("modal-title");
     const totalEl = document.getElementById("modal-total");
     const top = document.getElementById("modal-top");
     const restartBtn = document.getElementById("modal-restart-btn");
 
     if (result) {
-      title.textContent = "점수 등록 완료!";
+      title.textContent = improved === false ? "이전 최고 기록이 더 높아요" : "점수 등록 완료!";
       totalEl.style.display = "";
       top.style.display = "";
       restartBtn.textContent = "다시하기";
