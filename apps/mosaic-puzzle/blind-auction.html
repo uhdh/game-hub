@@ -208,6 +208,7 @@
       <button type="button" class="btn-primary category-choice-btn" data-category="collectible">소장품</button>
       <button type="button" class="btn-primary category-choice-btn" data-category="coupang">쿠팡 인기상품</button>
       <button type="button" class="btn-primary category-choice-btn" data-category="youtube">유튜브 조회수</button>
+      <button type="button" class="btn-primary category-choice-btn" data-category="billionaires">포브스 억만장자</button>
     </div>
     <div id="category-status" class="status-banner"></div>
   </div>
@@ -297,12 +298,13 @@
     };
   }
 
-  const CATEGORY_UNIT = { art: "억원", collectible: "억원", coupang: "만원", youtube: "억회" };
+  const CATEGORY_UNIT = { art: "억원", collectible: "억원", coupang: "만원", youtube: "억회", billionaires: "조원" };
   const META_LABELS = {
     art: { artist: "작가", created_year: "제작년도" },
     collectible: { artist: "작가", created_year: "제작년도" },
     coupang: { artist: "브랜드", created_year: "제작년도" },
     youtube: { artist: "채널", created_year: "업로드" },
+    billionaires: { artist: "회사", created_year: "제작년도" },
   };
 
   async function fetchAllItems(category) {
