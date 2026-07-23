@@ -659,7 +659,10 @@
       .map((row, i) => {
         const unit = CATEGORY_UNIT[row.category] || "억원";
         const label = CATEGORY_LABELS[row.category];
-        const breakdown = label ? `${label}, ${row.score}%(${row.acquired}${unit}/${row.pool_total}${unit})` : `${row.score}%`;
+        const hasAuctionDetails = label && row.acquired != null && row.auction_total != null;
+        const breakdown = hasAuctionDetails
+          ? `${label}, ${row.score}% (${row.acquired}${unit} / ${row.auction_total}${unit})`
+          : `${row.score}%`;
         return `<div class="leaderboard-row"><span class="lb-rank">${i + 1}</span><span class="lb-nickname">${row.nickname || "익명"}</span><span class="lb-score">${breakdown}</span></div>`;
       })
       .join("");
