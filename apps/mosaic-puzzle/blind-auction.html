@@ -209,7 +209,7 @@
 
 <div id="modal-reveal" class="modal hidden">
   <div class="modal-box">
-    <div class="reveal-label">물품 22개 가치 총합 (<span id="reveal-unit-label">억원</span>)</div>
+    <div class="reveal-label"><span id="reveal-category-label">미술품</span> · 물품 22개 가치 총합 (<span id="reveal-unit-label">억원</span>)</div>
     <div class="reveal-total" id="reveal-total-value">0</div>
     <div class="reveal-hint">이 중 11개만 경매에 오릅니다.</div>
     <button type="button" class="btn-primary" id="reveal-continue-btn">경매 시작</button>
@@ -419,6 +419,7 @@
     state.poolTotal = poolTotal;
     state.auctionTotal = auctionTotal;
     state.playQueue = playQueue;
+    document.getElementById("reveal-category-label").textContent = CATEGORY_LABELS[category] || category;
     document.getElementById("reveal-unit-label").textContent = CATEGORY_UNIT[category] || "억원";
     document.getElementById("reveal-total-value").textContent = poolTotal;
     document.getElementById("modal-reveal").classList.remove("hidden");
