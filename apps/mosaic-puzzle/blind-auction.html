@@ -282,6 +282,7 @@
       aiProfiles: L.createAiProfiles(),
       pool: null,
       poolTotal: 0,
+      auctionTotal: 0,
       playQueue: [],
       roundIndex: 0,
       startPlayerId: L.PLAYER_ORDER[Math.floor(Math.random() * L.PLAYER_ORDER.length)],
@@ -413,9 +414,10 @@
 
   function beginGame(items, category) {
     resetGame(category);
-    const { pool, poolTotal, playQueue } = L.pickGamePool(items);
+    const { pool, poolTotal, playQueue, auctionTotal } = L.pickGamePool(items);
     state.pool = pool;
     state.poolTotal = poolTotal;
+    state.auctionTotal = auctionTotal;
     state.playQueue = playQueue;
     document.getElementById("reveal-unit-label").textContent = CATEGORY_UNIT[category] || "억원";
     document.getElementById("reveal-total-value").textContent = poolTotal;
@@ -630,14 +632,14 @@
 
   async function fetchLeaderboard() {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/${LEADERBOARD_TABLE}?select=id,nickname,score,category,acquired,pool_total,created_at&order=score.desc,created_at.asc&limit=10`,
+      `${SUPABASE_URL}/rest/v1/${LEADERBOARD_TABLE}?select=id,nickname,score,category,acquired,pool_total,auction_total,created_at&order=score.desc,created_at.asc&limit=10`,
       { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
     );
     if (!res.ok) throw new Error("리더보드 조회 실패");
     return res.json();
   }
 
-  async function submitScore(score, nickname, category, acquired, poolTotal) {
+  async function submitScore(score, nickname, category, acquired, poolTotal, auctionTotal) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${LEADERBOARD_TABLE}`, {
       method: "POST",
       headers: {
@@ -646,7 +648,7 @@
         "Content-Type": "application/json",
         Prefer: "return=representation",
       },
-      body: JSON.stringify({ score, nickname, category, acquired, pool_total: poolTotal }),
+      body: JSON.stringify({ score, nickname, category, acquired, pool_total: poolTotal, auction_total: auctionTotal }),
     });
     if (!res.ok) throw new Error("리더보드 등록 실패");
     return res.json();
@@ -675,10 +677,10 @@
     return Math.round((userTotal / poolTotal) * 100);
   }
 
-  async function registerScore(nickname, pct, category, acquired, poolTotal) {
+  async function registerScore(nickname, pct, category, acquired, poolTotal, auctionTotal) {
     const statusEl = document.getElementById("rank-register-status");
     try {
-      await submitScore(pct, nickname, category, acquired, poolTotal);
+      await submitScore(pct, nickname, category, acquired, poolTotal, auctionTotal);
       const rows = await fetchLeaderboard();
       renderLeaderboard(rows);
       statusEl.textContent = `"${nickname}" 이름으로 ${pct}% 등록 완료`;
@@ -708,7 +710,7 @@
 
     // 게임이 끝나면 자동으로 한 번만 리더보드에 등록한다. 재등록 버튼은 중복 등록을
     // 유발해 제거했다.
-    await registerScore(storedNickname, pct, state.category, userEntry.total, state.poolTotal);
+    await registerScore(storedNickname, pct, state.category, userEntry.total, state.poolTotal, state.auctionTotal);
   }
 
   document.getElementById("restart-btn").addEventListener("click", () => {

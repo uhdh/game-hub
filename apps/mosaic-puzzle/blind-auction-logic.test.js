@@ -19,11 +19,13 @@ test('pickGamePool throws when pool has fewer than 22 items', () => {
 test('pickGamePool returns 22-item pool and 11-item play queue drawn from the pool', () => {
   const items = Array.from({ length: 30 }, (_, i) => ({ id: i, item_name: 'x' + i, value: i + 1 }));
   const rng = mulberry32(42);
-  const { pool, poolTotal, playQueue } = L.pickGamePool(items, rng);
+  const { pool, poolTotal, playQueue, auctionTotal } = L.pickGamePool(items, rng);
   assert.equal(pool.length, 22);
   assert.equal(playQueue.length, 11);
   const expectedTotal = pool.reduce((s, it) => s + it.value, 0);
   assert.equal(poolTotal, expectedTotal);
+  const expectedAuctionTotal = playQueue.reduce((s, it) => s + it.value, 0);
+  assert.equal(auctionTotal, expectedAuctionTotal);
   const poolIds = new Set(pool.map((it) => it.id));
   playQueue.forEach((it) => assert.ok(poolIds.has(it.id)));
 });
