@@ -673,12 +673,11 @@
     document.getElementById("leaderboard-list").innerHTML = buildLeaderboardHtml(rows);
   }
 
-  // 물품 22개(총 poolTotal) 중 내가 낙찰받은 금액이 몇 %인지를 리더보드 점수로 쓴다
-  // (예: 1000억 중 400억 획득 -> 40). 절대 금액 대신 비율로 남겨야 매 게임 물품
-  // 풀이 달라져도(추첨되는 22개가 매번 다름) 기록끼리 공정하게 비교된다.
-  function winPercent(userTotal, poolTotal) {
-    if (!poolTotal) return 0;
-    return Math.round((userTotal / poolTotal) * 100);
+  // 실제 경매에 오른 11개 물품의 총가치 중 내가 낙찰받은 금액이 몇 %인지
+  // 리더보드 점수로 쓴다.
+  function winPercent(userTotal, auctionTotal) {
+    if (!auctionTotal) return 0;
+    return Math.round((userTotal / auctionTotal) * 100);
   }
 
   async function registerScore(nickname, pct, category, acquired, poolTotal, auctionTotal) {
@@ -708,8 +707,8 @@
     });
 
     const userEntry = ranking.find((r) => r.id === "user");
-    const pct = winPercent(userEntry.total, state.poolTotal);
-    document.getElementById("results-pct").textContent = `획득 가치 비율 ${pct}% (${userEntry.total}${unit} / ${state.poolTotal}${unit})`;
+    const pct = winPercent(userEntry.total, state.auctionTotal);
+    document.getElementById("results-pct").textContent = `획득 가치 비율 ${pct}% (${userEntry.total}${unit} / ${state.auctionTotal}${unit})`;
     const storedNickname = getOrCreateStoredNickname(NICKNAME_KEY);
 
     // 게임이 끝나면 자동으로 한 번만 리더보드에 등록한다. 재등록 버튼은 중복 등록을
