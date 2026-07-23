@@ -217,6 +217,15 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  .post-content.expandable {
+    cursor: pointer;
+  }
+  .post-content.expanded {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-break: break-word;
+  }
   .status-badge {
     flex: 0 0 auto;
     font-size: 10.5px;
@@ -372,8 +381,8 @@
     </div>
 
     <div class="sort-tabs">
-      <div class="sort-tab active" id="sort-hot">추천순</div>
-      <div class="sort-tab" id="sort-new">최신순</div>
+      <div class="sort-tab" id="sort-hot">추천순</div>
+      <div class="sort-tab active" id="sort-new">최신순</div>
     </div>
 
     <div class="post-list" id="post-list"></div>
@@ -533,7 +542,7 @@
     return localStorage.getItem(ADMIN_PW_KEY) || "";
   }
 
-  let currentSort = "hot";
+  let currentSort = "new";
   let allPosts = [];
   let voteCounts = new Map();
 
@@ -658,6 +667,24 @@
       }
 
       list.appendChild(card);
+
+      if (contentEl.scrollWidth > contentEl.clientWidth) {
+        contentEl.classList.add("expandable");
+        contentEl.setAttribute("role", "button");
+        contentEl.setAttribute("tabindex", "0");
+        contentEl.setAttribute("aria-expanded", "false");
+        const toggleContent = () => {
+          const expanded = contentEl.classList.toggle("expanded");
+          contentEl.setAttribute("aria-expanded", String(expanded));
+        };
+        contentEl.addEventListener("click", toggleContent);
+        contentEl.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            toggleContent();
+          }
+        });
+      }
     });
 
     list.querySelectorAll(".vote-btn").forEach((btn) => {
