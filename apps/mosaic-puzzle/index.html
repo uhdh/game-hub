@@ -1113,7 +1113,7 @@
         limit
       ),
       format: r => {
-        const labels = { art: '미술품', collectible: '소장품', coupang: '쿠팡 인기상품', youtube: '유튜브 조회수', billionaires: '포브스 억만장자' };
+        const labels = { art: '미술품', collectible: '소장품', coupang: '네이버 쇼핑 인기상품', youtube: '유튜브 조회수', billionaires: '포브스 억만장자' };
         const units = { art: '억원', collectible: '억원', coupang: '만원', youtube: '억회', billionaires: '조원' };
         return labels[r.category] && r.acquired != null && r.auction_total != null
           ? `${labels[r.category]} · ${r.score}% (${r.acquired}${units[r.category]} / ${r.auction_total}${units[r.category]})`
