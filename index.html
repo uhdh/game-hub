@@ -616,7 +616,7 @@
     <span>💬 채팅</span>
   </button>
   <button type="button" class="floating-btn" id="leaderboard-btn">
-    <span>🏆 전체 리더보드</span>
+    <span>🏆 리더보드</span>
   </button>
   <a href="./predict.html" class="floating-btn">
     <span>🏆 우승자 예측</span>
@@ -677,7 +677,7 @@
   <div class="ann-box">
     <div class="ann-head">
       <div>
-        <span class="ann-head-title">전체 게임 리더보드</span>
+        <span class="ann-head-title">리더보드</span>
       </div>
       <button type="button" id="lb-close" class="ann-close" aria-label="닫기">✕</button>
     </div>
@@ -1136,6 +1136,11 @@
       label: '모자이크 퍼즐',
       fetch: (limit) => fetchSimpleTop('color_connect_leaderboard', 'nickname,score', 'score.desc,created_at.asc', limit),
       format: r => `${r.score}점`,
+    },
+    {
+      label: '수식 콤보',
+      fetch: (limit) => fetchSimpleTop('formula_combo_leaderboard', 'nickname,score,combos', 'score.desc,created_at.asc', limit),
+      format: r => `${r.score}점 · ${r.combos}콤보`,
     },
   ];
 
