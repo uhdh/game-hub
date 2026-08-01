@@ -791,6 +791,7 @@
   const ANNOUNCEMENT_SUPABASE_URL = 'https://paktzmofotvwfdxcpmzv.supabase.co';
   const ANNOUNCEMENT_SUPABASE_ANON_KEY = 'sb_publishable_jWbstEn2pKJTNDxLTR4Jig_asglvzGW';
   const ANNOUNCEMENT_SEEN_KEY = 'gamehub_announcement_seen_version';
+  const ANNOUNCEMENT_SEEN_HISTORY_KEY = 'gamehub_announcement_seen_history_id';
 
   const annBtn = document.getElementById('announcement-btn');
   const annDot = document.getElementById('announcement-dot');
@@ -829,6 +830,10 @@
       document.getElementById('ann-version').textContent = head.version;
       document.getElementById('ann-date').textContent = head.deploy_date;
       annIntro.textContent = head.intro || '';
+      const latestHistoryId = history.length ? String(history[0].id) : '';
+      const hasNewHistory = Boolean(
+        latestHistoryId && localStorage.getItem(ANNOUNCEMENT_SEEN_HISTORY_KEY) !== latestHistoryId
+      );
 
       if (head.intro_more) {
         annIntroToggle.hidden = false;
@@ -847,9 +852,10 @@
           const bullets = Array.isArray(entry.bullets) ? entry.bullets : [];
           const item = document.createElement('div');
           item.className = 'ann-history-item';
+          item.dataset.historyId = String(entry.id);
           item.innerHTML = `
             <div class="ann-history-title-row">
-              ${idx === 0 ? '<span class="ann-new-badge">NEW</span>' : ''}
+              ${idx === 0 && hasNewHistory ? '<span class="ann-new-badge">NEW</span>' : ''}
               <span class="ann-history-date">${entry.entry_date}</span>
               <span>${entry.title}</span>
             </div>
@@ -861,7 +867,7 @@
         });
       }
 
-      if (localStorage.getItem(ANNOUNCEMENT_SEEN_KEY) !== announcementVersion) {
+      if (localStorage.getItem(ANNOUNCEMENT_SEEN_KEY) !== announcementVersion || hasNewHistory) {
         annDot.classList.add('show');
       }
     } catch (e) {
@@ -873,6 +879,14 @@
   function openAnnouncement() {
     annOverlay.classList.add('show');
     if (announcementVersion) localStorage.setItem(ANNOUNCEMENT_SEEN_KEY, announcementVersion);
+    const latestHistoryItem = annHistoryList.querySelector('.ann-history-item');
+    if (latestHistoryItem) {
+      const badge = latestHistoryItem.querySelector('.ann-new-badge');
+      if (badge) badge.remove();
+      if (latestHistoryItem.dataset.historyId) {
+        localStorage.setItem(ANNOUNCEMENT_SEEN_HISTORY_KEY, latestHistoryItem.dataset.historyId);
+      }
+    }
     annDot.classList.remove('show');
   }
   function closeAnnouncement() {
