@@ -600,3 +600,8 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 - `game-hub/apps/mosaic-puzzle/ring-the-bell.html`에 모바일 최적화 버전을 반영하고 홈 화면에 링 더 벨 진입 카드를 유지했다.
 - `game-hub` 원격 `master`에 커밋 `3306687`을 push했다. 프로덕션 주소 `https://pgamex.vercel.app/ring-the-bell.html` 응답은 HTTP 200이며 게임 마크업과 520px 반응형 스타일을 확인했다.
 - 브라우저 자동 탭은 이번 확인 환경에서 URL 이동 후 빈 탭으로 남아 시각 캡처는 완료하지 못했다. 다음에는 프로덕션 모바일 실제 조작 확인이 남아 있다.
+## 2026-08-02 · Codex · 프로덕션 무한 로딩 수정
+- 원인: 자동 리더보드가 `leaderboardRows`의 변경을 감시하면서 자신의 `innerHTML`을 다시 갱신해 무한 MutationObserver 루프가 발생했다.
+- 수정: 리더보드 DOM 감시를 제거하고, 초기 표시와 라운드 종료 시점에만 갱신하도록 변경했다.
+- 검증: Chrome에서 프로덕션 페이지를 열어 본문과 초기 손패를 확인했고, 더미 클릭 후 손패가 5장으로 늘어나는 첫 턴 동작까지 확인했다.
+- 배포: `game-hub` 원격 `master`에 커밋 `75fea8a`를 push했다.
