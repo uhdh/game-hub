@@ -65,8 +65,8 @@ $('discardBtn').onclick=discardSelected;$('bell').onclick=showBell;$('fourBtn').
 </script><script>document.getElementById('scoreboard').style.display='none';const handLabel=document.querySelector('.hand-label');if(handLabel&&handLabel.firstChild)handLabel.firstChild.textContent='';(()=>{})();</script><script>(()=>{})();</script></body></html>
 <script>
 (()=>{
-  const nicknameKey='ringTheBellAutoNickname', eloKey='ringTheBellElo', winsKey='ringTheBellWins', lossesKey='ringTheBellLosses', processedKey='ringTheBellProcessedRounds';
-  const pool=['별빛여우','달빛토끼','구름고래','푸른수달','작은용','느긋한곰','반짝펭귄','노을여행자','은하수달','꿈꾸는너구리'];
+  const nicknameKey='ringTheBellParticipantNickname', eloKey='ringTheBellElo', winsKey='ringTheBellWins', lossesKey='ringTheBellLosses', processedKey='ringTheBellProcessedRounds';
+  const pool=['이상민','정근우','박지민','이태균','하승진','현성주','윤비','이진형','홍진호','서출구','최혜선','허성범','김경훈','김유현','김남희','강지후','곽범','이관희','신승용','덕후'];
   const randomNickname=()=>{const word=pool[Math.floor(Math.random()*pool.length)];return `${word}#${Math.floor(Math.random()*999)+1}`};
   const nickname=localStorage.getItem(nicknameKey)||randomNickname();
   localStorage.setItem(nicknameKey,nickname);
