@@ -596,3 +596,7 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 - 리더보드는 자동 생성 닉네임, ELO, 우리 팀 승·패·승률을 표시하고 브라우저 로컬 저장소에 누적한다.
 - JavaScript 구문 검사를 통과했고 로컬 서버 HTTP 응답은 200이다. 배포는 `game-hub` 동기화 후 Vercel Git 연동으로 진행한다.
 - 다음 작업: 배포 후 실제 프로덕션 모바일 화면에서 최종 확인.
+## 2026-08-02 · Codex · 링 더 벨 배포 완료
+- `game-hub/apps/mosaic-puzzle/ring-the-bell.html`에 모바일 최적화 버전을 반영하고 홈 화면에 링 더 벨 진입 카드를 유지했다.
+- `game-hub` 원격 `master`에 커밋 `3306687`을 push했다. 프로덕션 주소 `https://pgamex.vercel.app/ring-the-bell.html` 응답은 HTTP 200이며 게임 마크업과 520px 반응형 스타일을 확인했다.
+- 브라우저 자동 탭은 이번 확인 환경에서 URL 이동 후 빈 탭으로 남아 시각 캡처는 완료하지 못했다. 다음에는 프로덕션 모바일 실제 조작 확인이 남아 있다.
