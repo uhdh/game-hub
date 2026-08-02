@@ -630,3 +630,9 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 - 변경 파일: `ring-the-bell.html`의 리더보드 덮어쓰기 문제를 수정한 버전을 배포 사본에 동기화했다.
 - 배포: `game-hub` 커밋 `dacee3e`를 `origin/master`에 푸시했고, Vercel 프로덕션 `https://pgamex.vercel.app/ring-the-bell.html`에서 HTTP 200과 수정된 리더보드 단일 렌더링 코드 반영을 확인했다.
 - 다음 작업/미해결: 없음.
+## 2026-08-02 00:00 · Codex · 공지사항 미변경 원인 확인
+- 확인 파일: `index.html`은 공지사항을 정적 HTML에서 읽지 않고 Supabase `site_announcement`, `site_announcement_history`를 직접 조회한다.
+- 확인 결과: 프로덕션과 Supabase 응답 모두 기존 본문(version `1.0.1`, deploy_date `2026-07-22`)과 기존 내역을 반환한다. 최신 id 8 내역은 `?? ?? ?? ????` 형태의 잘못 저장된 문자열이다.
+- 원인: 링더벨 코드 배포만으로는 공지사항 DB가 변경되지 않으며, 관리자 RPC 인증을 거친 DB 수정이 별도로 필요하다. 캐시 문제는 아니다.
+- 배포: 미배포. 읽기 전용 진단만 수행했다.
+- 다음 작업/미해결: 관리자 인증 후 기존 잘못된 id 8 내역을 삭제하고 올바른 배포 내역을 새로 등록해야 한다.
