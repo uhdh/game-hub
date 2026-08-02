@@ -76,7 +76,7 @@ $('discardBtn').onclick=discardSelected;$('bell').onclick=showBell;$('fourBtn').
   let processed=Number(localStorage.getItem(processedKey))||0;
   function render(){const el=document.getElementById('leaderboardRows');if(!el)return;const total=wins+losses,rate=total?Math.round(wins/total*100):0;el.innerHTML=`<div class="leaderboard-row"><span class="leaderboard-rank">1</span><span class="leaderboard-name">${nickname} · 내 팀</span><span class="leaderboard-record"><b class="leaderboard-elo">ELO ${elo}</b><span class="leaderboard-wr">승 ${wins} · 패 ${losses} · 승률 ${rate}%</span></span></div>`}
   function recordRound(text){if(!text.includes('라운드 종료')||text===localStorage.getItem('ringTheBellLastRoundText'))return;localStorage.setItem('ringTheBellLastRoundText',text);const userWon=text.includes('팀 A');const expected=1/(1+Math.pow(10,(1000-elo)/400));elo=Math.max(100,Math.round(elo+32*((userWon?1:0)-expected)));if(userWon)wins++;else losses++;localStorage.setItem(eloKey,elo);localStorage.setItem(winsKey,wins);localStorage.setItem(lossesKey,losses);processed++;localStorage.setItem(processedKey,processed);render()}
-  const rows=document.getElementById('leaderboardRows');if(rows){new MutationObserver(render).observe(rows,{childList:true,subtree:true});render()}
+  const rows=document.getElementById('leaderboardRows');if(rows)render()
   const modalBox=document.getElementById('modalBox');if(modalBox)new MutationObserver(()=>recordRound(modalBox.textContent||'')).observe(modalBox,{childList:true,subtree:true,characterData:true});
   render();
 })();
