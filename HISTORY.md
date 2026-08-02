@@ -1,5 +1,10 @@
 # 작업 히스토리
 
+## 2026-08-02 · Codex · 링 더 벨 내부 리더보드 DB 표시 수정
+- 변경 파일: `ring-the-bell.html`. 내부 리더보드가 현재 참가자 한 명만 표시하던 문제를 수정해 Supabase `ring_the_bell_leaderboard`의 상위 20개 행을 ELO·승패·승률과 함께 표시하도록 변경했다. 라운드 결과 RPC 반영 후에도 목록을 다시 조회한다.
+- 검증: 프로덕션 화면에서 DB에 있던 여러 참가자 행이 순위대로 표시되는 것을 확인했다. DB REST 조회 결과와 화면의 순위·수치가 일치했다.
+- 배포: game-hub 커밋 `1a08ed2`를 `origin/master`에 푸시했다.
+
 ## 2026-08-02 · Codex · 링 더 벨 리더보드 DB 저장 배포 확인
 - 배포: game-hub 커밋 `be741cb`를 `origin/master`에 푸시했고 Vercel 프로덕션에 반영됐다.
 - 검증: 프로덕션 `ring-the-bell.html`에서 참가자 행이 표시됐고, 생성된 참가자 `현성주#653`의 `ELO 1000 · 0승 · 0패` 행이 Supabase REST 조회에서도 확인됐다. DB에 저장된 값과 화면 값이 일치한다.
