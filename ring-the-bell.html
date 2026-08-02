@@ -90,4 +90,21 @@ $('discardBtn').onclick=discardSelected;$('bell').onclick=showBell;$('fourBtn').
   .arena{gap:8px}.opponents{grid-template-columns:1fr;gap:7px}.player-card{padding:8px}.player-head{font-size:11px}.player-card .card{width:31px;height:43px}
   .center{grid-template-columns:minmax(0,1fr) 76px;column-gap:6px}.center>.deck-area{gap:8px}.deck-area{gap:8px}.deck,.discard{width:52px;height:72px}.pile-label{font-size:9px}.center>.bell{width:70px!important;height:92px!important}.center>.bell:before{top:20px;width:37px;height:36px}.center>.bell:after{bottom:39px;width:44px}.hand-label{font-size:13px}.your-hand{grid-template-columns:minmax(0,1fr) 0;display:block;padding:10px}.your-hand>.bell{position:absolute!important;right:8px;top:10px;width:70px!important;height:82px!important}.hand{padding-right:78px;gap:7px;overflow-x:auto}.card{width:54px;height:78px;flex:0 0 auto}.card .num{font-size:27px}.hint{font-size:10px;line-height:1.35}.log{max-height:120px;font-size:10px}.live-leaderboard{padding:10px}.leaderboard-row{grid-template-columns:18px minmax(0,1fr);gap:5px}.leaderboard-record{grid-column:2;font-size:10px;gap:6px}.instructions{font-size:11px;line-height:1.55}
 }
+@media (max-width:520px){
+  .shell{padding:12px 10px 28px}
+  .topbar{margin-bottom:14px}.rules-btn{padding:8px 11px;font-size:11px}
+  .hero{display:block;margin-bottom:12px}.hero h1{font-size:36px;margin:5px 0 8px}.hero p{font-size:12px;line-height:1.4}.bell-mark{display:none}
+  .table{padding:9px;border-radius:16px}.table-head{gap:6px;margin-bottom:10px}.status{font-size:13px}.progress{font-size:10px;padding:7px 10px}.signal-rule{font-size:11px;padding:7px 8px}
+  .arena{display:flex;flex-direction:column;gap:10px}.center{order:1;display:grid;grid-template-columns:1fr;gap:0}.your-hand{order:2;width:100%;margin-top:0;padding:11px 9px}.opponents{order:3;width:100%;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.player-card{padding:6px 4px;min-width:0}.player-head{font-size:9px;gap:2px}.player-head>span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mini-lives{font-size:9px;letter-spacing:0}.player-card>div:last-child{gap:2px!important}.player-card .card{width:21px;height:32px;padding:2px;border-width:2px}
+  .center>.deck-area{gap:12px;margin:5px 0 10px}.deck,.discard{width:64px;height:88px}.pile-label{font-size:9px}
+  .center>.bell{width:100%!important;height:64px!important;margin:0 0 6px!important;border-radius:20px!important}.center>.bell:before{left:50%!important;transform:translateX(-50%);top:12px}.center>.bell:after{left:50%;transform:translateX(-50%);bottom:9px}.center>.bell span{display:none!important}
+  .hint{font-size:10px;line-height:1.35;margin:5px auto 2px;min-height:18px}
+  .hand-label{font-size:12px;margin-bottom:7px}.hand{justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;padding:4px 2px 9px;gap:6px;min-height:94px;scrollbar-width:thin}.card{width:58px;height:82px;flex:0 0 auto}.card .mark{font-size:15px}.card .num{font-size:25px}
+  .actions{gap:6px;margin-top:8px}.actions .action{flex:1;min-width:0;padding:10px 7px;font-size:11px}
+  .player-card{padding:8px}.player-head{font-size:11px}.player-card>div:last-child{overflow:hidden}.player-card .card{width:31px;height:43px}
+  .log{margin-top:9px;max-height:116px;overflow:auto;font-size:10px;line-height:1.45;padding:9px 10px}.live-leaderboard{padding:10px}.leaderboard-row{grid-template-columns:18px minmax(0,1fr);gap:5px}.leaderboard-record{grid-column:2;font-size:10px;gap:6px}.instructions{font-size:11px;line-height:1.5}
+}
+@media (max-width:380px){
+  .shell{padding-left:8px;padding-right:8px}.hero h1{font-size:32px}.table{padding:8px 7px}.deck,.discard{width:58px;height:80px}.card{width:54px;height:78px}.card .num{font-size:23px}.center>.bell{height:58px!important}
+}
 </style></html>
