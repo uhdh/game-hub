@@ -733,6 +733,13 @@
       emoji: '🔨',
     },
     {
+      name: '링 더 벨',
+      desc: '카드를 교체해 조합을 만들고 최적의 순간에 종을 울리세요',
+      href: './ring-the-bell.html',
+      target: '_self',
+      emoji: '🔔',
+    },
+    {
       name: '돈벌레 게임',
       desc: '베팅하고 굴려서 배당을 노려보세요',
       href: 'https://cockroach-gambling-board.web.app/',
@@ -1132,19 +1139,8 @@
     },
     {
       label: '블라인드 경매',
-      fetch: (limit) => fetchSimpleTop(
-        'blind_auction_leaderboard',
-        'nickname,score,category,acquired,auction_total',
-        'score.desc,created_at.asc',
-        limit
-      ),
-      format: r => {
-        const labels = { art: '미술품', collectible: '소장품', coupang: '네이버 쇼핑 인기상품', youtube: '유튜브 조회수', billionaires: '포브스 억만장자' };
-        const units = { art: '억원', collectible: '억원', coupang: '만원', youtube: '억회', billionaires: '조원' };
-        return labels[r.category] && r.acquired != null && r.auction_total != null
-          ? `${labels[r.category]} · ${r.score}% (${r.acquired}${units[r.category]} / ${r.auction_total}${units[r.category]})`
-          : `${r.score}%`;
-      },
+      fetch: (limit) => fetchSimpleTop('blind_auction_leaderboard', 'nickname,score', 'score.desc,created_at.asc', limit),
+      format: r => `${r.score}%`,
     },
     {
       label: '모자이크 퍼즐',
