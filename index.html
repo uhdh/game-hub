@@ -616,7 +616,7 @@
     <span>💬 채팅</span>
   </button>
   <button type="button" class="floating-btn" id="leaderboard-btn">
-    <span>🏆 전체 리더보드</span>
+    <span>🏆 리더보드</span>
   </button>
   <a href="./predict.html" class="floating-btn">
     <span>🏆 우승자 예측</span>
@@ -677,7 +677,7 @@
   <div class="ann-box">
     <div class="ann-head">
       <div>
-        <span class="ann-head-title">전체 게임 리더보드</span>
+        <span class="ann-head-title">리더보드</span>
       </div>
       <button type="button" id="lb-close" class="ann-close" aria-label="닫기">✕</button>
     </div>
@@ -687,6 +687,25 @@
 
 <script>
   const GAMES = [
+    {
+      name: '링 더 벨',
+      desc: '카드를 교체해 조합을 만들고 최적의 순간에 종을 울리세요',
+      href: './ring-the-bell.html',
+      target: '_self',
+      emoji: '🔔',
+    },
+    {
+      name: '수식 콤보',
+      desc: '육각 타일을 이어 10의 거듭제곱을 만드는 콤보 게임',
+      href: './formula-combo.html',
+      target: '_self',
+      hexIcon: [
+        { left: 14, top: -9, bg: '#f0ece2', label: '+6', color: '#202020' },
+        { left: 28, top: 20, bg: '#73bdb0', label: '-7', color: '#202020' },
+        { left: 0, top: 20, bg: '#f0ece2', label: '+8', color: '#202020' },
+        { left: -14, top: -6, bg: '#f0ece2', label: '÷2', color: '#202020' },
+      ],
+    },
     {
       name: '모자이크 퍼즐',
       desc: '컬러 타일을 이어붙여 최고 점수를 노려보세요',
@@ -719,13 +738,6 @@
       href: './blind-auction.html',
       target: '_self',
       emoji: '🔨',
-    },
-    {
-      name: '돈벌레 게임',
-      desc: '베팅하고 굴려서 배당을 노려보세요',
-      href: 'https://cockroach-gambling-board.web.app/',
-      target: '_self',
-      image: './assets/donbeolle-1.png',
     },
   ];
 
@@ -779,6 +791,7 @@
   const ANNOUNCEMENT_SUPABASE_URL = 'https://paktzmofotvwfdxcpmzv.supabase.co';
   const ANNOUNCEMENT_SUPABASE_ANON_KEY = 'sb_publishable_jWbstEn2pKJTNDxLTR4Jig_asglvzGW';
   const ANNOUNCEMENT_SEEN_KEY = 'gamehub_announcement_seen_version';
+  const ANNOUNCEMENT_SEEN_HISTORY_KEY = 'gamehub_announcement_seen_history_id';
 
   const annBtn = document.getElementById('announcement-btn');
   const annDot = document.getElementById('announcement-dot');
@@ -817,6 +830,10 @@
       document.getElementById('ann-version').textContent = head.version;
       document.getElementById('ann-date').textContent = head.deploy_date;
       annIntro.textContent = head.intro || '';
+      const latestHistoryId = history.length ? String(history[0].id) : '';
+      const hasNewHistory = Boolean(
+        latestHistoryId && localStorage.getItem(ANNOUNCEMENT_SEEN_HISTORY_KEY) !== latestHistoryId
+      );
 
       if (head.intro_more) {
         annIntroToggle.hidden = false;
@@ -835,9 +852,10 @@
           const bullets = Array.isArray(entry.bullets) ? entry.bullets : [];
           const item = document.createElement('div');
           item.className = 'ann-history-item';
+          item.dataset.historyId = String(entry.id);
           item.innerHTML = `
             <div class="ann-history-title-row">
-              ${idx === 0 ? '<span class="ann-new-badge">NEW</span>' : ''}
+              ${idx === 0 && hasNewHistory ? '<span class="ann-new-badge">NEW</span>' : ''}
               <span class="ann-history-date">${entry.entry_date}</span>
               <span>${entry.title}</span>
             </div>
@@ -849,7 +867,7 @@
         });
       }
 
-      if (localStorage.getItem(ANNOUNCEMENT_SEEN_KEY) !== announcementVersion) {
+      if (localStorage.getItem(ANNOUNCEMENT_SEEN_KEY) !== announcementVersion || hasNewHistory) {
         annDot.classList.add('show');
       }
     } catch (e) {
@@ -861,6 +879,17 @@
   function openAnnouncement() {
     annOverlay.classList.add('show');
     if (announcementVersion) localStorage.setItem(ANNOUNCEMENT_SEEN_KEY, announcementVersion);
+    const latestHistoryItem = annHistoryList.querySelector('.ann-history-item');
+    if (latestHistoryItem) {
+      const latestHistoryDate = latestHistoryItem.querySelector('.ann-history-date');
+      if (latestHistoryDate) {
+        const latestHistory = latestHistoryDate.parentElement;
+        const badge = latestHistory.querySelector('.ann-new-badge');
+        if (badge) badge.remove();
+      }
+    }
+    const latestHistoryId = annHistoryList.querySelector('.ann-history-item')?.dataset.historyId;
+    if (latestHistoryId) localStorage.setItem(ANNOUNCEMENT_SEEN_HISTORY_KEY, latestHistoryId);
     annDot.classList.remove('show');
   }
   function closeAnnouncement() {
@@ -1093,7 +1122,31 @@
       .slice(0, limit);
   }
 
+  function fetchRingTheBellTop(limit) {
+    const key = 'ringTheBellParticipantNickname';
+    const pool = ['이상민', '정근우', '박지민', '이태균', '하승진', '현성주', '윤비', '이진형', '홍진호', '서출구', '최혜선', '허성범', '김경훈', '김유현', '김남희', '강지후', '곽범', '이관희', '신승용', '덕후'];
+    let nickname = localStorage.getItem(key);
+    if (!nickname) {
+      nickname = `${pool[Math.floor(Math.random() * pool.length)]}#${Math.floor(Math.random() * 999) + 1}`;
+      localStorage.setItem(key, nickname);
+    }
+    const wins = Number(localStorage.getItem('ringTheBellWins')) || 0;
+    const losses = Number(localStorage.getItem('ringTheBellLosses')) || 0;
+    const rating = Number(localStorage.getItem('ringTheBellElo')) || 1000;
+    return Promise.resolve([{ nickname, wins, losses, rating }].slice(0, limit));
+  }
+
   const LB_SECTIONS = [
+    {
+      label: '수식 콤보',
+      fetch: (limit) => fetchSimpleTop('formula_combo_leaderboard', 'nickname,score,combos', 'score.desc,created_at.asc', limit),
+      format: r => `${r.score}점 · ${r.combos}콤보`,
+    },
+    {
+      label: '링 더 벨',
+      fetch: (limit) => fetchRingTheBellTop(limit),
+      format: r => `${r.wins}승 ${r.losses}패 · ELO ${r.rating}`,
+    },
     {
       label: '3단 오목 · 최상',
       fetch: (limit) => fetchSimpleTop('gomoku_extreme_ranking', 'nickname,rating,wins,losses', 'rating.desc', limit),
