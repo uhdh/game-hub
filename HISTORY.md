@@ -1,5 +1,10 @@
 # 작업 히스토리
 
+## 2026-08-02 · Codex · 링 더 벨 리더보드 DB 저장 배포 확인
+- 배포: game-hub 커밋 `be741cb`를 `origin/master`에 푸시했고 Vercel 프로덕션에 반영됐다.
+- 검증: 프로덕션 `ring-the-bell.html`에서 참가자 행이 표시됐고, 생성된 참가자 `현성주#653`의 `ELO 1000 · 0승 · 0패` 행이 Supabase REST 조회에서도 확인됐다. DB에 저장된 값과 화면 값이 일치한다.
+- 다음 작업: 실제 라운드 종료를 한 번 진행해 RPC를 통한 승패·ELO 증가까지 운영 화면에서 확인한다.
+
 ## 2026-08-02 · Codex · 링 더 벨 리더보드 DB 저장 전환
 - 변경 파일: `ring-the-bell.html`, `index.html`. 링 더 벨의 ELO·승리·패배·승률을 `localStorage`에서 읽던 로직을 Supabase `ring_the_bell_leaderboard` 테이블 조회 로직으로 전환했다. 참가자 이름 생성 규칙은 기존 피의 게임 참가자 이름 규칙을 유지하고, 이름 외 점수 데이터는 DB를 단일 기준으로 사용한다.
 - DB 변경: `ring_the_bell_leaderboard` 테이블과 `record_ring_the_bell_result(text, boolean)` RPC를 추가했다. 라운드 결과는 RPC에서 행 잠금과 ELO 계산을 거쳐 원자적으로 반영되며, 홈 리더보드도 DB의 ELO 내림차순으로 표시한다.
