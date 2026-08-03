@@ -36,6 +36,21 @@
           scoreFormula: `${parts.comboPoints} × ${parts.combos} = ${parts.comboPoints * parts.combos}`,
           snapshot: document.querySelector('.board-card')?.innerText?.slice(0, 4000) || ''
         });
+        const refreshLeaderboardFormula = async () => {
+          try {
+            const response = await nativeFetch(`${api}?select=nickname,score,combos,combo_points&order=score.desc,created_at.asc&limit=20`, { headers });
+            const entries = await response.json();
+            document.querySelectorAll('.leaderboard-row').forEach((row, index) => {
+              const entry = entries[index];
+              if (!entry) return;
+              const points = entry.combo_points || (entry.combos ? Math.round(entry.score / entry.combos) : 0);
+              const small = row.querySelector('small');
+              const score = row.querySelector('b');
+              if (small) small.textContent = `${points}점 × ${entry.combos}콤보`;
+              if (score) score.textContent = `= ${entry.score.toLocaleString('ko-KR')}점`;
+            });
+          } catch (_) {}
+        };
         window.fetch = async (input, init = {}) => {
           const target = typeof input === 'string' ? input : input?.url || '';
           if (target.startsWith(api) && init.body && (init.method === 'POST' || init.method === 'PATCH')) {
@@ -67,6 +82,7 @@
           panel.innerHTML = '<strong>1위 기보</strong><p>불러오는 중입니다.</p>';
           head.append(button);
           card.append(panel);
+          refreshLeaderboardFormula();
           button.onclick = async () => {
             panel.hidden = !panel.hidden;
             if (panel.hidden) return;
