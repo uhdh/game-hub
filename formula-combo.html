@@ -42,14 +42,44 @@
           board: getBoardLayout(),
           snapshot: document.querySelector('.board-card')?.innerText?.slice(0, 4000) || ''
         });
-        const getComboCounts = () => {
-          const counts = {};
-          document.querySelectorAll('.combo-log .log-row small').forEach(row => {
-            const match = row.textContent.match(/(\d+)\s+zeros/);
-            if (match) { const key = String(10 ** Number(match[1])); counts[key] = (counts[key] || 0) + 1; }
-          });
-          return counts;
+        // 콤보 로그 패널(.combo-log)은 일반 게임 화면에만 렌더링되고 강지후 샘플 화면에는
+        // 없어서 DOM 스크래핑으로는 샘플 모드의 집계를 얻을 수 없다. 대신 두 모드 모두에
+        // 존재하는 "콤보 완성 선언" 버튼 클릭을 캡처 단계에서 관찰해 직접 집계한다.
+        let comboCountsTally = {};
+        const resetComboTally = () => { comboCountsTally = {}; };
+        const readComboBadge = () => Number(document.querySelector('.score-card span')?.textContent.match(/\d+/)?.[0] ?? -1);
+        const readActiveFormulaResult = () => {
+          const el = document.querySelector('.top-sample-formula strong') || document.querySelector('.board-sample-formula strong');
+          const match = el?.textContent.match(/=\s*([-\d,.]+)/);
+          if (!match || match[1].trim() === '—') return null;
+          return Number(match[1].replace(/,/g, ''));
         };
+        // 점수 제출은 React 이펙트의 setTimeout(0)으로 거의 즉시 발생하므로, 콤보 선언
+        // 판정도 같은 매크로태스크 큐 지연(setTimeout)으로 확인하면 제출이 먼저 실행되는
+        // 경쟁이 생긴다. MutationObserver 콜백은 마이크로태스크라 어떤 setTimeout(0)보다도
+        // 먼저 실행되므로 이걸로 배지 변화를 감지해 제출 전에 집계를 확정한다.
+        let pendingDeclare = null;
+        new MutationObserver(() => {
+          if (!pendingDeclare) return;
+          const badge = readComboBadge();
+          if (badge <= pendingDeclare.beforeBadge) return;
+          const { result } = pendingDeclare;
+          pendingDeclare = null;
+          if (result === null) return;
+          const zeros = String(Math.abs(Math.trunc(result))).replace(/[^0]/g, '').length;
+          if (zeros < 1) return;
+          const key = String(10 ** zeros);
+          comboCountsTally[key] = (comboCountsTally[key] || 0) + 1;
+        }).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+        document.addEventListener('click', event => {
+          const button = event.target.closest('button');
+          if (!button) return;
+          const label = button.textContent.trim();
+          if (label === '새 게임') { resetComboTally(); return; }
+          if (!label.includes('콤보 완성 선언')) return;
+          pendingDeclare = { beforeBadge: readComboBadge(), result: readActiveFormulaResult() };
+        }, true);
+        const getComboCounts = () => ({ ...comboCountsTally });
         const getBoardLayout = () => {
           const board = document.querySelector('.hex-board');
           if (!board) return null;
@@ -111,13 +141,10 @@
               if (parts) {
                 body.combo_points = parts.comboPoints;
                 body.score = parts.comboPoints * Number(body.combos || parts.combos);
-                if (body.score > 100000) {
-                  body.replay = getReplay({ ...parts, combos: Number(body.combos || parts.combos) });
-                  body.combo_counts = body.replay.comboCounts;
-                } else {
-                  body.replay = null;
-                  body.combo_counts = null;
-                }
+                body.combo_counts = getComboCounts();
+                body.replay = body.score > 100000
+                  ? getReplay({ ...parts, combos: Number(body.combos || parts.combos) })
+                  : null;
                 init = { ...init, body: JSON.stringify(body) };
               }
             } catch (_) {}
