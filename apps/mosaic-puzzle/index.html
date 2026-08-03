@@ -1141,6 +1141,16 @@
       format: r => `${Number(r.combo_points || (r.combos ? Math.round(r.score / r.combos) : 0)).toLocaleString('ko-KR')}점 × ${r.combos}콤보 = ${Number(r.score).toLocaleString('ko-KR')}점`,
     },
     {
+      label: '수식 콤보 · AI',
+      // AI 관전 기록은 사람 리더보드와 다른 테이블에 쌓인다.
+      // 홈 리더보드 렌더러가 nickname 을 쓰므로 label 을 맞춰 넘긴다.
+      fetch: async (limit) => {
+        const rows = await fetchSimpleTop('formula_combo_ai_leaderboard', 'label,score,combos,combo_points', 'score.desc,created_at.asc', limit);
+        return rows.map(r => ({ ...r, nickname: r.label || 'AI' }));
+      },
+      format: r => `${Number(r.combo_points).toLocaleString('ko-KR')}점 × ${r.combos}콤보 = ${Number(r.score).toLocaleString('ko-KR')}점`,
+    },
+    {
       label: '링 더 벨',
       fetch: (limit) => fetchRingTheBellTop(limit),
       format: r => `${r.wins}승 ${r.losses}패 · ELO ${r.rating}`,
