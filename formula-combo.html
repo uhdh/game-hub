@@ -253,7 +253,24 @@
           };
           return mount;
         })();
-        const mountFormulaSolver = () => formulaSolver();
+        let adminSolverDecision = null;
+        const mountFormulaSolver = () => {
+          if (adminSolverDecision === false || adminSolverDecision === true) {
+            if (adminSolverDecision === true) formulaSolver();
+            return;
+          }
+          const password = window.sessionStorage.getItem('bloodGameXAdminPw');
+          if (!password) { adminSolverDecision = false; return; }
+          adminSolverDecision = fetch('https://paktzmofotvwfdxcpmzv.supabase.co/rest/v1/rpc/admin_check_password', {
+            method: 'POST',
+            headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ p_password: password })
+          }).then(response => response.ok ? response.json() : false).then(valid => {
+            adminSolverDecision = valid === true;
+            if (adminSolverDecision) formulaSolver();
+            return adminSolverDecision;
+          }).catch(() => { adminSolverDecision = false; return false; });
+        };
         let modeSwitchBypass = false;
         document.addEventListener('click', event => {
           if (modeSwitchBypass) return;
