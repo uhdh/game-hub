@@ -142,4 +142,10 @@ $('discardBtn').onclick=discardSelected;$('bell').onclick=showBell;$('fourBtn').
 @media (max-width:380px){
   .shell{padding-left:8px;padding-right:8px}.hero h1{font-size:32px}.table{padding:8px 7px}.deck,.discard{width:58px;height:80px}.hand{gap:3px}.card{width:48px;height:72px}.card .num{font-size:22px}.center>.bell{height:58px!important}
 }
-</style></html>
+</style><script>
+(()=>{
+  const style=document.createElement('style');
+  style.textContent='.your-hand>.bell,.center>.bell{background:transparent!important;border:0!important;box-shadow:none!important}.your-hand>.bell:before,.your-hand>.bell:after,.center>.bell:before,.center>.bell:after{display:none!important}.your-hand>.bell span,.center>.bell span{display:grid!important;place-items:center!important;inset:0!important;height:100%!important;font-size:0!important;color:transparent!important;text-shadow:none!important}.your-hand>.bell span:after,.center>.bell span:after{content:"🔔";font-family:"Apple Color Emoji","Segoe UI Emoji",sans-serif;font-size:48px;line-height:1;color:initial;text-shadow:none}.center>.bell span:after{font-size:52px}@media(max-width:520px){.your-hand>.bell span:after{font-size:42px}.center>.bell span:after{font-size:46px}}';
+  document.head.append(style);
+})();
+</script></html>
