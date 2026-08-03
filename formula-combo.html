@@ -34,7 +34,7 @@
           mode: document.querySelector('.sample-card') ? 'sample' : 'new_game',
           comboPoints: parts.comboPoints,
           combos: parts.combos,
-          scoreFormula: `${parts.comboPoints} × ${parts.combos} = ${parts.comboPoints * parts.combos}`,
+          scoreFormula: `${parts.comboPoints.toLocaleString('ko-KR')} × ${parts.combos} = ${(parts.comboPoints * parts.combos).toLocaleString('ko-KR')}`,
           snapshot: document.querySelector('.board-card')?.innerText?.slice(0, 4000) || ''
         });
         const refreshLeaderboardFormula = async () => {
@@ -97,7 +97,7 @@
               if (!top) { panel.innerHTML = '<strong>1위 기보</strong><p>등록된 기보가 없습니다.</p>'; return; }
               const replay = top.replay;
               const mode = replay?.mode === 'sample' ? '강지후 샘플' : '새 게임';
-              panel.innerHTML = `<strong>1위 기보 · ${mode} · ${esc(top.nickname)}</strong><p>${replay?.scoreFormula || `${top.combo_points || Math.round(top.score / Math.max(1, top.combos))} × ${top.combos} = ${top.score}`} · ${top.score}점</p><pre>${esc(replay?.snapshot || '이전 기록에는 기보 데이터가 없습니다.')}</pre>`;
+              panel.innerHTML = `<strong>1위 기보 · ${mode} · ${esc(top.nickname)}</strong><p>${replay?.scoreFormula || `${(top.combo_points || Math.round(top.score / Math.max(1, top.combos))).toLocaleString('ko-KR')} × ${top.combos} = ${Number(top.score).toLocaleString('ko-KR')}`} · ${Number(top.score).toLocaleString('ko-KR')}점</p><pre>${esc(replay?.snapshot || '이전 기록에는 기보 데이터가 없습니다.')}</pre>`;
             } catch (_) { panel.innerHTML = '<strong>1위 기보</strong><p>기보를 불러오지 못했습니다.</p>'; }
           };
         };
