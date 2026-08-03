@@ -11,24 +11,27 @@
         const headers = { apikey: key, Authorization: `Bearer ${key}` };
         const nativeFetch = window.fetch.bind(window);
         const esc = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-        const normalizeScore = () => {
-          const line = document.querySelector('.total-score-line');
-          if (!line) return;
-          const match = line.textContent.match(/총점\s*\(([-\d,.]+)\s*-\s*[-\d,.]+\)\s*[×x]\s*(\d+)\s*=\s*[-\d,.]+/);
-          if (!match) return;
-          const comboPoints = Number(match[1].replace(/,/g, ''));
-          const combos = Number(match[2]);
-          line.dataset.comboPoints = comboPoints;
-          line.dataset.combos = combos;
-          line.textContent = `최종점수 ${comboPoints} × ${combos} = ${comboPoints * combos}`;
-        };
+        const scorePattern = /총점\s*\(([-\d,.]+)\s*-\s*[-\d,.]+\)\s*[×x]\s*(\d+)\s*=\s*[-\d,.]+/;
+        // React가 그리는 총점 줄은 손대지 않고 값만 읽는다. textContent를 덮어쓰면
+        // React가 붙잡고 있던 텍스트 노드가 떨어져 나가 이후 갱신이 화면에 반영되지 않는다.
         const getScoreParts = () => {
-          const normalized = document.querySelector('.total-score-line');
-          if (normalized?.dataset.comboPoints) return { comboPoints: Number(normalized.dataset.comboPoints), combos: Number(normalized.dataset.combos) };
-          const line = document.querySelector('.total-score-line')?.textContent || '';
-          const match = line.match(/총점\s*\(([-\d,.]+)\s*-\s*[-\d,.]+\)\s*[×x]\s*(\d+)\s*=\s*[-\d,.]+/);
+          const match = document.querySelector('.total-score-line')?.textContent.match(scorePattern);
           if (!match) return null;
           return { comboPoints: Number(match[1].replace(/,/g, '')), combos: Number(match[2]) };
+        };
+        const normalizeScore = () => {
+          const line = document.querySelector('.total-score-line');
+          const parts = getScoreParts();
+          if (!line || !parts) return;
+          line.classList.add('is-raw-total');
+          let view = document.querySelector('.formula-final-score');
+          if (!view) {
+            view = document.createElement('small');
+            view.className = 'formula-final-score';
+            line.after(view);
+          }
+          const text = `최종점수 ${parts.comboPoints.toLocaleString('ko-KR')} × ${parts.combos} = ${(parts.comboPoints * parts.combos).toLocaleString('ko-KR')}`;
+          if (view.textContent !== text) view.textContent = text;
         };
         const getReplay = parts => ({
           mode: document.querySelector('.sample-card') ? 'sample' : 'new_game',
@@ -317,7 +320,7 @@
           }
         }, true);
         const style = document.createElement('style');
-        style.textContent = '#formula-replay-tab{margin-left:auto;border:1px solid #70c7b5;border-radius:8px;background:transparent;color:#70c7b5;padding:6px 9px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}#formula-my-rank{color:#e2b653;font-size:10px;font-weight:800;margin-left:auto;margin-right:8px}#formula-replay-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-replay-panel p{color:#70c7b5;margin:8px 0}#formula-replay-panel pre{max-height:180px;overflow:auto;white-space:pre-wrap;color:#aab4bd;font:11px/1.5 ui-monospace,monospace}.formula-source{font-style:normal;color:#e2b653;font-size:10px;font-weight:800;white-space:nowrap}.formula-counts{color:#8992a0;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.replay-board-wrap{overflow:auto;margin:10px -4px;padding:4px}.replay-board{position:relative;min-width:640px;background:#11181e;border-radius:10px}.replay-tile{position:absolute;box-sizing:border-box;border:1px solid #536471;border-radius:8px;background:#26333b;color:#eef3f4;font:800 13px/1 ui-monospace,monospace;cursor:pointer}.replay-tile:hover,.replay-tile.selected{background:#2d8f88;border-color:#b9fff2;color:#fff}.replay-challenge-status{color:#70c7b5;font-size:11px}.replay-reset{margin-top:8px;border:1px solid #536471;border-radius:7px;background:transparent;color:#aab4bd;padding:6px 9px;font-size:10px;cursor:pointer}#formula-solver-controls{display:flex;align-items:center;gap:6px;margin-left:8px;flex-wrap:wrap}#formula-solver-controls button{border:1px solid #70c7b5;border-radius:7px;background:#16252a;color:#b9fff2;padding:5px 8px;font:inherit;font-size:10px;font-weight:800;cursor:pointer}#formula-solver-controls span{color:#8992a0;font-size:10px}';
+        style.textContent = '#formula-replay-tab{margin-left:auto;border:1px solid #70c7b5;border-radius:8px;background:transparent;color:#70c7b5;padding:6px 9px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}#formula-my-rank{color:#e2b653;font-size:10px;font-weight:800;margin-left:auto;margin-right:8px}#formula-replay-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-replay-panel p{color:#70c7b5;margin:8px 0}#formula-replay-panel pre{max-height:180px;overflow:auto;white-space:pre-wrap;color:#aab4bd;font:11px/1.5 ui-monospace,monospace}.formula-source{font-style:normal;color:#e2b653;font-size:10px;font-weight:800;white-space:nowrap}.formula-counts{color:#8992a0;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.replay-board-wrap{overflow:auto;margin:10px -4px;padding:4px}.replay-board{position:relative;min-width:640px;background:#11181e;border-radius:10px}.replay-tile{position:absolute;box-sizing:border-box;border:1px solid #536471;border-radius:8px;background:#26333b;color:#eef3f4;font:800 13px/1 ui-monospace,monospace;cursor:pointer}.replay-tile:hover,.replay-tile.selected{background:#2d8f88;border-color:#b9fff2;color:#fff}.replay-challenge-status{color:#70c7b5;font-size:11px}.replay-reset{margin-top:8px;border:1px solid #536471;border-radius:7px;background:transparent;color:#aab4bd;padding:6px 9px;font-size:10px;cursor:pointer}#formula-solver-controls{display:flex;align-items:center;gap:6px;margin-left:8px;flex-wrap:wrap}#formula-solver-controls button{border:1px solid #70c7b5;border-radius:7px;background:#16252a;color:#b9fff2;padding:5px 8px;font:inherit;font-size:10px;font-weight:800;cursor:pointer}#formula-solver-controls span{color:#8992a0;font-size:10px}.score-card .total-score-line.is-raw-total{display:none}.score-card .formula-final-score{display:block;color:var(--accent-hover);background:#5fb8b01f;border:1px solid #5fb8b073;border-radius:9px;margin-top:8px;padding:8px 10px;font-size:13px;font-weight:800}';
         document.head.append(style);
         new MutationObserver(mount).observe(document.documentElement, { childList: true, subtree: true });
         setTimeout(mount, 0);
