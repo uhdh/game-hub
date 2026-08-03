@@ -108,8 +108,13 @@
               if (parts) {
                 body.combo_points = parts.comboPoints;
                 body.score = parts.comboPoints * Number(body.combos || parts.combos);
-                body.replay = getReplay({ ...parts, combos: Number(body.combos || parts.combos) });
-                body.combo_counts = body.replay.comboCounts;
+                if (body.score > 100000) {
+                  body.replay = getReplay({ ...parts, combos: Number(body.combos || parts.combos) });
+                  body.combo_counts = body.replay.comboCounts;
+                } else {
+                  body.replay = null;
+                  body.combo_counts = null;
+                }
                 init = { ...init, body: JSON.stringify(body) };
               }
             } catch (_) {}
@@ -153,11 +158,154 @@
             } catch (_) { panel.innerHTML = '<strong>1위 기보</strong><p>기보를 불러오지 못했습니다.</p>'; }
           };
         };
+        const formulaSolver = (() => {
+          const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+          const parseLabel = label => {
+            const text = String(label || '').replace(/\s+/g, '');
+            const op = text[0];
+            const value = Number(text.slice(1).replace(/[()]/g, ''));
+            return { op, value };
+          };
+          const apply = (value, tile) => tile.op === '+' ? value + tile.value : tile.op === '-' || tile.op === '−' ? value - tile.value : tile.op === '×' ? value * tile.value : tile.value ? value / tile.value : value;
+          const isPower = value => Number.isInteger(value) && value >= 10 && Math.log10(value) % 1 === 0;
+          const zeroCount = value => String(Math.abs(Math.trunc(value))).replace(/[^0]/g, '').length;
+          const board = () => [...document.querySelectorAll('.hex-board .hex-slot')].map((slot, index) => {
+            const el = slot.querySelector('.hex-tile');
+            if (!el) return null;
+            const rect = slot.getBoundingClientRect();
+            return { index, el, tile: parseLabel(el.querySelector('strong')?.textContent || el.textContent), x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, removed: el.classList.contains('removed') };
+          }).filter(Boolean);
+          const neighbours = nodes => nodes.map((node, i) => nodes.map((other, j) => i !== j && Math.hypot(node.x - other.x, node.y - other.y) <= 75 ? j : -1).filter(j => j >= 0));
+          const findBest = (nodes, graph, start) => {
+            let best = null;
+            const beam = [{ at: start, value: nodes[start].tile.value, path: [start] }];
+            for (let depth = 1; depth <= 14 && beam.length; depth++) {
+              const next = [];
+              for (const state of beam) for (const to of graph[state.at]) {
+                if (state.path.includes(to) || nodes[to].removed) continue;
+                const value = apply(state.value, nodes[to].tile);
+                const path = [...state.path, to];
+                if (path.length > 1 && isPower(value)) {
+                  const score = path.length * zeroCount(value);
+                  if (!best || score > best.score || score === best.score && path.length > best.path.length) best = { path, value, score };
+                }
+                if (Number.isFinite(value) && Math.abs(value) <= 1000000) next.push({ at: to, value, path });
+              }
+              next.sort((a, b) => (Math.abs(b.value) === Math.abs(a.value) ? b.path.length - a.path.length : Math.abs(a.value) - Math.abs(b.value)));
+              beam.splice(0, beam.length, ...next.slice(0, 700));
+            }
+            return best;
+          };
+          const clickPath = async (nodes, path) => {
+            for (const index of path) { nodes[index].el.click(); await sleep(28); }
+            const declare = [...document.querySelectorAll('button.combo-button')].find(button => !button.classList.contains('retry-button') && !button.disabled);
+            if (declare) { declare.click(); await sleep(45); return true; }
+            return false;
+          };
+          const solve = async status => {
+            const nodes = board();
+            if (nodes.length < 2 || document.querySelector('.tray-stack .tray-tile')) { status.textContent = '먼저 타일 배치를 완료하세요.'; return; }
+            const graph = neighbours(nodes);
+            let completed = 0;
+            for (let round = 0; round < nodes.length; round++) {
+              const current = board();
+              const currentGraph = neighbours(current);
+              let best = null;
+              current.forEach((node, start) => { if (!node.removed) { const candidate = findBest(current, currentGraph, start); if (candidate && (!best || candidate.score > best.score || candidate.score === best.score && candidate.path.length > best.path.length)) best = candidate; } });
+              if (!best) break;
+              if (!(await clickPath(current, best.path))) break;
+              completed += 1;
+              status.textContent = `자동 솔버 진행 중 · ${completed}콤보 · 최근 결과 ${best.value.toLocaleString('ko-KR')}`;
+              await sleep(70);
+            }
+            status.textContent = `자동 솔버 완료 · ${completed}콤보`;
+          };
+          const placeAll = async status => {
+            let placed = 0;
+            for (let i = 0; i < 75; i++) {
+              const source = document.querySelector('.tray-stack .tray-tile');
+              const target = document.querySelector('.hex-board .hex-slot:not(.occupied)');
+              if (!source || !target) break;
+              const props = element => { const key = Object.keys(element).find(name => name.startsWith('__reactProps')); return key ? element[key] : null; };
+              props(source)?.onDragStart?.();
+              await sleep(35);
+              const freshTarget = document.querySelector('.hex-board .hex-slot:not(.occupied)');
+              props(freshTarget)?.onDrop?.({ preventDefault() {} });
+              placed += 1;
+              status.textContent = `자동 배치 중 · ${placed}/75`;
+              await sleep(90);
+            }
+            const finish = [...document.querySelectorAll('button')].find(button => button.textContent.includes('배치 완료'));
+            if (finish) { finish.click(); await sleep(120); }
+            status.textContent = `자동 배치 완료 · ${placed}개`;
+          };
+          const mount = () => {
+            if (document.getElementById('formula-solver-controls')) return;
+            const head = document.querySelector('.topbar');
+            if (!head) return;
+            const controls = document.createElement('div');
+            controls.id = 'formula-solver-controls';
+            controls.innerHTML = '<button type="button" data-solver-place>자동 배치</button><button type="button" data-solver-run>솔버 실행</button><span data-solver-status>개발용 자동 플레이</span>';
+            head.append(controls);
+            const status = controls.querySelector('[data-solver-status]');
+            controls.querySelector('[data-solver-place]').onclick = () => placeAll(status);
+            controls.querySelector('[data-solver-run]').onclick = () => solve(status);
+          };
+          return mount;
+        })();
+        const mountFormulaSolver = () => formulaSolver();
+        let modeSwitchBypass = false;
+        document.addEventListener('click', event => {
+          if (modeSwitchBypass) return;
+          const button = event.target.closest('button');
+          const label = button?.textContent.trim();
+          if (label !== '강지후 샘플' && label !== '샘플 닫기') return;
+          event.preventDefault();
+          event.stopPropagation();
+          const newGame = [...document.querySelectorAll('button')].find(item => item.textContent.trim() === '새 게임');
+          modeSwitchBypass = true;
+          newGame?.click();
+          modeSwitchBypass = false;
+          if (label === '강지후 샘플') setTimeout(() => {
+            const sample = [...document.querySelectorAll('button')].find(item => item.textContent.trim() === '강지후 샘플');
+            modeSwitchBypass = true;
+            sample?.click();
+            modeSwitchBypass = false;
+          }, 0);
+        }, true);
+        let replayResetBypass = false;
+        document.addEventListener('click', async event => {
+          const button = event.target.closest('button.retry-button');
+          if (replayResetBypass || !button || button.textContent.trim() !== '다시 하기') return;
+          event.preventDefault();
+          event.stopPropagation();
+          const restart = [...document.querySelectorAll('button')].find(item => item.textContent.trim() === '새 게임');
+          if (button.closest('.sample-card')) {
+            restart?.click();
+            setTimeout(() => [...document.querySelectorAll('button')].find(item => item.textContent.trim() === '강지후 샘플')?.click(), 0);
+          } else {
+            let remaining = 0;
+            const readComboCount = () => Number(document.querySelector('.combo-log .log-head b')?.textContent.match(/\d+/)?.[0] || 0);
+            while ((remaining = readComboCount()) > 0) {
+              const undo = [...document.querySelectorAll('button.retry-button')].find(item => item.textContent.trim() === '되돌리기');
+              if (!undo) break;
+              replayResetBypass = true;
+              undo.click();
+              replayResetBypass = false;
+              await new Promise(resolve => setTimeout(resolve, 25));
+            }
+            replayResetBypass = true;
+            button.click();
+            replayResetBypass = false;
+          }
+        }, true);
         const style = document.createElement('style');
-        style.textContent = '#formula-replay-tab{margin-left:auto;border:1px solid #70c7b5;border-radius:8px;background:transparent;color:#70c7b5;padding:6px 9px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}#formula-my-rank{color:#e2b653;font-size:10px;font-weight:800;margin-left:auto;margin-right:8px}#formula-replay-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-replay-panel p{color:#70c7b5;margin:8px 0}#formula-replay-panel pre{max-height:180px;overflow:auto;white-space:pre-wrap;color:#aab4bd;font:11px/1.5 ui-monospace,monospace}.formula-source{font-style:normal;color:#e2b653;font-size:10px;font-weight:800;white-space:nowrap}.formula-counts{color:#8992a0;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.replay-board-wrap{overflow:auto;margin:10px -4px;padding:4px}.replay-board{position:relative;min-width:640px;background:#11181e;border-radius:10px}.replay-tile{position:absolute;box-sizing:border-box;border:1px solid #536471;border-radius:8px;background:#26333b;color:#eef3f4;font:800 13px/1 ui-monospace,monospace;cursor:pointer}.replay-tile:hover,.replay-tile.selected{background:#2d8f88;border-color:#b9fff2;color:#fff}.replay-challenge-status{color:#70c7b5;font-size:11px}.replay-reset{margin-top:8px;border:1px solid #536471;border-radius:7px;background:transparent;color:#aab4bd;padding:6px 9px;font-size:10px;cursor:pointer}';
+        style.textContent = '#formula-replay-tab{margin-left:auto;border:1px solid #70c7b5;border-radius:8px;background:transparent;color:#70c7b5;padding:6px 9px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}#formula-my-rank{color:#e2b653;font-size:10px;font-weight:800;margin-left:auto;margin-right:8px}#formula-replay-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-replay-panel p{color:#70c7b5;margin:8px 0}#formula-replay-panel pre{max-height:180px;overflow:auto;white-space:pre-wrap;color:#aab4bd;font:11px/1.5 ui-monospace,monospace}.formula-source{font-style:normal;color:#e2b653;font-size:10px;font-weight:800;white-space:nowrap}.formula-counts{color:#8992a0;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.replay-board-wrap{overflow:auto;margin:10px -4px;padding:4px}.replay-board{position:relative;min-width:640px;background:#11181e;border-radius:10px}.replay-tile{position:absolute;box-sizing:border-box;border:1px solid #536471;border-radius:8px;background:#26333b;color:#eef3f4;font:800 13px/1 ui-monospace,monospace;cursor:pointer}.replay-tile:hover,.replay-tile.selected{background:#2d8f88;border-color:#b9fff2;color:#fff}.replay-challenge-status{color:#70c7b5;font-size:11px}.replay-reset{margin-top:8px;border:1px solid #536471;border-radius:7px;background:transparent;color:#aab4bd;padding:6px 9px;font-size:10px;cursor:pointer}#formula-solver-controls{display:flex;align-items:center;gap:6px;margin-left:8px;flex-wrap:wrap}#formula-solver-controls button{border:1px solid #70c7b5;border-radius:7px;background:#16252a;color:#b9fff2;padding:5px 8px;font:inherit;font-size:10px;font-weight:800;cursor:pointer}#formula-solver-controls span{color:#8992a0;font-size:10px}';
         document.head.append(style);
         new MutationObserver(mount).observe(document.documentElement, { childList: true, subtree: true });
         setTimeout(mount, 0);
+        new MutationObserver(mountFormulaSolver).observe(document.documentElement, { childList: true, subtree: true });
+        setTimeout(mountFormulaSolver, 0);
       })();
     </script>
     <script type="module" crossorigin src="./assets/formula-combo/formula-combo-BP32ypKH.js"></script>
