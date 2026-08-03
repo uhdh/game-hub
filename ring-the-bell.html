@@ -154,7 +154,23 @@ $('discardBtn').onclick=discardSelected;$('bell').onclick=showBell;$('fourBtn').
   style.textContent='.your-hand>.bell,.center>.bell{transform:translateY(-12px)!important}.your-hand>.bell:hover,.center>.bell:hover{transform:translateY(-12px)!important}@media(max-width:760px){.your-hand>.bell{display:grid!important;visibility:visible!important;opacity:1!important;position:absolute!important;right:8px!important;top:0!important;z-index:5!important;transform:translateY(-2px)!important}.your-hand>.bell span{display:grid!important;visibility:visible!important;opacity:1!important}.center>.bell{display:grid!important;visibility:visible!important;opacity:1!important;position:relative!important;grid-column:2!important;justify-self:end!important;z-index:5!important;transform:translateY(-2px)!important}.center>.bell span{display:grid!important;visibility:visible!important;opacity:1!important}}';
   document.head.append(style);
   const reapply=()=>document.head.append(style.cloneNode(true));
+  const ensureBell=()=>{
+    const bell=document.querySelector('.center>.bell');
+    const icon=bell?.querySelector('span');
+    if(!bell||!icon)return;
+    bell.style.setProperty('display','grid','important');
+    bell.style.setProperty('visibility','visible','important');
+    bell.style.setProperty('opacity','1','important');
+    icon.textContent='🔔';
+    icon.style.setProperty('display','grid','important');
+    icon.style.setProperty('visibility','visible','important');
+    icon.style.setProperty('opacity','1','important');
+    icon.style.setProperty('font-size','46px','important');
+    icon.style.setProperty('line-height','1','important');
+  };
+  ensureBell();
   setTimeout(reapply,0);
-  window.addEventListener('load',()=>setTimeout(reapply,0),{once:true});
+  setTimeout(ensureBell,0);
+  window.addEventListener('load',()=>{setTimeout(reapply,0);setTimeout(ensureBell,0)},{once:true});
 })();
 </script></html>
