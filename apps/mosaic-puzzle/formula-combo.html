@@ -46,10 +46,11 @@
           });
           return counts;
         };
+        const isValidEntry = entry => Number.isInteger(Number(entry.combos)) && Number(entry.combos) >= 0 && Number(entry.combos) <= 75 && Number(entry.combo_points) >= 0 && Number(entry.score) === Number(entry.combo_points) * Number(entry.combos);
         const refreshLeaderboardFormula = async () => {
           try {
-            const response = await nativeFetch(`${api}?select=nickname,score,combos,combo_points,combo_counts,replay&order=score.desc,created_at.asc&limit=10`, { headers });
-            const entries = await response.json();
+            const response = await nativeFetch(`${api}?select=nickname,score,combos,combo_points,combo_counts,replay&order=score.desc,created_at.asc&limit=1000`, { headers });
+            const entries = (await response.json()).filter(isValidEntry);
             document.querySelectorAll('.leaderboard-row').forEach((row, index) => {
               row.hidden = index >= 10;
               const entry = entries[index];
@@ -72,8 +73,8 @@
         const refreshMyRank = async rank => {
           try {
             const nickname = window.localStorage.getItem('formulaComboNickname');
-            const response = await nativeFetch(`${api}?select=nickname,score&order=score.desc,created_at.asc`, { headers });
-            const entries = await response.json();
+            const response = await nativeFetch(`${api}?select=nickname,score,combos,combo_points&order=score.desc,created_at.asc`, { headers });
+            const entries = (await response.json()).filter(isValidEntry);
             const position = entries.findIndex(entry => entry.nickname === nickname);
             rank.textContent = position >= 0 ? `내 순위 ${position + 1}위 · ${Number(entries[position].score).toLocaleString('ko-KR')}점` : '내 순위 미등록';
           } catch (_) { rank.textContent = '내 순위 확인 실패'; }
@@ -121,8 +122,8 @@
             if (panel.hidden) return;
             panel.innerHTML = '<strong>1위 기보</strong><p>불러오는 중입니다.</p>';
             try {
-              const response = await nativeFetch(`${api}?select=nickname,score,combos,combo_points,combo_counts,replay&order=score.desc,created_at.asc&limit=1`, { headers });
-              const [top] = await response.json();
+              const response = await nativeFetch(`${api}?select=nickname,score,combos,combo_points,combo_counts,replay&order=score.desc,created_at.asc&limit=1000`, { headers });
+              const [top] = (await response.json()).filter(isValidEntry);
               if (!top) { panel.innerHTML = '<strong>1위 기보</strong><p>등록된 기보가 없습니다.</p>'; return; }
               const replay = top.replay;
               const mode = replay?.mode === 'sample' ? '강지후 샘플' : '새 게임';

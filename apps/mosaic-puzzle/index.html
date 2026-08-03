@@ -1088,6 +1088,11 @@
     return res.json();
   }
 
+  async function fetchFormulaTop(limit) {
+    const rows = await fetchSimpleTop('formula_combo_leaderboard', 'nickname,score,combos,combo_points', 'score.desc,created_at.asc', 1000);
+    return rows.filter(r => Number.isInteger(Number(r.combos)) && Number(r.combos) >= 0 && Number(r.combos) <= 75 && Number(r.combo_points) >= 0 && Number(r.score) === Number(r.combo_points) * Number(r.combos)).slice(0, limit);
+  }
+
   // 지각변동은 별도 랭킹 테이블이 없어, 대국 기록(1인 vs AI 2명, 사람은 항상 R)을
   // 닉네임별로 직접 집계한다. tectonic-shift.html의 fetchRanking과 동일한 로직.
   async function fetchTectonicTop(limit) {
@@ -1132,7 +1137,7 @@
   const LB_SECTIONS = [
     {
       label: '수식 콤보',
-      fetch: (limit) => fetchSimpleTop('formula_combo_leaderboard', 'nickname,score,combos,combo_points', 'score.desc,created_at.asc', limit),
+      fetch: (limit) => fetchFormulaTop(limit),
       format: r => `${Number(r.combo_points || (r.combos ? Math.round(r.score / r.combos) : 0)).toLocaleString('ko-KR')}점 × ${r.combos}콤보 = ${Number(r.score).toLocaleString('ko-KR')}점`,
     },
     {
