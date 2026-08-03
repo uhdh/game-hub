@@ -31,6 +31,7 @@
           return { comboPoints: Number(match[1].replace(/,/g, '')), combos: Number(match[2]) };
         };
         const getReplay = parts => ({
+          mode: document.querySelector('.sample-card') ? 'sample' : 'new_game',
           comboPoints: parts.comboPoints,
           combos: parts.combos,
           scoreFormula: `${parts.comboPoints} × ${parts.combos} = ${parts.comboPoints * parts.combos}`,
@@ -38,7 +39,7 @@
         });
         const refreshLeaderboardFormula = async () => {
           try {
-            const response = await nativeFetch(`${api}?select=nickname,score,combos,combo_points&order=score.desc,created_at.asc&limit=20`, { headers });
+            const response = await nativeFetch(`${api}?select=nickname,score,combos,combo_points,replay&order=score.desc,created_at.asc&limit=20`, { headers });
             const entries = await response.json();
             document.querySelectorAll('.leaderboard-row').forEach((row, index) => {
               const entry = entries[index];
@@ -48,6 +49,9 @@
               const score = row.querySelector('b');
               if (small) small.textContent = `${points}점 × ${entry.combos}콤보`;
               if (score) score.textContent = `= ${entry.score.toLocaleString('ko-KR')}점`;
+              let source = row.querySelector('.formula-source');
+              if (!source) { source = document.createElement('em'); source.className = 'formula-source'; row.append(source); }
+              source.textContent = entry.replay?.mode === 'sample' ? '강지후 샘플' : '새 게임';
             });
           } catch (_) {}
         };
@@ -92,12 +96,13 @@
               const [top] = await response.json();
               if (!top) { panel.innerHTML = '<strong>1위 기보</strong><p>등록된 기보가 없습니다.</p>'; return; }
               const replay = top.replay;
-              panel.innerHTML = `<strong>1위 기보 · ${esc(top.nickname)}</strong><p>${replay?.scoreFormula || `${top.combo_points || Math.round(top.score / Math.max(1, top.combos))} × ${top.combos} = ${top.score}`} · ${top.score}점</p><pre>${esc(replay?.snapshot || '이전 기록에는 기보 데이터가 없습니다.')}</pre>`;
+              const mode = replay?.mode === 'sample' ? '강지후 샘플' : '새 게임';
+              panel.innerHTML = `<strong>1위 기보 · ${mode} · ${esc(top.nickname)}</strong><p>${replay?.scoreFormula || `${top.combo_points || Math.round(top.score / Math.max(1, top.combos))} × ${top.combos} = ${top.score}`} · ${top.score}점</p><pre>${esc(replay?.snapshot || '이전 기록에는 기보 데이터가 없습니다.')}</pre>`;
             } catch (_) { panel.innerHTML = '<strong>1위 기보</strong><p>기보를 불러오지 못했습니다.</p>'; }
           };
         };
         const style = document.createElement('style');
-        style.textContent = '#formula-replay-tab{margin-left:auto;border:1px solid #70c7b5;border-radius:8px;background:transparent;color:#70c7b5;padding:6px 9px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}#formula-replay-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-replay-panel p{color:#70c7b5;margin:8px 0}#formula-replay-panel pre{max-height:180px;overflow:auto;white-space:pre-wrap;color:#aab4bd;font:11px/1.5 ui-monospace,monospace}';
+        style.textContent = '#formula-replay-tab{margin-left:auto;border:1px solid #70c7b5;border-radius:8px;background:transparent;color:#70c7b5;padding:6px 9px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}#formula-replay-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-replay-panel p{color:#70c7b5;margin:8px 0}#formula-replay-panel pre{max-height:180px;overflow:auto;white-space:pre-wrap;color:#aab4bd;font:11px/1.5 ui-monospace,monospace}.formula-source{font-style:normal;color:#e2b653;font-size:10px;font-weight:800;white-space:nowrap}';
         document.head.append(style);
         new MutationObserver(mount).observe(document.documentElement, { childList: true, subtree: true });
         setTimeout(mount, 0);
