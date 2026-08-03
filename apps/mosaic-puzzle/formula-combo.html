@@ -132,8 +132,13 @@
             rank.textContent = position >= 0 ? `내 순위 ${position + 1}위 · ${Number(entries[position].score).toLocaleString('ko-KR')}점` : '내 순위 미등록';
           } catch (_) { rank.textContent = '내 순위 확인 실패'; }
         };
+        let suppressSubmit = false;
         window.fetch = async (input, init = {}) => {
           const target = typeof input === 'string' ? input : input?.url || '';
+          if (suppressSubmit && target.startsWith(api) && (init.method === 'POST' || init.method === 'PATCH')) {
+            // 자동 솔버가 콤보를 연달아 선언하는 동안에는 중간 점수를 제출하지 않는다
+            return new Response(null, { status: 204 });
+          }
           if (target.startsWith(api) && init.body && (init.method === 'POST' || init.method === 'PATCH')) {
             try {
               const body = JSON.parse(init.body);
@@ -150,6 +155,27 @@
             } catch (_) {}
           }
           return nativeFetch(input, init);
+        };
+        // 자동 솔버가 끝난 뒤 현재 화면의 최종 점수를 한 번만 제출한다.
+        const submitFinalScore = async () => {
+          try {
+            const parts = getScoreParts();
+            if (!parts || !parts.combos) return false;
+            const nickname = window.localStorage.getItem('formulaComboNickname');
+            if (!nickname) return false;
+            const score = Math.max(0, parts.comboPoints * parts.combos);
+            const lookup = await nativeFetch(`${api}?nickname=eq.${encodeURIComponent(nickname)}&select=id,score`, { headers });
+            if (!lookup.ok) return false;
+            const [existing] = await lookup.json();
+            if (existing && Number(existing.score) >= score) return false;
+            // window.fetch 오버라이드가 combo_points·replay·combo_counts를 채워준다
+            const response = await window.fetch(existing ? `${api}?id=eq.${existing.id}` : api, {
+              method: existing ? 'PATCH' : 'POST',
+              headers: { ...headers, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+              body: JSON.stringify({ nickname, score, combos: parts.combos })
+            });
+            return response.ok;
+          } catch (_) { return false; }
         };
         const mount = () => {
           normalizeScore();
@@ -190,96 +216,390 @@
         };
         const formulaSolver = (() => {
           const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+          const waitFor = async (check, timeout = 2000) => {
+            const start = performance.now();
+            while (performance.now() - start < timeout) {
+              if (check()) return true;
+              await new Promise(resolve => setTimeout(resolve, 4));
+            }
+            return check();
+          };
+          const reactProps = element => {
+            if (!element) return null;
+            const key = Object.keys(element).find(name => name.startsWith('__reactProps'));
+            return key ? element[key] : null;
+          };
+
+          // --- 게임 규칙 복제 (번들 로직과 동일) ---
+          const DIRS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+          const CELLS = (() => {
+            const out = [];
+            for (let q = -6; q <= 6; q += 1) {
+              for (let r = -6; r <= 6; r += 1) {
+                if (Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r)) > 6) continue;
+                out.push({ q, r });
+              }
+            }
+            return out;
+          })();
+          const CELL_AT = new Map(CELLS.map((cell, index) => [`${cell.q},${cell.r}`, index]));
+          const hexDist = cell => (Math.abs(cell.q) + Math.abs(cell.r) + Math.abs(cell.q + cell.r)) / 2;
           const parseLabel = label => {
             const text = String(label || '').replace(/\s+/g, '');
-            const op = text[0];
-            const value = Number(text.slice(1).replace(/[()]/g, ''));
-            return { op, value };
+            if (text.startsWith('÷')) return { op: '÷', value: Number(text.slice(1)) };
+            if (text.startsWith('×')) return { op: '×', value: Number(text.slice(1).replace(/[()]/g, '')) };
+            if (text.startsWith('+')) return { op: '+', value: Number(text.slice(1)) };
+            return { op: '−', value: Number(text.slice(1).replace(/[()]/g, '')) };
           };
-          const apply = (value, tile) => tile.op === '+' ? value + tile.value : tile.op === '-' || tile.op === '−' ? value - tile.value : tile.op === '×' ? value * tile.value : tile.value ? value / tile.value : value;
-          const isPower = value => Number.isInteger(value) && value >= 10 && Math.log10(value) % 1 === 0;
-          const zeroCount = value => String(Math.abs(Math.trunc(value))).replace(/[^0]/g, '').length;
-          const board = () => [...document.querySelectorAll('.hex-board .hex-slot')].map((slot, index) => {
-            const el = slot.querySelector('.hex-tile');
-            if (!el) return null;
-            const rect = slot.getBoundingClientRect();
-            return { index, el, tile: parseLabel(el.querySelector('strong')?.textContent || el.textContent), x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, removed: el.classList.contains('removed') };
-          }).filter(Boolean);
-          const neighbours = nodes => nodes.map((node, i) => nodes.map((other, j) => i !== j && Math.hypot(node.x - other.x, node.y - other.y) <= 75 ? j : -1).filter(j => j >= 0));
-          const findBest = (nodes, graph, start) => {
-            let best = null;
-            const beam = [{ at: start, value: nodes[start].tile.value, path: [start] }];
-            for (let depth = 1; depth <= 14 && beam.length; depth++) {
-              const next = [];
-              for (const state of beam) for (const to of graph[state.at]) {
-                if (state.path.includes(to) || nodes[to].removed) continue;
-                const value = apply(state.value, nodes[to].tile);
-                const path = [...state.path, to];
-                if (path.length > 1 && isPower(value)) {
-                  const score = path.length * zeroCount(value);
-                  if (!best || score > best.score || score === best.score && path.length > best.path.length) best = { path, value, score };
-                }
-                if (Number.isFinite(value) && Math.abs(value) <= 1000000) next.push({ at: to, value, path });
-              }
-              next.sort((a, b) => (Math.abs(b.value) === Math.abs(a.value) ? b.path.length - a.path.length : Math.abs(a.value) - Math.abs(b.value)));
-              beam.splice(0, beam.length, ...next.slice(0, 700));
+          const labelOf = tile => (tile.op === '×' && tile.value < 0 ? `×(${tile.value})` : `${tile.op}${tile.value}`);
+          const applyOp = (value, tile) => {
+            if (tile.op === '+') return value + tile.value;
+            if (tile.op === '−') return value - tile.value;
+            if (tile.op === '×') return value * tile.value;
+            return tile.value === 0 ? value : value / tile.value;
+          };
+          const isPower = value => {
+            if (value < 10 || !Number.isInteger(value)) return false;
+            const log = Math.log10(value);
+            return Math.abs(log - Math.round(log)) < 1e-9;
+          };
+          const zerosOf = value => String(Math.abs(Math.trunc(value))).replace(/[^0]/g, '').length;
+
+          // --- DOM 접근 ---
+          const slots = () => [...document.querySelectorAll('.hex-board .hex-slot')];
+          const trayTiles = () => [...document.querySelectorAll('.tray-stack .tray-tile, .tray-tile')].map(el => {
+            const match = (el.getAttribute('aria-label') || '').match(/타일\s*(\d+)\s*개/);
+            return { el, label: (el.querySelector('strong') || {}).textContent.trim(), count: match ? Number(match[1]) : 1 };
+          });
+          const pathCount = () => document.querySelectorAll('.hex-board .hex-tile.path').length;
+          const comboCount = () => {
+            const head = document.querySelector('.combo-log .log-head b');
+            return Number(((head || {}).textContent || '').match(/\d+/) || [0]);
+          };
+          const buttonByText = text => [...document.querySelectorAll('button')].find(button => button.textContent.trim() === text);
+
+          // --- 배치 계획 ---
+          // 곱셈·나눗셈 타일을 값이 큰 순서로 보드 중앙에 모으고, +/− 타일은 큰 값부터 번갈아 채운다.
+          const buildPlan = () => {
+            const tiles = [];
+            trayTiles().forEach(entry => {
+              const parsed = parseLabel(entry.label);
+              for (let i = 0; i < entry.count; i += 1) tiles.push({ ...parsed, label: entry.label });
+            });
+            if (!tiles.length) return null;
+            const scale = tiles.filter(tile => tile.op === '×' || tile.op === '÷').sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+            const plus = tiles.filter(tile => tile.op === '+').sort((a, b) => b.value - a.value);
+            const minus = tiles.filter(tile => tile.op === '−').sort((a, b) => b.value - a.value);
+            const mixed = [];
+            for (let i = 0; i < Math.max(plus.length, minus.length); i += 1) {
+              if (plus[i]) mixed.push(plus[i]);
+              if (minus[i]) mixed.push(minus[i]);
             }
-            return best;
+            const ordered = [...scale, ...mixed];
+            const targets = CELLS.map((cell, index) => ({ index, cell }))
+              .sort((a, b) => hexDist(a.cell) - hexDist(b.cell) || a.index - b.index)
+              .slice(0, ordered.length);
+            return ordered.map((tile, i) => ({ tile, cellIndex: targets[i].index }));
           };
-          const clickPath = async (nodes, path) => {
-            for (const index of path) { nodes[index].el.click(); await sleep(28); }
-            const declare = [...document.querySelectorAll('button.combo-button')].find(button => !button.classList.contains('retry-button') && !button.disabled);
-            if (declare) { declare.click(); await sleep(45); return true; }
-            return false;
-          };
-          const solve = async status => {
-            const nodes = board();
-            if (nodes.length < 2 || document.querySelector('.tray-stack .tray-tile')) { status.textContent = '먼저 타일 배치를 완료하세요.'; return; }
-            const graph = neighbours(nodes);
-            let completed = 0;
-            for (let round = 0; round < nodes.length; round++) {
-              const current = board();
-              const currentGraph = neighbours(current);
-              let best = null;
-              current.forEach((node, start) => { if (!node.removed) { const candidate = findBest(current, currentGraph, start); if (candidate && (!best || candidate.score > best.score || candidate.score === best.score && candidate.path.length > best.path.length)) best = candidate; } });
-              if (!best) break;
-              if (!(await clickPath(current, best.path))) break;
-              completed += 1;
-              status.textContent = `자동 솔버 진행 중 · ${completed}콤보 · 최근 결과 ${best.value.toLocaleString('ko-KR')}`;
-              await sleep(70);
-            }
-            status.textContent = `자동 솔버 완료 · ${completed}콤보`;
-          };
+
           const placeAll = async status => {
+            const plan = buildPlan();
+            if (!plan) { status.textContent = '배치할 타일이 없습니다.'; return null; }
             let placed = 0;
-            for (let i = 0; i < 75; i++) {
-              const source = document.querySelector('.tray-stack .tray-tile');
-              const target = document.querySelector('.hex-board .hex-slot:not(.occupied)');
-              if (!source || !target) break;
-              const props = element => { const key = Object.keys(element).find(name => name.startsWith('__reactProps')); return key ? element[key] : null; };
-              props(source)?.onDragStart?.();
-              await sleep(35);
-              const freshTarget = document.querySelector('.hex-board .hex-slot:not(.occupied)');
-              props(freshTarget)?.onDrop?.({ preventDefault() {} });
+            for (const step of plan) {
+              const source = trayTiles().find(entry => entry.label === step.tile.label);
+              if (!source) break;
+              const startProps = reactProps(source.el);
+              if (!startProps || !startProps.onDragStart) break;
+              startProps.onDragStart();
+              await waitFor(() => true, 0);
+              await sleep(0);
+              const slot = slots()[step.cellIndex];
+              const dropProps = reactProps(slot);
+              if (!dropProps || !dropProps.onDrop) break;
+              dropProps.onDrop({ preventDefault() {} });
+              const ok = await waitFor(() => slots()[step.cellIndex].classList.contains('occupied'), 800);
+              if (!ok) break;
               placed += 1;
-              status.textContent = `자동 배치 중 · ${placed}/75`;
-              await sleep(90);
+              if (placed % 5 === 0) status.textContent = `자동 배치 중 · ${placed}/${plan.length}`;
             }
-            const finish = [...document.querySelectorAll('button')].find(button => button.textContent.includes('배치 완료'));
-            if (finish) { finish.click(); await sleep(120); }
+            const finish = buttonByText('배치 완료');
+            if (finish) { finish.click(); await waitFor(() => !buttonByText('배치 완료'), 800); }
             status.textContent = `자동 배치 완료 · ${placed}개`;
+            return placed;
           };
+
+          // --- 현재 보드 상태 읽기 ---
+          const readBoard = () => {
+            const all = slots();
+            const tiles = [];
+            const cellToNode = new Map();
+            all.forEach((slot, cellIndex) => {
+              const el = slot.querySelector('.hex-tile');
+              if (!el) return;
+              const tile = parseLabel((el.querySelector('strong') || el).textContent);
+              cellToNode.set(cellIndex, tiles.length);
+              tiles.push({ ...tile, cellIndex, removed: el.classList.contains('removed') });
+            });
+            const graph = tiles.map(tile => {
+              const cell = CELLS[tile.cellIndex];
+              return DIRS.map(([dq, dr]) => cellToNode.get(CELL_AT.get(`${cell.q + dq},${cell.r + dr}`)))
+                .filter(index => index !== undefined);
+            });
+            return { tiles, graph };
+          };
+
+          // --- 라운드 경로 탐색 (beam search) ---
+          const findPath = (tiles, graph, removed, start, opts) => {
+            const words = Math.ceil(tiles.length / 32);
+            const hasBit = (mask, i) => (mask[i >> 5] & (1 << (i & 31))) !== 0;
+            const setBit = (mask, i) => { const copy = mask.slice(); copy[i >> 5] |= (1 << (i & 31)); return copy; };
+            const first = new Uint32Array(words);
+            first[start >> 5] |= (1 << (start & 31));
+            let beam = [{ pos: start, value: tiles[start].value, mask: first, len: 1, prev: null }];
+            let best = null;
+            for (let depth = 1; depth <= opts.maxDepth && beam.length; depth += 1) {
+              const buckets = new Map();
+              for (const state of beam) {
+                for (const to of graph[state.pos]) {
+                  if (removed[to] || hasBit(state.mask, to)) continue;
+                  const value = applyOp(state.value, tiles[to]);
+                  if (!Number.isFinite(value) || Math.abs(value) > 2e6) continue;
+                  const len = state.len + 1;
+                  const next = { pos: to, value, mask: setBit(state.mask, to), len, prev: state };
+                  if (isPower(value)) {
+                    const score = len * zerosOf(value);
+                    if (!best || score > best.score) best = { score, value, len, node: next };
+                  }
+                  const key = String(value);
+                  let bucket = buckets.get(key);
+                  if (!bucket) { bucket = []; buckets.set(key, bucket); }
+                  if (bucket.length < opts.perValue) bucket.push(next);
+                  else {
+                    let worst = 0;
+                    for (let i = 1; i < bucket.length; i += 1) if (bucket[i].len < bucket[worst].len) worst = i;
+                    if (next.len > bucket[worst].len) bucket[worst] = next;
+                  }
+                }
+              }
+              const pool = [];
+              buckets.forEach(bucket => pool.push(...bucket));
+              pool.sort((a, b) => {
+                const ai = Number.isInteger(a.value) ? 0 : 1;
+                const bi = Number.isInteger(b.value) ? 0 : 1;
+                if (ai !== bi) return ai - bi;
+                if (b.len !== a.len) return b.len - a.len;
+                return Math.abs(a.value) - Math.abs(b.value);
+              });
+              beam = pool.slice(0, opts.beamWidth);
+            }
+            if (!best) return null;
+            const path = [];
+            for (let node = best.node; node; node = node.prev) path.push(node.pos);
+            path.reverse();
+            return { path, value: best.value, zeros: zerosOf(best.value), score: best.score };
+          };
+
+          // 제거하면 남은 타일이 분단되는 칸(관절점)
+          const articulation = (graph, removed, alive) => {
+            const cut = new Set();
+            if (alive.length < 3) return cut;
+            const disc = new Map();
+            const low = new Map();
+            let timer = 0;
+            const root = alive[0];
+            disc.set(root, timer); low.set(root, timer); timer += 1;
+            const stack = [{ u: root, parent: -1, index: 0, children: 0 }];
+            while (stack.length) {
+              const frame = stack[stack.length - 1];
+              const neighbours = graph[frame.u].filter(v => !removed[v]);
+              if (frame.index < neighbours.length) {
+                const v = neighbours[frame.index];
+                frame.index += 1;
+                if (v === frame.parent) continue;
+                if (disc.has(v)) low.set(frame.u, Math.min(low.get(frame.u), disc.get(v)));
+                else {
+                  disc.set(v, timer); low.set(v, timer); timer += 1;
+                  frame.children += 1;
+                  stack.push({ u: v, parent: frame.u, index: 0, children: 0 });
+                }
+              } else {
+                stack.pop();
+                const parent = stack[stack.length - 1];
+                if (parent) {
+                  low.set(parent.u, Math.min(low.get(parent.u), low.get(frame.u)));
+                  if (parent.parent !== -1 && low.get(frame.u) >= disc.get(parent.u)) cut.add(parent.u);
+                }
+              }
+            }
+            const rootChildren = graph[root].filter(v => !removed[v] && disc.get(v) === 1).length;
+            if (rootChildren > 1) cut.add(root);
+            return cut;
+          };
+
+          const longestPath = (graph, removed, alive, beamWidth) => {
+            if (!alive.length) return [];
+            const words = Math.ceil(graph.length / 32);
+            const hasBit = (mask, i) => (mask[i >> 5] & (1 << (i & 31))) !== 0;
+            const setBit = (mask, i) => { const copy = mask.slice(); copy[i >> 5] |= (1 << (i & 31)); return copy; };
+            let beam = alive.map(start => {
+              const mask = new Uint32Array(words);
+              mask[start >> 5] |= (1 << (start & 31));
+              return { pos: start, mask, len: 1, prev: null };
+            });
+            let best = beam[0];
+            while (beam.length) {
+              const next = [];
+              for (const state of beam) {
+                for (const to of graph[state.pos]) {
+                  if (removed[to] || hasBit(state.mask, to)) continue;
+                  next.push({ pos: to, mask: setBit(state.mask, to), len: state.len + 1, prev: state });
+                }
+              }
+              if (!next.length) break;
+              next.sort((a, b) => b.len - a.len);
+              beam = next.slice(0, beamWidth);
+              if (beam[0].len > best.len) best = beam[0];
+            }
+            const out = [];
+            for (let node = best; node; node = node.prev) out.push(node.pos);
+            return out.reverse();
+          };
+
+          // --- 전체 계획 수립 ---
+          const planGame = (tiles, graph, opts) => {
+            const removed = tiles.map(tile => tile.removed);
+            const rounds = [];
+            let sum = 0;
+            for (let round = 0; round < tiles.length; round += 1) {
+              const alive = [];
+              for (let i = 0; i < tiles.length; i += 1) if (!removed[i]) alive.push(i);
+              if (alive.length < 2) break;
+              const cut = articulation(graph, removed, alive);
+              const degree = i => graph[i].filter(x => !removed[x]).length;
+              const ranked = alive.slice().sort((a, b) => {
+                const ca = cut.has(a) ? 1 : 0;
+                const cb = cut.has(b) ? 1 : 0;
+                if (ca !== cb) return ca - cb;
+                const pa = tiles[a].op === '×' || tiles[a].op === '÷' ? 1 : 0;
+                const pb = tiles[b].op === '×' || tiles[b].op === '÷' ? 1 : 0;
+                if (pa !== pb) return pa - pb;
+                return degree(a) - degree(b);
+              });
+              let bestRound = null;
+              for (const start of ranked.slice(0, opts.startCandidates)) {
+                const found = findPath(tiles, graph, removed, start, opts);
+                if (found && (!bestRound || found.score > bestRound.score)) bestRound = found;
+              }
+              if (!bestRound) {
+                for (const start of alive) {
+                  const found = findPath(tiles, graph, removed, start, opts);
+                  if (found && (!bestRound || found.score > bestRound.score)) bestRound = found;
+                }
+              }
+              if (!bestRound) break;
+              rounds.push(bestRound);
+              sum += bestRound.score;
+              removed[bestRound.path[0]] = true;
+            }
+            const aliveEnd = [];
+            for (let i = 0; i < tiles.length; i += 1) if (!removed[i]) aliveEnd.push(i);
+            const tail = longestPath(graph, removed, aliveEnd, 300);
+            return { rounds, tail, sum, penalty: aliveEnd.length - tail.length };
+          };
+
+          // --- 계획 재생 ---
+          const resetPath = async () => {
+            const button = [...document.querySelectorAll('button.retry-button')].find(item => item.textContent.trim() === '다시 하기');
+            const props = reactProps(button);
+            if (props && props.onClick) props.onClick();
+            else if (button) button.click();
+            return waitFor(() => pathCount() === 0, 600);
+          };
+          const clickNode = async (tiles, node, expected) => {
+            const slot = slots()[tiles[node].cellIndex];
+            const button = slot && slot.querySelector('.hex-tile');
+            if (!button) return false;
+            button.click();
+            return waitFor(() => pathCount() === expected, 600);
+          };
+          const declare = async () => {
+            const button = [...document.querySelectorAll('button.combo-button')].find(item => !item.classList.contains('retry-button') && item.textContent.trim() === '콤보 완성 선언');
+            if (!button) return false;
+            const before = comboCount();
+            button.click();
+            return waitFor(() => comboCount() > before, 900);
+          };
+
+          const solve = async status => {
+            if (document.querySelector('.tray-stack .tray-tile')) { status.textContent = '먼저 타일 배치를 완료하세요.'; return; }
+            const board = readBoard();
+            if (board.tiles.length < 2) { status.textContent = '배치된 타일이 없습니다.'; return; }
+            status.textContent = '경로 계산 중…';
+            await sleep(20);
+            const opts = { beamWidth: 700, maxDepth: 75, startCandidates: 6, perValue: 2 };
+            const t0 = performance.now();
+            const plan = planGame(board.tiles, board.graph, opts);
+            const planned = plan.rounds.length;
+            status.textContent = `계획 완료 · ${planned}콤보 예상 (${Math.round(performance.now() - t0)}ms) · 재생 중…`;
+            await sleep(20);
+
+            suppressSubmit = true;
+            let done = 0;
+            let failed = 0;
+            for (let i = 0; i < plan.rounds.length; i += 1) {
+              const round = plan.rounds[i];
+              if (!(await resetPath())) { failed += 1; break; }
+              let ok = true;
+              for (let step = 0; step < round.path.length; step += 1) {
+                if (!(await clickNode(board.tiles, round.path[step], step + 1))) { ok = false; break; }
+              }
+              if (!ok) { failed += 1; break; }
+              if (!(await declare())) { failed += 1; break; }
+              done += 1;
+              if (done % 3 === 0 || i === plan.rounds.length - 1) {
+                status.textContent = `자동 솔버 진행 중 · ${done}/${planned}콤보`;
+                await sleep(0);
+              }
+            }
+            // 남은 타일을 경로에 담아 미사용 감점을 줄인다
+            if (plan.tail.length > 1) {
+              await resetPath();
+              for (let step = 0; step < plan.tail.length; step += 1) {
+                if (!(await clickNode(board.tiles, plan.tail[step], step + 1))) break;
+              }
+            }
+            await sleep(60);
+            suppressSubmit = false;
+            const submitted = await submitFinalScore();
+            const parts = getScoreParts();
+            const shown = parts ? `${(parts.comboPoints * parts.combos).toLocaleString('ko-KR')}점` : '';
+            status.textContent = `자동 솔버 완료 · ${done}콤보${failed ? ' · 중단됨' : ''} · ${shown}${submitted ? ' · 제출됨' : ''}`;
+          };
+
           const mount = () => {
             if (document.getElementById('formula-solver-controls')) return;
             const head = document.querySelector('.topbar');
             if (!head) return;
             const controls = document.createElement('div');
             controls.id = 'formula-solver-controls';
-            controls.innerHTML = '<button type="button" data-solver-place>자동 배치</button><button type="button" data-solver-run>솔버 실행</button><span data-solver-status>개발용 자동 플레이</span>';
+            controls.innerHTML = '<button type="button" data-solver-place>자동 배치</button><button type="button" data-solver-run>솔버 실행</button><button type="button" data-solver-auto>자동 플레이</button><span data-solver-status>개발용 자동 플레이</span>';
             head.append(controls);
             const status = controls.querySelector('[data-solver-status]');
-            controls.querySelector('[data-solver-place]').onclick = () => placeAll(status);
-            controls.querySelector('[data-solver-run]').onclick = () => solve(status);
+            const lock = async (button, task) => {
+              const all = [...controls.querySelectorAll('button')];
+              all.forEach(item => { item.disabled = true; });
+              try { await task(); } catch (error) { status.textContent = `오류: ${error && error.message}`; }
+              all.forEach(item => { item.disabled = false; });
+            };
+            controls.querySelector('[data-solver-place]').onclick = event => lock(event.target, () => placeAll(status));
+            controls.querySelector('[data-solver-run]').onclick = event => lock(event.target, () => solve(status));
+            controls.querySelector('[data-solver-auto]').onclick = event => lock(event.target, async () => {
+              const fresh = buttonByText('새 게임');
+              if (fresh) { fresh.click(); await waitFor(() => !!document.querySelector('.tray-stack .tray-tile'), 1500); }
+              await placeAll(status);
+              await solve(status);
+            });
           };
           return mount;
         })();
@@ -287,6 +607,12 @@
         const mountFormulaSolver = () => {
           if (adminSolverDecision === false || adminSolverDecision === true) {
             if (adminSolverDecision === true) formulaSolver();
+            return;
+          }
+          // 로컬 개발 환경에서는 관리자 인증 없이 개발용 컨트롤을 띄운다
+          if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+            adminSolverDecision = true;
+            formulaSolver();
             return;
           }
           const password = window.sessionStorage.getItem('bloodGameXAdminPw');
