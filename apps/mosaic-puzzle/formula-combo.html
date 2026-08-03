@@ -7,6 +7,8 @@
     <script>
       (() => {
         const api = 'https://paktzmofotvwfdxcpmzv.supabase.co/rest/v1/formula_combo_leaderboard';
+        // AI 자동 플레이 기록은 사람 리더보드와 완전히 분리된 테이블에 쌓는다
+        const aiApi = 'https://paktzmofotvwfdxcpmzv.supabase.co/rest/v1/formula_combo_ai_leaderboard';
         const key = 'sb_publishable_jWbstEn2pKJTNDxLTR4Jig_asglvzGW';
         const headers = { apikey: key, Authorization: `Bearer ${key}` };
         const nativeFetch = window.fetch.bind(window);
@@ -177,6 +179,43 @@
             return response.ok;
           } catch (_) { return false; }
         };
+        // AI 플레이 결과는 사람 리더보드가 아니라 AI 전용 테이블에 한 판씩 쌓는다.
+        // 보관 비용을 낮추려고 기보(replay)는 저장하지 않고 자릿수별 집계만 남긴다.
+        const submitAiScore = async () => {
+          try {
+            const parts = getScoreParts();
+            if (!parts || !parts.combos) return false;
+            const score = Math.max(0, parts.comboPoints * parts.combos);
+            const response = await nativeFetch(aiApi, {
+              method: 'POST',
+              headers: { ...headers, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+              body: JSON.stringify({
+                label: 'AI',
+                score,
+                combos: parts.combos,
+                combo_points: parts.comboPoints,
+                combo_counts: getComboCounts()
+              })
+            });
+            return response.ok;
+          } catch (_) { return false; }
+        };
+        const renderAiBoard = async panel => {
+          panel.innerHTML = '<strong>AI 기록</strong><p>불러오는 중입니다.</p>';
+          try {
+            const response = await nativeFetch(`${aiApi}?select=label,score,combos,combo_points,combo_counts,created_at&order=score.desc,created_at.asc&limit=10`, { headers });
+            if (!response.ok) throw new Error('fetch failed');
+            const rows = await response.json();
+            if (!rows.length) { panel.innerHTML = '<strong>AI 기록</strong><p>아직 AI 플레이 기록이 없습니다. 상단 <b>AI 플레이 구경</b>을 눌러보세요.</p>'; return; }
+            const labels = ['10', '100', '1,000', '10,000', '100,000', '1,000,000'];
+            panel.innerHTML = `<strong>AI 기록 · 상위 ${rows.length}판</strong><p>사람 리더보드와 별도로 집계됩니다.</p>` + rows.map((row, index) => {
+              const counts = row.combo_counts || {};
+              const detail = labels.map(item => `${item} ${counts[item.replace(/,/g, '')] || 0}개`).join(' · ');
+              const date = new Date(row.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+              return `<div class="ai-row"><b>${String(index + 1).padStart(2, '0')}</b><span>${Number(row.combo_points).toLocaleString('ko-KR')}점 × ${row.combos}콤보</span><em>= ${Number(row.score).toLocaleString('ko-KR')}점</em><i>${esc(date)}</i><small>${detail}</small></div>`;
+            }).join('');
+          } catch (_) { panel.innerHTML = '<strong>AI 기록</strong><p>AI 기록을 불러오지 못했습니다.</p>'; }
+        };
         const mount = () => {
           normalizeScore();
           const head = document.querySelector('.leaderboard-head');
@@ -194,13 +233,27 @@
           panel.id = 'formula-replay-panel';
           panel.hidden = true;
           panel.innerHTML = '<strong>1위 기보</strong><p>불러오는 중입니다.</p>';
+          const aiButton = document.createElement('button');
+          aiButton.id = 'formula-ai-tab';
+          aiButton.type = 'button';
+          aiButton.textContent = 'AI 기록';
+          const aiPanel = document.createElement('div');
+          aiPanel.id = 'formula-ai-panel';
+          aiPanel.hidden = true;
           head.append(button);
+          head.append(aiButton);
           card.append(panel);
+          card.append(aiPanel);
+          aiButton.onclick = () => {
+            aiPanel.hidden = !aiPanel.hidden;
+            if (!aiPanel.hidden) { panel.hidden = true; renderAiBoard(aiPanel); }
+          };
           setTimeout(refreshLeaderboardFormula, 600);
           refreshMyRank(rank);
           button.onclick = async () => {
             panel.hidden = !panel.hidden;
             if (panel.hidden) return;
+            aiPanel.hidden = true;
             panel.innerHTML = '<strong>1위 기보</strong><p>불러오는 중입니다.</p>';
             try {
               const response = await nativeFetch(`${api}?select=nickname,score,combos,combo_points,combo_counts,replay&order=score.desc,created_at.asc&limit=1000`, { headers });
@@ -531,22 +584,27 @@
             return waitFor(() => comboCount() > before, 900);
           };
 
-          const solve = async status => {
+          const solve = async (status, options = {}) => {
             if (document.querySelector('.tray-stack .tray-tile')) { status.textContent = '먼저 타일 배치를 완료하세요.'; return; }
             const board = readBoard();
             if (board.tiles.length < 2) { status.textContent = '배치된 타일이 없습니다.'; return; }
-            status.textContent = '경로 계산 중…';
+            status.textContent = options.ai ? 'AI가 경로를 계산 중…' : '경로 계산 중…';
             await sleep(20);
             const opts = { beamWidth: 700, maxDepth: 75, startCandidates: 6, perValue: 2 };
             const t0 = performance.now();
             const plan = planGame(board.tiles, board.graph, opts);
             const planned = plan.rounds.length;
-            status.textContent = `계획 완료 · ${planned}콤보 예상 (${Math.round(performance.now() - t0)}ms) · 재생 중…`;
+            status.textContent = options.ai
+              ? `AI가 ${planned}콤보 경로를 찾았습니다 · 재생 중…`
+              : `계획 완료 · ${planned}콤보 예상 (${Math.round(performance.now() - t0)}ms) · 재생 중…`;
             await sleep(20);
 
+            // 재생 중에는 게임이 콤보마다 걸어두는 자동 제출을 전부 막는다.
+            // 어떤 경로로 호출되든 이 함수가 끝나면 반드시 해제된다(아래 finally).
             suppressSubmit = true;
             let done = 0;
             let failed = 0;
+            try {
             for (let i = 0; i < plan.rounds.length; i += 1) {
               const round = plan.rounds[i];
               if (!(await resetPath())) { failed += 1; break; }
@@ -558,7 +616,7 @@
               if (!(await declare())) { failed += 1; break; }
               done += 1;
               if (done % 3 === 0 || i === plan.rounds.length - 1) {
-                status.textContent = `자동 솔버 진행 중 · ${done}/${planned}콤보`;
+                status.textContent = `${options.ai ? 'AI 플레이 중' : '자동 솔버 진행 중'} · ${done}/${planned}콤보`;
                 await sleep(0);
               }
             }
@@ -570,14 +628,41 @@
               }
             }
             await sleep(60);
-            suppressSubmit = false;
-            const submitted = await submitFinalScore();
             const parts = getScoreParts();
             const shown = parts ? `${(parts.comboPoints * parts.combos).toLocaleString('ko-KR')}점` : '';
-            status.textContent = `자동 솔버 완료 · ${done}콤보${failed ? ' · 중단됨' : ''} · ${shown}${submitted ? ' · 제출됨' : ''}`;
+            let submitted = false;
+            if (done === 0) {
+              // 이번 실행에서 새로 만든 콤보가 없으면(예: 이미 다 푼 보드에서 다시 누른 경우)
+              // 화면에 남아 있는 이전 점수를 중복 기록하지 않는다.
+              submitted = false;
+            } else if (options.ai) {
+              // AI 기록은 사람 리더보드가 아닌 전용 테이블로만 나간다.
+              // submitAiScore는 nativeFetch를 쓰므로 suppressSubmit의 영향을 받지 않는다.
+              submitted = await submitAiScore();
+            } else {
+              suppressSubmit = false;
+              submitted = await submitFinalScore();
+            }
+            const label = options.ai ? 'AI 플레이 완료' : '자동 솔버 완료';
+            status.textContent = `${label} · ${done}콤보${failed ? ' · 중단됨' : ''} · ${shown}${submitted ? ' · 기록 저장됨' : ''}`;
+            return { done, failed, score: parts ? parts.comboPoints * parts.combos : 0 };
+            } finally {
+              // 마지막 콤보 선언이 걸어둔 setTimeout(0) 제출이 지나갈 시간을 준 뒤 해제한다
+              if (options.ai) await sleep(150);
+              suppressSubmit = false;
+            }
           };
 
-          const mount = () => {
+          // 새 게임 → 자동 배치 → 솔버까지 한 번에 돌린다.
+          // ai:true 면 시작부터 끝까지 사람 리더보드 제출을 막고 AI 테이블에만 기록한다.
+          const runFullPlay = async (status, options = {}) => {
+            const fresh = buttonByText('새 게임');
+            if (fresh) { fresh.click(); await waitFor(() => !!document.querySelector('.tray-stack .tray-tile'), 1500); }
+            await placeAll(status);
+            return solve(status, options);
+          };
+
+          const mountDevControls = () => {
             if (document.getElementById('formula-solver-controls')) return;
             const head = document.querySelector('.topbar');
             if (!head) return;
@@ -586,33 +671,55 @@
             controls.innerHTML = '<button type="button" data-solver-place>자동 배치</button><button type="button" data-solver-run>솔버 실행</button><button type="button" data-solver-auto>자동 플레이</button><span data-solver-status>개발용 자동 플레이</span>';
             head.append(controls);
             const status = controls.querySelector('[data-solver-status]');
-            const lock = async (button, task) => {
+            const lock = async task => {
               const all = [...controls.querySelectorAll('button')];
               all.forEach(item => { item.disabled = true; });
               try { await task(); } catch (error) { status.textContent = `오류: ${error && error.message}`; }
               all.forEach(item => { item.disabled = false; });
             };
-            controls.querySelector('[data-solver-place]').onclick = event => lock(event.target, () => placeAll(status));
-            controls.querySelector('[data-solver-run]').onclick = event => lock(event.target, () => solve(status));
-            controls.querySelector('[data-solver-auto]').onclick = event => lock(event.target, async () => {
-              const fresh = buttonByText('새 게임');
-              if (fresh) { fresh.click(); await waitFor(() => !!document.querySelector('.tray-stack .tray-tile'), 1500); }
-              await placeAll(status);
-              await solve(status);
-            });
+            // 개발용 버튼도 결국 AI가 푸는 것이므로 사람 리더보드가 아니라 AI 테이블에 기록한다.
+            // 사람 리더보드는 손으로 플레이했을 때만 갱신된다.
+            controls.querySelector('[data-solver-place]').onclick = () => lock(() => placeAll(status));
+            controls.querySelector('[data-solver-run]').onclick = () => lock(() => solve(status, { ai: true }));
+            controls.querySelector('[data-solver-auto]').onclick = () => lock(() => runFullPlay(status, { ai: true }));
           };
-          return mount;
+
+          // 누구나 쓸 수 있는 관전 탭. 사람 리더보드에는 기록하지 않는다.
+          const mountAiTab = () => {
+            if (document.getElementById('formula-ai-show')) return;
+            const head = document.querySelector('.topbar');
+            if (!head) return;
+            const wrap = document.createElement('div');
+            wrap.id = 'formula-ai-show';
+            wrap.innerHTML = '<button type="button" class="reset" data-ai-run>AI 플레이 구경</button><span data-ai-status></span>';
+            const anchor = document.getElementById('formula-solver-controls');
+            if (anchor) head.insertBefore(wrap, anchor); else head.append(wrap);
+            const button = wrap.querySelector('[data-ai-run]');
+            const status = wrap.querySelector('[data-ai-status]');
+            button.onclick = async () => {
+              button.disabled = true;
+              button.classList.add('active');
+              try {
+                await runFullPlay(status, { ai: true });
+              } catch (error) {
+                status.textContent = `오류: ${error && error.message}`;
+              }
+              button.disabled = false;
+              button.classList.remove('active');
+            };
+          };
+          return { mountDevControls, mountAiTab };
         })();
         let adminSolverDecision = null;
         const mountFormulaSolver = () => {
           if (adminSolverDecision === false || adminSolverDecision === true) {
-            if (adminSolverDecision === true) formulaSolver();
+            if (adminSolverDecision === true) formulaSolver.mountDevControls();
             return;
           }
           // 로컬 개발 환경에서는 관리자 인증 없이 개발용 컨트롤을 띄운다
           if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
             adminSolverDecision = true;
-            formulaSolver();
+            formulaSolver.mountDevControls();
             return;
           }
           const password = window.sessionStorage.getItem('bloodGameXAdminPw');
@@ -623,7 +730,7 @@
             body: JSON.stringify({ p_password: password })
           }).then(response => response.ok ? response.json() : false).then(valid => {
             adminSolverDecision = valid === true;
-            if (adminSolverDecision) formulaSolver();
+            if (adminSolverDecision) formulaSolver.mountDevControls();
             return adminSolverDecision;
           }).catch(() => { adminSolverDecision = false; return false; });
         };
@@ -673,12 +780,16 @@
           }
         }, true);
         const style = document.createElement('style');
-        style.textContent = '#formula-replay-tab{margin-left:auto;border:1px solid #70c7b5;border-radius:8px;background:transparent;color:#70c7b5;padding:6px 9px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}#formula-my-rank{color:#e2b653;font-size:10px;font-weight:800;margin-left:auto;margin-right:8px}#formula-replay-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-replay-panel p{color:#70c7b5;margin:8px 0}#formula-replay-panel pre{max-height:180px;overflow:auto;white-space:pre-wrap;color:#aab4bd;font:11px/1.5 ui-monospace,monospace}.formula-source{font-style:normal;color:#e2b653;font-size:10px;font-weight:800;white-space:nowrap}.formula-counts{color:#8992a0;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.replay-board-wrap{overflow:auto;margin:10px -4px;padding:4px}.replay-board{position:relative;min-width:640px;background:#11181e;border-radius:10px}.replay-tile{position:absolute;box-sizing:border-box;border:1px solid #536471;border-radius:8px;background:#26333b;color:#eef3f4;font:800 13px/1 ui-monospace,monospace;cursor:pointer}.replay-tile:hover,.replay-tile.selected{background:#2d8f88;border-color:#b9fff2;color:#fff}.replay-challenge-status{color:#70c7b5;font-size:11px}.replay-reset{margin-top:8px;border:1px solid #536471;border-radius:7px;background:transparent;color:#aab4bd;padding:6px 9px;font-size:10px;cursor:pointer}#formula-solver-controls{display:flex;align-items:center;gap:6px;margin-left:8px;flex-wrap:wrap}#formula-solver-controls button{border:1px solid #70c7b5;border-radius:7px;background:#16252a;color:#b9fff2;padding:5px 8px;font:inherit;font-size:10px;font-weight:800;cursor:pointer}#formula-solver-controls span{color:#8992a0;font-size:10px}.score-card .total-score-line.is-raw-total{display:none}.score-card .formula-final-score{display:block;color:var(--accent-hover);background:#5fb8b01f;border:1px solid #5fb8b073;border-radius:9px;margin-top:8px;padding:8px 10px;font-size:13px;font-weight:800}';
+        style.textContent = '#formula-replay-tab{margin-left:auto;border:1px solid #70c7b5;border-radius:8px;background:transparent;color:#70c7b5;padding:6px 9px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}#formula-my-rank{color:#e2b653;font-size:10px;font-weight:800;margin-left:auto;margin-right:8px}#formula-replay-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-replay-panel p{color:#70c7b5;margin:8px 0}#formula-replay-panel pre{max-height:180px;overflow:auto;white-space:pre-wrap;color:#aab4bd;font:11px/1.5 ui-monospace,monospace}.formula-source{font-style:normal;color:#e2b653;font-size:10px;font-weight:800;white-space:nowrap}.formula-counts{color:#8992a0;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.replay-board-wrap{overflow:auto;margin:10px -4px;padding:4px}.replay-board{position:relative;min-width:640px;background:#11181e;border-radius:10px}.replay-tile{position:absolute;box-sizing:border-box;border:1px solid #536471;border-radius:8px;background:#26333b;color:#eef3f4;font:800 13px/1 ui-monospace,monospace;cursor:pointer}.replay-tile:hover,.replay-tile.selected{background:#2d8f88;border-color:#b9fff2;color:#fff}.replay-challenge-status{color:#70c7b5;font-size:11px}.replay-reset{margin-top:8px;border:1px solid #536471;border-radius:7px;background:transparent;color:#aab4bd;padding:6px 9px;font-size:10px;cursor:pointer}#formula-solver-controls{display:flex;align-items:center;gap:6px;margin-left:8px;flex-wrap:wrap}#formula-solver-controls button{border:1px solid #70c7b5;border-radius:7px;background:#16252a;color:#b9fff2;padding:5px 8px;font:inherit;font-size:10px;font-weight:800;cursor:pointer}#formula-solver-controls span{color:#8992a0;font-size:10px}#formula-ai-show{display:flex;align-items:center;gap:8px;flex-wrap:wrap}#formula-ai-show [data-ai-run]{white-space:nowrap}#formula-ai-show [data-ai-run].active{opacity:.75;cursor:progress}#formula-ai-show [data-ai-status]{color:#70c7b5;font-size:11px;font-weight:700}#formula-ai-tab{margin-left:8px;border:1px solid #e2b653;border-radius:8px;background:transparent;color:#e2b653;padding:6px 9px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}#formula-ai-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-ai-panel p{color:#70c7b5;margin:8px 0}#formula-ai-panel .ai-row{display:grid;grid-template-columns:auto 1fr auto auto;gap:4px 8px;align-items:center;padding:7px 0;border-top:1px solid rgba(255,255,255,.06)}#formula-ai-panel .ai-row b{color:#e2b653;font-size:11px}#formula-ai-panel .ai-row span{color:#aab4bd;font-size:11px}#formula-ai-panel .ai-row em{font-style:normal;color:#b9fff2;font-size:12px;font-weight:800;white-space:nowrap}#formula-ai-panel .ai-row i{font-style:normal;color:#8992a0;font-size:10px;white-space:nowrap}#formula-ai-panel .ai-row small{grid-column:1/-1;color:#8992a0;font-size:9px}.score-card .total-score-line.is-raw-total{display:none}.score-card .formula-final-score{display:block;color:var(--accent-hover);background:#5fb8b01f;border:1px solid #5fb8b073;border-radius:9px;margin-top:8px;padding:8px 10px;font-size:13px;font-weight:800}';
         document.head.append(style);
         new MutationObserver(mount).observe(document.documentElement, { childList: true, subtree: true });
         setTimeout(mount, 0);
         new MutationObserver(mountFormulaSolver).observe(document.documentElement, { childList: true, subtree: true });
         setTimeout(mountFormulaSolver, 0);
+        // AI 관전 탭은 관리자 여부와 무관하게 모두에게 노출한다
+        const mountAiShowTab = () => formulaSolver.mountAiTab();
+        new MutationObserver(mountAiShowTab).observe(document.documentElement, { childList: true, subtree: true });
+        setTimeout(mountAiShowTab, 0);
       })();
     </script>
     <script type="module" crossorigin src="./assets/formula-combo/formula-combo-BP32ypKH.js"></script>
