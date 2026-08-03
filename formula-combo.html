@@ -72,10 +72,10 @@
         const refreshMyRank = async rank => {
           try {
             const nickname = window.localStorage.getItem('formulaComboNickname');
-            const response = await nativeFetch(`${api}?select=nickname&order=score.desc,created_at.asc`, { headers });
+            const response = await nativeFetch(`${api}?select=nickname,score&order=score.desc,created_at.asc`, { headers });
             const entries = await response.json();
             const position = entries.findIndex(entry => entry.nickname === nickname);
-            rank.textContent = position >= 0 ? `내 순위 ${position + 1}위` : '내 순위 미등록';
+            rank.textContent = position >= 0 ? `내 순위 ${position + 1}위 · ${Number(entries[position].score).toLocaleString('ko-KR')}점` : '내 순위 미등록';
           } catch (_) { rank.textContent = '내 순위 확인 실패'; }
         };
         window.fetch = async (input, init = {}) => {
