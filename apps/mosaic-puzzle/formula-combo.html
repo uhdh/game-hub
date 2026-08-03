@@ -355,30 +355,59 @@
             return ordered.map((tile, i) => ({ tile, cellIndex: targets[i].index }));
           };
 
+          // 타일 한 장을 목표 칸에 놓는다.
+          // 드래그 시작 → 리렌더 → 드롭 순서를 지켜야 한다. 게임의 슬롯 onDrop 은 렌더 시점의
+          // "드래그 중인 타일 id"를 클로저로 붙잡고 있어서, 리렌더 전에 드롭하면 그 값이 아직
+          // null 이라 조용히 무시된다. 느린 기기에서 배치가 첫 타일 뒤로 진행되지 않던 원인이다.
+          // 트레이 타일에는 드래그 상태가 dragging 클래스로 나타나므로 그걸 기다린다.
+          const placeOne = async step => {
+            const source = trayTiles().find(entry => entry.label === step.tile.label);
+            if (!source) return 'no-tile';
+            const startProps = reactProps(source.el);
+            if (!startProps || !startProps.onDragStart) return 'no-handler';
+            startProps.onDragStart();
+            const ready = await waitFor(() => {
+              const current = trayTiles().find(entry => entry.label === step.tile.label);
+              return !!current && current.el.classList.contains('dragging');
+            }, 1500);
+            if (!ready) return 'drag-not-applied';
+            const slot = slots()[step.cellIndex];
+            const dropProps = reactProps(slot);
+            if (!dropProps || !dropProps.onDrop) return 'no-slot';
+            dropProps.onDrop({ preventDefault() {} });
+            const ok = await waitFor(() => {
+              const target = slots()[step.cellIndex];
+              return !!target && target.classList.contains('occupied');
+            }, 2000);
+            return ok ? 'ok' : 'drop-ignored';
+          };
+
           const placeAll = async status => {
             const plan = buildPlan();
             if (!plan) { status.textContent = '배치할 타일이 없습니다.'; return null; }
             let placed = 0;
+            let lastReason = '';
             for (const step of plan) {
-              const source = trayTiles().find(entry => entry.label === step.tile.label);
-              if (!source) break;
-              const startProps = reactProps(source.el);
-              if (!startProps || !startProps.onDragStart) break;
-              startProps.onDragStart();
-              await waitFor(() => true, 0);
-              await sleep(0);
-              const slot = slots()[step.cellIndex];
-              const dropProps = reactProps(slot);
-              if (!dropProps || !dropProps.onDrop) break;
-              dropProps.onDrop({ preventDefault() {} });
-              const ok = await waitFor(() => slots()[step.cellIndex].classList.contains('occupied'), 800);
-              if (!ok) break;
+              let result = '';
+              // 느린 기기에서 렌더가 밀릴 수 있으므로 몇 번 더 시도한다
+              for (let attempt = 0; attempt < 3; attempt += 1) {
+                result = await placeOne(step);
+                if (result === 'ok' || result === 'no-tile') break;
+                // 실패했으면 드래그 상태를 정리하고 한 박자 쉬었다가 다시 시도한다
+                const stale = trayTiles().find(entry => entry.label === step.tile.label);
+                const staleProps = stale && reactProps(stale.el);
+                if (staleProps && staleProps.onDragEnd) staleProps.onDragEnd();
+                await sleep(60 * (attempt + 1));
+              }
+              if (result !== 'ok') { lastReason = result; break; }
               placed += 1;
               if (placed % 5 === 0) status.textContent = `자동 배치 중 · ${placed}/${plan.length}`;
             }
             const finish = buttonByText('배치 완료');
-            if (finish) { finish.click(); await waitFor(() => !buttonByText('배치 완료'), 800); }
-            status.textContent = `자동 배치 완료 · ${placed}개`;
+            if (finish) { finish.click(); await waitFor(() => !buttonByText('배치 완료'), 1200); }
+            status.textContent = placed === plan.length
+              ? `자동 배치 완료 · ${placed}개`
+              : `자동 배치 중단 · ${placed}/${plan.length}개 (${lastReason})`;
             return placed;
           };
 
