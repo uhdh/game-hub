@@ -232,10 +232,16 @@
         // 모바일에서 상단 버튼이 한 줄에 들어가도록 짧은 라벨을 달아준다.
         // React가 그리는 버튼의 텍스트를 직접 바꾸면 다음 갱신에서 되돌아가므로,
         // data-short 속성만 붙이고 실제 축약 표시는 CSS(::after)가 담당한다.
-        const SHORT_LABELS = { '홈 화면': '홈', '강지후 샘플': '강지후', 'AI 플레이 구경': 'AI 관전' };
+        const SHORT_LABELS = { '홈 화면': '홈', '강지후 샘플': '강지후', 'AI 플레이 구경': 'AI 관전', 'AI 샘플 풀기': 'AI 샘플' };
         const compactTopbar = () => {
           const bar = document.querySelector('.topbar');
           if (!bar) return;
+          // 샘플 화면에서는 같은 버튼이 그 고정 배치를 푸는 역할을 하므로 이름도 바꾼다
+          const aiRun = bar.querySelector('#formula-ai-show [data-ai-run]');
+          if (aiRun && !aiRun.disabled) {
+            const label = document.querySelector('.sample-card') ? 'AI 샘플 풀기' : 'AI 플레이 구경';
+            if (aiRun.textContent !== label) aiRun.textContent = label;
+          }
           bar.querySelectorAll('a, button').forEach(el => {
             const short = SHORT_LABELS[el.textContent.trim()];
             if (short && el.dataset.short !== short) el.dataset.short = short;
@@ -405,12 +411,13 @@
           };
 
           // --- 현재 보드 상태 읽기 ---
-          const readBoard = () => {
-            const all = slots();
+          // 슬롯의 DOM 순서가 게임의 셀 배열과 1:1이라 인덱스로 육각 좌표를 복원할 수 있다.
+          // 일반 게임과 강지후 샘플은 클래스 이름만 다르고 구조가 같다.
+          const readBoardFrom = (slotList, tileSelector) => {
             const tiles = [];
             const cellToNode = new Map();
-            all.forEach((slot, cellIndex) => {
-              const el = slot.querySelector('.hex-tile');
+            slotList.forEach((slot, cellIndex) => {
+              const el = slot.querySelector(tileSelector);
               if (!el) return;
               const tile = parseLabel((el.querySelector('strong') || el).textContent);
               cellToNode.set(cellIndex, tiles.length);
@@ -423,6 +430,9 @@
             });
             return { tiles, graph };
           };
+          const readBoard = () => readBoardFrom(slots(), '.hex-tile');
+          const sampleSlots = () => [...document.querySelectorAll('.sample-hex-board .sample-hex-slot')];
+          const readSampleBoard = () => readBoardFrom(sampleSlots(), '.sample-hex-tile');
 
           // --- 라운드 경로 탐색 (beam search) ---
           const findPath = (tiles, graph, removed, start, opts) => {
@@ -583,6 +593,44 @@
             return { rounds, tail, sum, penalty: aliveEnd.length - tail.length };
           };
 
+          // 강지후 샘플은 경로만 비우는 수단이 없다. '다시 하기'를 누르면 제거 기록까지 날아간다.
+          // 그래서 콤보를 선언하면 남는 마지막 타일이 다음 콤보의 시작 타일로 강제된다.
+          // 첫 콤보만 시작 타일을 고를 수 있고, 이후로는 한 줄로 이어지는 사슬이 된다.
+          const planSample = (tiles, graph, opts) => {
+            const removed = tiles.map(tile => tile.removed);
+            const rounds = [];
+            let sum = 0;
+            let startFrom = null;
+            for (let round = 0; round < tiles.length; round += 1) {
+              const alive = [];
+              for (let i = 0; i < tiles.length; i += 1) if (!removed[i]) alive.push(i);
+              if (alive.length < 2) break;
+              let bestRound = null;
+              if (startFrom === null) {
+                const cut = articulation(graph, removed, alive);
+                const degree = i => graph[i].filter(x => !removed[x]).length;
+                const ranked = alive.slice().sort((a, b) => {
+                  const ca = cut.has(a) ? 1 : 0;
+                  const cb = cut.has(b) ? 1 : 0;
+                  if (ca !== cb) return ca - cb;
+                  return degree(a) - degree(b);
+                });
+                for (const start of ranked.slice(0, opts.startCandidates)) {
+                  const found = findPath(tiles, graph, removed, start, opts);
+                  if (found && (!bestRound || found.score > bestRound.score)) bestRound = found;
+                }
+              } else if (!removed[startFrom]) {
+                bestRound = findPath(tiles, graph, removed, startFrom, opts);
+              }
+              if (!bestRound) break;
+              rounds.push(bestRound);
+              sum += bestRound.score;
+              removed[bestRound.path[0]] = true;
+              startFrom = bestRound.path[bestRound.path.length - 1];
+            }
+            return { rounds, sum };
+          };
+
           // --- 계획 재생 ---
           const resetPath = async () => {
             const button = [...document.querySelectorAll('button.retry-button')].find(item => item.textContent.trim() === '다시 하기');
@@ -604,6 +652,24 @@
             const before = comboCount();
             button.click();
             return waitFor(() => comboCount() > before, 900);
+          };
+          // 샘플 화면에는 콤보 로그가 없어서 점수 카드의 [N콤보] 배지로 진행을 확인한다
+          const sampleComboBadge = () => Number((document.querySelector('.score-card span') || {}).textContent?.match(/\d+/) || [-1]);
+          const sampleSelectedCount = () => document.querySelectorAll('.sample-hex-tile.selected').length;
+          const clickSampleNode = async (tiles, node, expected) => {
+            const slot = sampleSlots()[tiles[node].cellIndex];
+            const button = slot && slot.querySelector('.sample-hex-tile');
+            if (!button) return false;
+            button.click();
+            return waitFor(() => sampleSelectedCount() === expected, 600);
+          };
+          const declareSample = async () => {
+            const button = [...document.querySelectorAll('.sample-head-actions .combo-button')]
+              .find(item => !item.classList.contains('retry-button') && item.textContent.trim() === '콤보 완성 선언');
+            if (!button) return false;
+            const before = sampleComboBadge();
+            button.click();
+            return waitFor(() => sampleComboBadge() > before, 900);
           };
 
           const solve = async (status, options = {}) => {
@@ -687,6 +753,43 @@
             return solve(status, options);
           };
 
+          // 강지후 샘플 풀이. 고정 배치라 매번 같은 결과가 나오고 새 게임과 조건도 다르므로
+          // 사람·AI 어느 리더보드에도 기록하지 않는다(시연 전용).
+          const runSamplePlay = async status => {
+            aiSession = true;
+            const board = readSampleBoard();
+            if (board.tiles.length < 2) { status.textContent = '샘플 보드를 찾지 못했습니다.'; return; }
+            status.textContent = 'AI가 샘플 경로를 계산 중…';
+            await sleep(20);
+            const opts = { beamWidth: 700, maxDepth: 88, startCandidates: 8, perValue: 2 };
+            const plan = planSample(board.tiles, board.graph, opts);
+            const planned = plan.rounds.length;
+            if (!planned) { status.textContent = '샘플에서 만들 수 있는 콤보를 찾지 못했습니다.'; return; }
+            status.textContent = `AI가 ${planned}콤보 경로를 찾았습니다 · 재생 중…`;
+            await sleep(20);
+            let done = 0;
+            let failed = false;
+            for (let i = 0; i < plan.rounds.length; i += 1) {
+              const path = plan.rounds[i].path;
+              // 첫 콤보가 아니면 직전 콤보의 마지막 타일이 이미 경로에 남아 있으므로 그 칸은 건너뛴다
+              const from = i === 0 ? 0 : 1;
+              let ok = true;
+              for (let step = from; step < path.length; step += 1) {
+                if (!(await clickSampleNode(board.tiles, path[step], step + 1))) { ok = false; break; }
+              }
+              if (!ok || !(await declareSample())) { failed = true; break; }
+              done += 1;
+              if (done % 3 === 0 || i === plan.rounds.length - 1) {
+                status.textContent = `AI 샘플 풀이 중 · ${done}/${planned}콤보`;
+                await sleep(0);
+              }
+            }
+            const parts = getScoreParts();
+            const shown = parts ? `${(parts.comboPoints * parts.combos).toLocaleString('ko-KR')}점` : '';
+            status.textContent = `AI 샘플 풀이 완료 · ${done}콤보${failed ? ' · 중단됨' : ''} · ${shown} · 기록 미등록`;
+            return { done, failed };
+          };
+
           const mountDevControls = () => {
             if (document.getElementById('formula-solver-controls')) return;
             const head = document.querySelector('.topbar');
@@ -713,7 +816,7 @@
           // 세로로 길다). 그래서 관전 시작 시 보드로 스크롤하고, 진행 상황은 화면 하단에
           // 고정된 HUD로 따로 띄운다.
           const focusBoard = () => {
-            const board = document.querySelector('.hex-board') || document.querySelector('.board-card');
+            const board = document.querySelector('.hex-board') || document.querySelector('.sample-hex-board') || document.querySelector('.board-card');
             if (board && board.scrollIntoView) board.scrollIntoView({ block: 'center', behavior: 'smooth' });
           };
           let hudTimer = null;
@@ -754,14 +857,17 @@
             const button = wrap.querySelector('[data-ai-run]');
             const status = wrap.querySelector('[data-ai-status]');
             button.onclick = async () => {
+              // 강지후 샘플 화면에서는 그 고정 배치를 푼다
+              const sample = !!document.querySelector('.sample-card');
               button.disabled = true;
               button.classList.add('active');
               const hudText = showHud();
               const sink = statusSink(status, hudText);
-              sink.textContent = 'AI가 새 판을 준비하고 있습니다…';
+              sink.textContent = sample ? 'AI가 샘플을 살펴보는 중…' : 'AI가 새 판을 준비하고 있습니다…';
               focusBoard();
               try {
-                await runFullPlay(sink, { ai: true });
+                if (sample) await runSamplePlay(sink);
+                else await runFullPlay(sink, { ai: true });
               } catch (error) {
                 sink.textContent = `오류: ${error && error.message}`;
               }
