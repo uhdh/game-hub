@@ -48,9 +48,10 @@
         };
         const refreshLeaderboardFormula = async () => {
           try {
-            const response = await nativeFetch(`${api}?select=nickname,score,combos,combo_points,combo_counts,replay&order=score.desc,created_at.asc&limit=20`, { headers });
+            const response = await nativeFetch(`${api}?select=nickname,score,combos,combo_points,combo_counts,replay&order=score.desc,created_at.asc&limit=10`, { headers });
             const entries = await response.json();
             document.querySelectorAll('.leaderboard-row').forEach((row, index) => {
+              row.hidden = index >= 10;
               const entry = entries[index];
               if (!entry) return;
               const points = entry.combo_points || (entry.combos ? Math.round(entry.score / entry.combos) : 0);
@@ -67,6 +68,15 @@
               counts.textContent = comboCounts ? ['10', '100', '1,000', '10,000', '100,000', '1,000,000'].map(label => `${label} ${comboCounts[label.replace(/,/g, '')] || 0}개`).join(' · ') : '달성 콤보 집계 없음';
             });
           } catch (_) {}
+        };
+        const refreshMyRank = async rank => {
+          try {
+            const nickname = window.localStorage.getItem('formulaComboNickname');
+            const response = await nativeFetch(`${api}?select=nickname&order=score.desc,created_at.asc`, { headers });
+            const entries = await response.json();
+            const position = entries.findIndex(entry => entry.nickname === nickname);
+            rank.textContent = position >= 0 ? `내 순위 ${position + 1}위` : '내 순위 미등록';
+          } catch (_) { rank.textContent = '내 순위 확인 실패'; }
         };
         window.fetch = async (input, init = {}) => {
           const target = typeof input === 'string' ? input : input?.url || '';
@@ -94,6 +104,10 @@
           button.id = 'formula-replay-tab';
           button.type = 'button';
           button.textContent = '1위 기보';
+          const rank = document.createElement('small');
+          rank.id = 'formula-my-rank';
+          rank.textContent = '내 순위 확인 중…';
+          head.append(rank);
           const panel = document.createElement('div');
           panel.id = 'formula-replay-panel';
           panel.hidden = true;
@@ -101,6 +115,7 @@
           head.append(button);
           card.append(panel);
           setTimeout(refreshLeaderboardFormula, 600);
+          refreshMyRank(rank);
           button.onclick = async () => {
             panel.hidden = !panel.hidden;
             if (panel.hidden) return;
@@ -118,7 +133,7 @@
           };
         };
         const style = document.createElement('style');
-        style.textContent = '#formula-replay-tab{margin-left:auto;border:1px solid #70c7b5;border-radius:8px;background:transparent;color:#70c7b5;padding:6px 9px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}#formula-replay-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-replay-panel p{color:#70c7b5;margin:8px 0}#formula-replay-panel pre{max-height:180px;overflow:auto;white-space:pre-wrap;color:#aab4bd;font:11px/1.5 ui-monospace,monospace}.formula-source{font-style:normal;color:#e2b653;font-size:10px;font-weight:800;white-space:nowrap}.formula-counts{grid-column:1/-1;color:#8992a0;font-size:10px;white-space:normal;line-height:1.4}';
+        style.textContent = '#formula-replay-tab{margin-left:auto;border:1px solid #70c7b5;border-radius:8px;background:transparent;color:#70c7b5;padding:6px 9px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}#formula-my-rank{color:#e2b653;font-size:10px;font-weight:800;margin-left:auto;margin-right:8px}#formula-replay-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-replay-panel p{color:#70c7b5;margin:8px 0}#formula-replay-panel pre{max-height:180px;overflow:auto;white-space:pre-wrap;color:#aab4bd;font:11px/1.5 ui-monospace,monospace}.formula-source{font-style:normal;color:#e2b653;font-size:10px;font-weight:800;white-space:nowrap}.formula-counts{color:#8992a0;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}';
         document.head.append(style);
         new MutationObserver(mount).observe(document.documentElement, { childList: true, subtree: true });
         setTimeout(mount, 0);
