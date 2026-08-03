@@ -35,11 +35,20 @@
           comboPoints: parts.comboPoints,
           combos: parts.combos,
           scoreFormula: `${parts.comboPoints.toLocaleString('ko-KR')} × ${parts.combos} = ${(parts.comboPoints * parts.combos).toLocaleString('ko-KR')}`,
+          comboCounts: getComboCounts(),
           snapshot: document.querySelector('.board-card')?.innerText?.slice(0, 4000) || ''
         });
+        const getComboCounts = () => {
+          const counts = {};
+          document.querySelectorAll('.combo-log .log-row small').forEach(row => {
+            const match = row.textContent.match(/(\d+)\s+zeros/);
+            if (match) { const key = String(10 ** Number(match[1])); counts[key] = (counts[key] || 0) + 1; }
+          });
+          return counts;
+        };
         const refreshLeaderboardFormula = async () => {
           try {
-            const response = await nativeFetch(`${api}?select=nickname,score,combos,combo_points,replay&order=score.desc,created_at.asc&limit=20`, { headers });
+            const response = await nativeFetch(`${api}?select=nickname,score,combos,combo_points,combo_counts,replay&order=score.desc,created_at.asc&limit=20`, { headers });
             const entries = await response.json();
             document.querySelectorAll('.leaderboard-row').forEach((row, index) => {
               const entry = entries[index];
@@ -52,6 +61,10 @@
               let source = row.querySelector('.formula-source');
               if (!source) { source = document.createElement('em'); source.className = 'formula-source'; row.append(source); }
               source.textContent = entry.replay?.mode === 'sample' ? '강지후 샘플' : '새 게임';
+              let counts = row.querySelector('.formula-counts');
+              if (!counts) { counts = document.createElement('span'); counts.className = 'formula-counts'; row.append(counts); }
+              const comboCounts = entry.combo_counts || entry.replay?.comboCounts;
+              counts.textContent = comboCounts ? ['10', '100', '1,000', '10,000', '100,000', '1,000,000'].map(label => `${label} ${comboCounts[label.replace(/,/g, '')] || 0}개`).join(' · ') : '달성 콤보 집계 없음';
             });
           } catch (_) {}
         };
@@ -65,6 +78,7 @@
                 body.combo_points = parts.comboPoints;
                 body.score = parts.comboPoints * Number(body.combos || parts.combos);
                 body.replay = getReplay({ ...parts, combos: Number(body.combos || parts.combos) });
+                body.combo_counts = body.replay.comboCounts;
                 init = { ...init, body: JSON.stringify(body) };
               }
             } catch (_) {}
@@ -92,17 +106,19 @@
             if (panel.hidden) return;
             panel.innerHTML = '<strong>1위 기보</strong><p>불러오는 중입니다.</p>';
             try {
-              const response = await nativeFetch(`${api}?select=nickname,score,combos,combo_points,replay&order=score.desc,created_at.asc&limit=1`, { headers });
+              const response = await nativeFetch(`${api}?select=nickname,score,combos,combo_points,combo_counts,replay&order=score.desc,created_at.asc&limit=1`, { headers });
               const [top] = await response.json();
               if (!top) { panel.innerHTML = '<strong>1위 기보</strong><p>등록된 기보가 없습니다.</p>'; return; }
               const replay = top.replay;
               const mode = replay?.mode === 'sample' ? '강지후 샘플' : '새 게임';
-              panel.innerHTML = `<strong>1위 기보 · ${mode} · ${esc(top.nickname)}</strong><p>${replay?.scoreFormula || `${(top.combo_points || Math.round(top.score / Math.max(1, top.combos))).toLocaleString('ko-KR')} × ${top.combos} = ${Number(top.score).toLocaleString('ko-KR')}`} · ${Number(top.score).toLocaleString('ko-KR')}점</p><pre>${esc(replay?.snapshot || '이전 기록에는 기보 데이터가 없습니다.')}</pre>`;
+              const comboCounts = top.combo_counts || replay?.comboCounts;
+              const countText = comboCounts ? ['10', '100', '1,000', '10,000', '100,000', '1,000,000'].map(label => `${label} ${comboCounts[label.replace(/,/g, '')] || 0}개`).join(' · ') : '달성 콤보 집계 없음';
+              panel.innerHTML = `<strong>1위 기보 · ${mode} · ${esc(top.nickname)}</strong><p>${replay?.scoreFormula || `${(top.combo_points || Math.round(top.score / Math.max(1, top.combos))).toLocaleString('ko-KR')} × ${top.combos} = ${Number(top.score).toLocaleString('ko-KR')}`} · ${Number(top.score).toLocaleString('ko-KR')}점</p><p>${countText}</p><pre>${esc(replay?.snapshot || '이전 기록에는 기보 데이터가 없습니다.')}</pre>`;
             } catch (_) { panel.innerHTML = '<strong>1위 기보</strong><p>기보를 불러오지 못했습니다.</p>'; }
           };
         };
         const style = document.createElement('style');
-        style.textContent = '#formula-replay-tab{margin-left:auto;border:1px solid #70c7b5;border-radius:8px;background:transparent;color:#70c7b5;padding:6px 9px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}#formula-replay-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-replay-panel p{color:#70c7b5;margin:8px 0}#formula-replay-panel pre{max-height:180px;overflow:auto;white-space:pre-wrap;color:#aab4bd;font:11px/1.5 ui-monospace,monospace}.formula-source{font-style:normal;color:#e2b653;font-size:10px;font-weight:800;white-space:nowrap}';
+        style.textContent = '#formula-replay-tab{margin-left:auto;border:1px solid #70c7b5;border-radius:8px;background:transparent;color:#70c7b5;padding:6px 9px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}#formula-replay-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-replay-panel p{color:#70c7b5;margin:8px 0}#formula-replay-panel pre{max-height:180px;overflow:auto;white-space:pre-wrap;color:#aab4bd;font:11px/1.5 ui-monospace,monospace}.formula-source{font-style:normal;color:#e2b653;font-size:10px;font-weight:800;white-space:nowrap}.formula-counts{grid-column:1/-1;color:#8992a0;font-size:10px;white-space:normal;line-height:1.4}';
         document.head.append(style);
         new MutationObserver(mount).observe(document.documentElement, { childList: true, subtree: true });
         setTimeout(mount, 0);
