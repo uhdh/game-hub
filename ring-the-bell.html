@@ -100,6 +100,21 @@ $('discardBtn').onclick=discardSelected;$('bell').onclick=showBell;$('fourBtn').
   const modalBox=document.getElementById('modalBox');
   if(modalBox)new MutationObserver(()=>recordDb(modalBox.textContent||'')).observe(modalBox,{childList:true,subtree:true,characterData:true});
 })();
+</script><script>
+(()=>{
+  const url='https://paktzmofotvwfdxcpmzv.supabase.co/rest/v1/ring_the_bell_leaderboard';
+  const key='sb_publishable_jWbstEn2pKJTNDxLTR4Jig_asglvzGW';
+  const rows=document.getElementById('leaderboardRows');
+  if(!rows||!rows.parentElement)return;
+  const rank=document.createElement('div');
+  rank.id='ring-my-rank';
+  rank.style.cssText='margin:4px 0 8px;color:#e2b653;font-size:11px;font-weight:800';
+  rank.textContent='내 순위 확인 중…';
+  rows.parentElement.insertBefore(rank,rows);
+  const refresh=async()=>{try{const nickname=localStorage.getItem('ringTheBellParticipantNickname');const res=await fetch(`${url}?select=nickname,rating,wins,losses&order=rating.desc,wins.desc,updated_at.asc`,{headers:{apikey:key,Authorization:`Bearer ${key}`}});const entries=await res.json();const position=entries.findIndex(entry=>entry.nickname===nickname);if(position<0){rank.textContent='내 순위 미등록';return}const entry=entries[position];rank.textContent=`내 순위 ${position+1}위 · ELO ${entry.rating} · ${entry.wins}승 ${entry.losses}패`}catch(_){rank.textContent='내 순위 확인 실패'}};
+  refresh();
+  new MutationObserver(()=>setTimeout(refresh,80)).observe(rows,{childList:true});
+})();
 </script><style>
 @media (max-width:520px){
   .shell{padding:14px 10px 30px}
