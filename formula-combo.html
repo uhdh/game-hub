@@ -684,7 +684,39 @@
             controls.querySelector('[data-solver-auto]').onclick = () => lock(() => runFullPlay(status, { ai: true }));
           };
 
-          // 누구나 쓸 수 있는 관전 탭. 사람 리더보드에는 기록하지 않는다.
+          // 모바일에서는 상단 상태줄과 보드를 동시에 볼 수 없다(보드가 뷰포트보다 아래에 있고
+          // 세로로 길다). 그래서 관전 시작 시 보드로 스크롤하고, 진행 상황은 화면 하단에
+          // 고정된 HUD로 따로 띄운다.
+          const focusBoard = () => {
+            const board = document.querySelector('.hex-board') || document.querySelector('.board-card');
+            if (board && board.scrollIntoView) board.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          };
+          let hudTimer = null;
+          const showHud = () => {
+            let hud = document.getElementById('formula-ai-hud');
+            if (!hud) {
+              hud = document.createElement('div');
+              hud.id = 'formula-ai-hud';
+              hud.innerHTML = '<span data-hud-text></span><button type="button" data-hud-close aria-label="닫기">✕</button>';
+              document.body.append(hud);
+              hud.querySelector('[data-hud-close]').onclick = () => hud.remove();
+            }
+            window.clearTimeout(hudTimer);
+            hud.hidden = false;
+            return hud.querySelector('[data-hud-text]');
+          };
+          const hideHudLater = () => {
+            const hud = document.getElementById('formula-ai-hud');
+            if (!hud) return;
+            window.clearTimeout(hudTimer);
+            hudTimer = window.setTimeout(() => hud.remove(), 8000);
+          };
+          // 여러 요소에 같은 상태 문구를 동시에 반영하기 위한 얇은 대리 객체
+          const statusSink = (...targets) => ({
+            set textContent(value) { targets.forEach(target => { if (target) target.textContent = value; }); },
+            get textContent() { return (targets[0] && targets[0].textContent) || ''; }
+          });
+
           const mountAiTab = () => {
             if (document.getElementById('formula-ai-show')) return;
             const head = document.querySelector('.topbar');
@@ -699,13 +731,18 @@
             button.onclick = async () => {
               button.disabled = true;
               button.classList.add('active');
+              const hudText = showHud();
+              const sink = statusSink(status, hudText);
+              sink.textContent = 'AI가 새 판을 준비하고 있습니다…';
+              focusBoard();
               try {
-                await runFullPlay(status, { ai: true });
+                await runFullPlay(sink, { ai: true });
               } catch (error) {
-                status.textContent = `오류: ${error && error.message}`;
+                sink.textContent = `오류: ${error && error.message}`;
               }
               button.disabled = false;
               button.classList.remove('active');
+              hideHudLater();
             };
           };
           return { mountDevControls, mountAiTab };
@@ -780,7 +817,7 @@
           }
         }, true);
         const style = document.createElement('style');
-        style.textContent = '#formula-replay-tab{margin-left:auto;border:1px solid #70c7b5;border-radius:8px;background:transparent;color:#70c7b5;padding:6px 9px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}#formula-my-rank{color:#e2b653;font-size:10px;font-weight:800;margin-left:auto;margin-right:8px}#formula-replay-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-replay-panel p{color:#70c7b5;margin:8px 0}#formula-replay-panel pre{max-height:180px;overflow:auto;white-space:pre-wrap;color:#aab4bd;font:11px/1.5 ui-monospace,monospace}.formula-source{font-style:normal;color:#e2b653;font-size:10px;font-weight:800;white-space:nowrap}.formula-counts{color:#8992a0;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.replay-board-wrap{overflow:auto;margin:10px -4px;padding:4px}.replay-board{position:relative;min-width:640px;background:#11181e;border-radius:10px}.replay-tile{position:absolute;box-sizing:border-box;border:1px solid #536471;border-radius:8px;background:#26333b;color:#eef3f4;font:800 13px/1 ui-monospace,monospace;cursor:pointer}.replay-tile:hover,.replay-tile.selected{background:#2d8f88;border-color:#b9fff2;color:#fff}.replay-challenge-status{color:#70c7b5;font-size:11px}.replay-reset{margin-top:8px;border:1px solid #536471;border-radius:7px;background:transparent;color:#aab4bd;padding:6px 9px;font-size:10px;cursor:pointer}#formula-solver-controls{display:flex;align-items:center;gap:6px;margin-left:8px;flex-wrap:wrap}#formula-solver-controls button{border:1px solid #70c7b5;border-radius:7px;background:#16252a;color:#b9fff2;padding:5px 8px;font:inherit;font-size:10px;font-weight:800;cursor:pointer}#formula-solver-controls span{color:#8992a0;font-size:10px}#formula-ai-show{display:flex;align-items:center;gap:8px;flex-wrap:wrap}#formula-ai-show [data-ai-run]{white-space:nowrap}#formula-ai-show [data-ai-run].active{opacity:.75;cursor:progress}#formula-ai-show [data-ai-status]{color:#70c7b5;font-size:11px;font-weight:700}#formula-ai-tab{margin-left:8px;border:1px solid #e2b653;border-radius:8px;background:transparent;color:#e2b653;padding:6px 9px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}#formula-ai-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-ai-panel p{color:#70c7b5;margin:8px 0}#formula-ai-panel .ai-row{display:grid;grid-template-columns:auto 1fr auto auto;gap:4px 8px;align-items:center;padding:7px 0;border-top:1px solid rgba(255,255,255,.06)}#formula-ai-panel .ai-row b{color:#e2b653;font-size:11px}#formula-ai-panel .ai-row span{color:#aab4bd;font-size:11px}#formula-ai-panel .ai-row em{font-style:normal;color:#b9fff2;font-size:12px;font-weight:800;white-space:nowrap}#formula-ai-panel .ai-row i{font-style:normal;color:#8992a0;font-size:10px;white-space:nowrap}#formula-ai-panel .ai-row small{grid-column:1/-1;color:#8992a0;font-size:9px}.score-card .total-score-line.is-raw-total{display:none}.score-card .formula-final-score{display:block;color:var(--accent-hover);background:#5fb8b01f;border:1px solid #5fb8b073;border-radius:9px;margin-top:8px;padding:8px 10px;font-size:13px;font-weight:800}';
+        style.textContent = '#formula-replay-tab{margin-left:auto;border:1px solid #70c7b5;border-radius:8px;background:transparent;color:#70c7b5;padding:6px 9px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}#formula-my-rank{color:#e2b653;font-size:10px;font-weight:800;margin-left:auto;margin-right:8px}#formula-replay-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-replay-panel p{color:#70c7b5;margin:8px 0}#formula-replay-panel pre{max-height:180px;overflow:auto;white-space:pre-wrap;color:#aab4bd;font:11px/1.5 ui-monospace,monospace}.formula-source{font-style:normal;color:#e2b653;font-size:10px;font-weight:800;white-space:nowrap}.formula-counts{color:#8992a0;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.replay-board-wrap{overflow:auto;margin:10px -4px;padding:4px}.replay-board{position:relative;min-width:640px;background:#11181e;border-radius:10px}.replay-tile{position:absolute;box-sizing:border-box;border:1px solid #536471;border-radius:8px;background:#26333b;color:#eef3f4;font:800 13px/1 ui-monospace,monospace;cursor:pointer}.replay-tile:hover,.replay-tile.selected{background:#2d8f88;border-color:#b9fff2;color:#fff}.replay-challenge-status{color:#70c7b5;font-size:11px}.replay-reset{margin-top:8px;border:1px solid #536471;border-radius:7px;background:transparent;color:#aab4bd;padding:6px 9px;font-size:10px;cursor:pointer}#formula-solver-controls{display:flex;align-items:center;gap:6px;margin-left:8px;flex-wrap:wrap}#formula-solver-controls button{border:1px solid #70c7b5;border-radius:7px;background:#16252a;color:#b9fff2;padding:5px 8px;font:inherit;font-size:10px;font-weight:800;cursor:pointer}#formula-solver-controls span{color:#8992a0;font-size:10px}#formula-ai-show{display:flex;align-items:center;gap:8px;flex-wrap:wrap}#formula-ai-show [data-ai-run]{white-space:nowrap}#formula-ai-show [data-ai-run].active{opacity:.75;cursor:progress}#formula-ai-show [data-ai-status]{color:#70c7b5;font-size:11px;font-weight:700}#formula-ai-tab{margin-left:8px;border:1px solid #e2b653;border-radius:8px;background:transparent;color:#e2b653;padding:6px 9px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}#formula-ai-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-ai-panel p{color:#70c7b5;margin:8px 0}#formula-ai-panel .ai-row{display:grid;grid-template-columns:auto 1fr auto auto;gap:4px 8px;align-items:center;padding:7px 0;border-top:1px solid rgba(255,255,255,.06)}#formula-ai-panel .ai-row b{color:#e2b653;font-size:11px}#formula-ai-panel .ai-row span{color:#aab4bd;font-size:11px}#formula-ai-panel .ai-row em{font-style:normal;color:#b9fff2;font-size:12px;font-weight:800;white-space:nowrap}#formula-ai-panel .ai-row i{font-style:normal;color:#8992a0;font-size:10px;white-space:nowrap}#formula-ai-panel .ai-row small{grid-column:1/-1;color:#8992a0;font-size:9px}#formula-ai-hud{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;z-index:60;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 24px);padding:10px 12px;border:1px solid #5fb8b073;border-radius:12px;background:#0f1a1fF0;box-shadow:0 6px 20px rgba(0,0,0,.45);backdrop-filter:blur(6px)}#formula-ai-hud [data-hud-text]{color:#b9fff2;font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#formula-ai-hud [data-hud-close]{flex:none;border:0;border-radius:6px;background:transparent;color:#8992a0;font-size:12px;line-height:1;padding:4px 6px;cursor:pointer}#formula-ai-hud [data-hud-close]:hover{color:#eef3f4}@media (prefers-reduced-motion:reduce){#formula-ai-hud{backdrop-filter:none}}#formula-replay-tab,#formula-ai-tab{white-space:nowrap}@media (max-width:480px){#formula-ai-show{width:100%;order:-1}#formula-ai-show [data-ai-run]{width:100%;text-align:center}#formula-ai-show [data-ai-status]{display:none}#formula-ai-tab{margin-left:0}#formula-ai-panel .ai-row{grid-template-columns:auto 1fr;row-gap:2px}#formula-ai-panel .ai-row em{grid-column:2;justify-self:end}#formula-ai-panel .ai-row i{grid-column:1/-1}}.score-card .total-score-line.is-raw-total{display:none}.score-card .formula-final-score{display:block;color:var(--accent-hover);background:#5fb8b01f;border:1px solid #5fb8b073;border-radius:9px;margin-top:8px;padding:8px 10px;font-size:13px;font-weight:800}';
         document.head.append(style);
         new MutationObserver(mount).observe(document.documentElement, { childList: true, subtree: true });
         setTimeout(mount, 0);
