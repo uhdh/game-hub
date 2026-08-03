@@ -1132,8 +1132,8 @@
   const LB_SECTIONS = [
     {
       label: '수식 콤보',
-      fetch: (limit) => fetchSimpleTop('formula_combo_leaderboard', 'nickname,score,combos', 'score.desc,created_at.asc', limit),
-      format: r => `${r.score}점 · ${r.combos}콤보`,
+      fetch: (limit) => fetchSimpleTop('formula_combo_leaderboard', 'nickname,score,combos,combo_points', 'score.desc,created_at.asc', limit),
+      format: r => `${r.combo_points || (r.combos ? Math.round(r.score / r.combos) : 0)}점 × ${r.combos}콤보 = ${r.score}점`,
     },
     {
       label: '링 더 벨',
