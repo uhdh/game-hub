@@ -36,6 +36,7 @@
           combos: parts.combos,
           scoreFormula: `${parts.comboPoints.toLocaleString('ko-KR')} × ${parts.combos} = ${(parts.comboPoints * parts.combos).toLocaleString('ko-KR')}`,
           comboCounts: getComboCounts(),
+          board: getBoardLayout(),
           snapshot: document.querySelector('.board-card')?.innerText?.slice(0, 4000) || ''
         });
         const getComboCounts = () => {
@@ -45,6 +46,25 @@
             if (match) { const key = String(10 ** Number(match[1])); counts[key] = (counts[key] || 0) + 1; }
           });
           return counts;
+        };
+        const getBoardLayout = () => {
+          const board = document.querySelector('.hex-board');
+          if (!board) return null;
+          return { width: board.style.width, height: board.style.height, tiles: [...board.querySelectorAll('.hex-slot')].map(slot => { const tile = slot.querySelector('.hex-tile'); return tile ? { style: slot.getAttribute('style') || '', label: tile.querySelector('strong')?.textContent || '', removed: tile.classList.contains('removed') } : null; }).filter(Boolean) };
+        };
+        const renderReplayChallenge = (panel, top, replay, mode, countText) => {
+          if (!replay?.board?.tiles?.length) { panel.innerHTML = `<strong>1위 기보 · ${mode} · ${esc(top.nickname)}</strong><p>${replay?.scoreFormula || `${(top.combo_points || Math.round(top.score / Math.max(1, top.combos))).toLocaleString('ko-KR')} × ${top.combos} = ${Number(top.score).toLocaleString('ko-KR')}`} · ${Number(top.score).toLocaleString('ko-KR')}점</p><p>${countText}</p><pre>${esc(replay?.snapshot || '이전 기록에는 배치 데이터가 없습니다.')}</pre>`; return; }
+          panel.innerHTML = `<strong>1위 기보 도전 · ${mode} · ${esc(top.nickname)}</strong><p>${replay.scoreFormula || ''} · ${countText}</p><div class="replay-challenge"><div class="replay-challenge-status">타일을 눌러 같은 배치에서 콤보를 만들어보세요.</div><div class="replay-board-wrap"><div class="replay-board"></div></div><button type="button" class="replay-reset">선택 초기화</button></div>`;
+          const board = panel.querySelector('.replay-board');
+          board.style.width = replay.board.width || '760px'; board.style.height = replay.board.height || '544px';
+          const status = panel.querySelector('.replay-challenge-status');
+          const selected = [];
+          const parse = label => { const op = label[0]; const value = Number(label.slice(1).replace(/[()]/g, '')); return { op, value }; };
+          const evaluate = path => path.slice(1).reduce((value, tile) => { const { op, value: amount } = parse(tile.label); return op === '+' ? value + amount : op === '−' || op === '-' ? value - amount : op === '×' ? value * amount : amount ? value / amount : value; }, parse(path[0].label).value);
+          const power = value => Number.isInteger(value) && value >= 10 && Math.abs(Math.log10(value) - Math.round(Math.log10(value))) < 1e-9;
+          const refresh = () => { board.querySelectorAll('.replay-tile').forEach((el, index) => el.classList.toggle('selected', selected.includes(index))); };
+          replay.board.tiles.forEach((data, index) => { const tile = document.createElement('button'); tile.type = 'button'; tile.className = 'replay-tile'; tile.textContent = data.label; tile.setAttribute('style', data.style); tile.dataset.left = (data.style.match(/left:\s*([\d.]+)/)?.[1] || '0'); tile.dataset.top = (data.style.match(/top:\s*([\d.]+)/)?.[1] || '0'); tile.onclick = () => { if (selected.includes(index)) return; if (selected.length) { const prev = replay.board.tiles[selected[selected.length - 1]]; const dx = Number(tile.dataset.left) - Number(prev.style.match(/left:\s*([\d.]+)/)?.[1] || 0); const dy = Number(tile.dataset.top) - Number(prev.style.match(/top:\s*([\d.]+)/)?.[1] || 0); if (Math.hypot(dx, dy) > 60) { status.textContent = '인접한 타일만 이어갈 수 있습니다.'; return; } } selected.push(index); refresh(); const path = selected.map(i => replay.board.tiles[i]); const result = evaluate(path); status.textContent = `${path.map(item => item.label).join(' ')} = ${result.toLocaleString('ko-KR')}`; if (selected.length > 1 && power(result)) status.textContent += ' · 콤보 완성 가능'; }; board.append(tile); });
+          panel.querySelector('.replay-reset').onclick = () => { selected.splice(0, selected.length); refresh(); status.textContent = '타일을 눌러 같은 배치에서 콤보를 만들어보세요.'; };
         };
         const isValidEntry = entry => Number.isInteger(Number(entry.combos)) && Number(entry.combos) >= 0 && Number(entry.combos) <= 75 && Number(entry.combo_points) >= 0 && Number(entry.score) === Number(entry.combo_points) * Number(entry.combos);
         const refreshLeaderboardFormula = async () => {
@@ -129,12 +149,12 @@
               const mode = replay?.mode === 'sample' ? '강지후 샘플' : '새 게임';
               const comboCounts = top.combo_counts || replay?.comboCounts;
               const countText = comboCounts ? ['10', '100', '1,000', '10,000', '100,000', '1,000,000'].map(label => `${label} ${comboCounts[label.replace(/,/g, '')] || 0}개`).join(' · ') : '달성 콤보 집계 없음';
-              panel.innerHTML = `<strong>1위 기보 · ${mode} · ${esc(top.nickname)}</strong><p>${replay?.scoreFormula || `${(top.combo_points || Math.round(top.score / Math.max(1, top.combos))).toLocaleString('ko-KR')} × ${top.combos} = ${Number(top.score).toLocaleString('ko-KR')}`} · ${Number(top.score).toLocaleString('ko-KR')}점</p><p>${countText}</p><pre>${esc(replay?.snapshot || '이전 기록에는 기보 데이터가 없습니다.')}</pre>`;
+              renderReplayChallenge(panel, top, replay, mode, countText);
             } catch (_) { panel.innerHTML = '<strong>1위 기보</strong><p>기보를 불러오지 못했습니다.</p>'; }
           };
         };
         const style = document.createElement('style');
-        style.textContent = '#formula-replay-tab{margin-left:auto;border:1px solid #70c7b5;border-radius:8px;background:transparent;color:#70c7b5;padding:6px 9px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}#formula-my-rank{color:#e2b653;font-size:10px;font-weight:800;margin-left:auto;margin-right:8px}#formula-replay-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-replay-panel p{color:#70c7b5;margin:8px 0}#formula-replay-panel pre{max-height:180px;overflow:auto;white-space:pre-wrap;color:#aab4bd;font:11px/1.5 ui-monospace,monospace}.formula-source{font-style:normal;color:#e2b653;font-size:10px;font-weight:800;white-space:nowrap}.formula-counts{color:#8992a0;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}';
+        style.textContent = '#formula-replay-tab{margin-left:auto;border:1px solid #70c7b5;border-radius:8px;background:transparent;color:#70c7b5;padding:6px 9px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}#formula-my-rank{color:#e2b653;font-size:10px;font-weight:800;margin-left:auto;margin-right:8px}#formula-replay-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-replay-panel p{color:#70c7b5;margin:8px 0}#formula-replay-panel pre{max-height:180px;overflow:auto;white-space:pre-wrap;color:#aab4bd;font:11px/1.5 ui-monospace,monospace}.formula-source{font-style:normal;color:#e2b653;font-size:10px;font-weight:800;white-space:nowrap}.formula-counts{color:#8992a0;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.replay-board-wrap{overflow:auto;margin:10px -4px;padding:4px}.replay-board{position:relative;min-width:640px;background:#11181e;border-radius:10px}.replay-tile{position:absolute;box-sizing:border-box;border:1px solid #536471;border-radius:8px;background:#26333b;color:#eef3f4;font:800 13px/1 ui-monospace,monospace;cursor:pointer}.replay-tile:hover,.replay-tile.selected{background:#2d8f88;border-color:#b9fff2;color:#fff}.replay-challenge-status{color:#70c7b5;font-size:11px}.replay-reset{margin-top:8px;border:1px solid #536471;border-radius:7px;background:transparent;color:#aab4bd;padding:6px 9px;font-size:10px;cursor:pointer}';
         document.head.append(style);
         new MutationObserver(mount).observe(document.documentElement, { childList: true, subtree: true });
         setTimeout(mount, 0);
