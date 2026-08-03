@@ -86,7 +86,7 @@
           panel.innerHTML = '<strong>1위 기보</strong><p>불러오는 중입니다.</p>';
           head.append(button);
           card.append(panel);
-          refreshLeaderboardFormula();
+          setTimeout(refreshLeaderboardFormula, 600);
           button.onclick = async () => {
             panel.hidden = !panel.hidden;
             if (panel.hidden) return;
