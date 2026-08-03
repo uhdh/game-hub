@@ -4,6 +4,89 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>수식 콤보</title>
+    <script>
+      (() => {
+        const api = 'https://paktzmofotvwfdxcpmzv.supabase.co/rest/v1/formula_combo_leaderboard';
+        const key = 'sb_publishable_jWbstEn2pKJTNDxLTR4Jig_asglvzGW';
+        const headers = { apikey: key, Authorization: `Bearer ${key}` };
+        const nativeFetch = window.fetch.bind(window);
+        const esc = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const normalizeScore = () => {
+          const line = document.querySelector('.total-score-line');
+          if (!line) return;
+          const match = line.textContent.match(/총점\s*\(([-\d,.]+)\s*-\s*[-\d,.]+\)\s*[×x]\s*(\d+)\s*=\s*[-\d,.]+/);
+          if (!match) return;
+          const comboPoints = Number(match[1].replace(/,/g, ''));
+          const combos = Number(match[2]);
+          line.dataset.comboPoints = comboPoints;
+          line.dataset.combos = combos;
+          line.textContent = `최종점수 ${comboPoints} × ${combos} = ${comboPoints * combos}`;
+        };
+        const getScoreParts = () => {
+          const normalized = document.querySelector('.total-score-line');
+          if (normalized?.dataset.comboPoints) return { comboPoints: Number(normalized.dataset.comboPoints), combos: Number(normalized.dataset.combos) };
+          const line = document.querySelector('.total-score-line')?.textContent || '';
+          const match = line.match(/총점\s*\(([-\d,.]+)\s*-\s*[-\d,.]+\)\s*[×x]\s*(\d+)\s*=\s*[-\d,.]+/);
+          if (!match) return null;
+          return { comboPoints: Number(match[1].replace(/,/g, '')), combos: Number(match[2]) };
+        };
+        const getReplay = parts => ({
+          comboPoints: parts.comboPoints,
+          combos: parts.combos,
+          scoreFormula: `${parts.comboPoints} × ${parts.combos} = ${parts.comboPoints * parts.combos}`,
+          snapshot: document.querySelector('.board-card')?.innerText?.slice(0, 4000) || ''
+        });
+        window.fetch = async (input, init = {}) => {
+          const target = typeof input === 'string' ? input : input?.url || '';
+          if (target.startsWith(api) && init.body && (init.method === 'POST' || init.method === 'PATCH')) {
+            try {
+              const body = JSON.parse(init.body);
+              const parts = getScoreParts();
+              if (parts) {
+                body.combo_points = parts.comboPoints;
+                body.score = parts.comboPoints * Number(body.combos || parts.combos);
+                body.replay = getReplay({ ...parts, combos: Number(body.combos || parts.combos) });
+                init = { ...init, body: JSON.stringify(body) };
+              }
+            } catch (_) {}
+          }
+          return nativeFetch(input, init);
+        };
+        const mount = () => {
+          normalizeScore();
+          const head = document.querySelector('.leaderboard-head');
+          const card = document.querySelector('.leaderboard-card');
+          if (!head || !card || document.getElementById('formula-replay-tab')) return;
+          const button = document.createElement('button');
+          button.id = 'formula-replay-tab';
+          button.type = 'button';
+          button.textContent = '1위 기보';
+          const panel = document.createElement('div');
+          panel.id = 'formula-replay-panel';
+          panel.hidden = true;
+          panel.innerHTML = '<strong>1위 기보</strong><p>불러오는 중입니다.</p>';
+          head.append(button);
+          card.append(panel);
+          button.onclick = async () => {
+            panel.hidden = !panel.hidden;
+            if (panel.hidden) return;
+            panel.innerHTML = '<strong>1위 기보</strong><p>불러오는 중입니다.</p>';
+            try {
+              const response = await nativeFetch(`${api}?select=nickname,score,combos,combo_points,replay&order=score.desc,created_at.asc&limit=1`, { headers });
+              const [top] = await response.json();
+              if (!top) { panel.innerHTML = '<strong>1위 기보</strong><p>등록된 기보가 없습니다.</p>'; return; }
+              const replay = top.replay;
+              panel.innerHTML = `<strong>1위 기보 · ${esc(top.nickname)}</strong><p>${replay?.scoreFormula || `${top.combo_points || Math.round(top.score / Math.max(1, top.combos))} × ${top.combos} = ${top.score}`} · ${top.score}점</p><pre>${esc(replay?.snapshot || '이전 기록에는 기보 데이터가 없습니다.')}</pre>`;
+            } catch (_) { panel.innerHTML = '<strong>1위 기보</strong><p>기보를 불러오지 못했습니다.</p>'; }
+          };
+        };
+        const style = document.createElement('style');
+        style.textContent = '#formula-replay-tab{margin-left:auto;border:1px solid #70c7b5;border-radius:8px;background:transparent;color:#70c7b5;padding:6px 9px;font:inherit;font-size:11px;font-weight:800;cursor:pointer}#formula-replay-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-replay-panel p{color:#70c7b5;margin:8px 0}#formula-replay-panel pre{max-height:180px;overflow:auto;white-space:pre-wrap;color:#aab4bd;font:11px/1.5 ui-monospace,monospace}';
+        document.head.append(style);
+        new MutationObserver(mount).observe(document.documentElement, { childList: true, subtree: true });
+        setTimeout(mount, 0);
+      })();
+    </script>
     <script type="module" crossorigin src="./assets/formula-combo/formula-combo-BP32ypKH.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/formula-combo/formula-combo-5l9dnKUj.css">
   </head>
