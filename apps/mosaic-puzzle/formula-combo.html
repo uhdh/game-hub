@@ -454,7 +454,12 @@
                   const next = { pos: to, value, mask: setBit(state.mask, to), len, prev: state };
                   if (isPower(value)) {
                     const score = len * zerosOf(value);
-                    if (!best || score > best.score) best = { score, value, len, node: next };
+                    // 이 라운드가 끝나면 남은 타일은 여기서 끝난 타일에서만 이어 시작할 수 있으므로,
+                    // 점수가 같다면 이웃이 더 많이 살아있는 쪽(막다른 골목이 아닌 쪽)을 우선한다.
+                    const endDegree = graph[to].filter(n => !removed[n] && n !== start).length;
+                    if (!best || score > best.score || (score === best.score && endDegree > best.endDegree)) {
+                      best = { score, value, len, node: next, endDegree };
+                    }
                   }
                   const key = String(value);
                   let bucket = buckets.get(key);
