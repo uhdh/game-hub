@@ -621,6 +621,47 @@
             return { rounds, tail, sum, penalty: aliveEnd.length - tail.length };
           };
 
+          // 강지후 샘플은 콤보를 선언하면 남는 마지막 타일이 곧 다음 콤보의 시작 타일이 된다.
+          // (샘플의 '다시 하기'는 경로와 함께 제거 기록까지 되살리는 "무르기"라서, 새 게임처럼
+          //  경로만 비우는 용도로 쓸 수 없다.) 첫 콤보만 시작 타일을 고르고 이후는 한 줄 사슬이다.
+          const planSample = (tiles, graph, opts) => {
+            const removed = tiles.map(tile => tile.removed);
+            const rounds = [];
+            let sum = 0;
+            let startFrom = null;
+            for (let round = 0; round < tiles.length; round += 1) {
+              const alive = [];
+              for (let i = 0; i < tiles.length; i += 1) if (!removed[i]) alive.push(i);
+              if (alive.length < 2) break;
+              let bestRound = null;
+              if (startFrom === null) {
+                const cut = articulation(graph, removed, alive);
+                const degree = i => graph[i].filter(x => !removed[x]).length;
+                const ranked = alive.slice().sort((a, b) => {
+                  const ca = cut.has(a) ? 1 : 0;
+                  const cb = cut.has(b) ? 1 : 0;
+                  if (ca !== cb) return ca - cb;
+                  return degree(a) - degree(b);
+                });
+                for (const start of ranked.slice(0, opts.startCandidates)) {
+                  const found = findPath(tiles, graph, removed, start, opts);
+                  if (found && (!bestRound || found.score > bestRound.score)) bestRound = found;
+                }
+              } else if (!removed[startFrom]) {
+                bestRound = findPath(tiles, graph, removed, startFrom, opts);
+              }
+              if (!bestRound) break;
+              rounds.push(bestRound);
+              sum += bestRound.score;
+              removed[bestRound.path[0]] = true;
+              startFrom = bestRound.path[bestRound.path.length - 1];
+            }
+            // 마지막 콤보 뒤에도 경로는 끝 타일에 남아 있다. 거기서 이어 남은 타일을 훑어 감점을 줄인다.
+            const tail = startFrom !== null && !removed[startFrom]
+              ? longestPath(graph, removed, [startFrom], 400)
+              : [];
+            return { rounds, tail, sum };
+          };
 
           // --- 계획 재생 ---
           const resetPath = async () => {
@@ -646,17 +687,6 @@
           };
           // 샘플 화면에는 콤보 로그가 없어서 점수 카드의 [N콤보] 배지로 진행을 확인한다
           const sampleComboBadge = () => Number((document.querySelector('.score-card span') || {}).textContent?.match(/\d+/) || [-1]);
-          // 샘플의 '다시 하기'는 경로를 비우면서 제거된 타일까지 되살린다(콤보 점수는 유지).
-          // DOM 클릭은 이 페이지의 캡처 리스너가 가로채 샘플을 처음부터 다시 열어버리므로
-          // React onClick 을 직접 부른다.
-          const resetSamplePath = async () => {
-            const button = [...document.querySelectorAll('.sample-head-actions .combo-button')]
-              .find(item => item.textContent.trim() === '다시 하기');
-            const props = reactProps(button);
-            if (props && props.onClick) props.onClick();
-            else if (button) button.click();
-            return waitFor(() => sampleSelectedCount() === 0, 600);
-          };
           const sampleSelectedCount = () => document.querySelectorAll('.sample-hex-tile.selected').length;
           const clickSampleNode = async (tiles, node, expected) => {
             const slot = sampleSlots()[tiles[node].cellIndex];
@@ -782,7 +812,7 @@
             status.textContent = 'AI가 샘플 경로를 계산 중…';
             await sleep(20);
             const opts = { beamWidth: 700, maxDepth: 88, startCandidates: 6, perValue: 2 };
-            const plan = planGame(board.tiles, board.graph, opts);
+            const plan = planSample(board.tiles, board.graph, opts);
             const planned = plan.rounds.length;
             if (!planned) { status.textContent = '샘플에서 만들 수 있는 콤보를 찾지 못했습니다.'; return; }
             status.textContent = `AI가 ${planned}콤보 경로를 찾았습니다 · 재생 중…`;
@@ -791,9 +821,10 @@
             let failed = false;
             for (let i = 0; i < plan.rounds.length; i += 1) {
               const path = plan.rounds[i].path;
-              if (!(await resetSamplePath())) { failed = true; break; }
+              // 첫 콤보가 아니면 직전 콤보의 마지막 타일이 이미 경로에 남아 있으므로 그 칸은 건너뛴다
+              const from = i === 0 ? 0 : 1;
               let ok = true;
-              for (let step = 0; step < path.length; step += 1) {
+              for (let step = from; step < path.length; step += 1) {
                 if (!(await clickSampleNode(board.tiles, path[step], step + 1))) { ok = false; break; }
               }
               if (!ok || !(await declareSample())) { failed = true; break; }
@@ -803,25 +834,12 @@
                 await sleep(0);
               }
             }
-            // 마지막 '다시 하기'가 모든 타일을 되살리므로, 미사용 감점은 보드 전체를 훑어 줄인다
-            if (done) {
-              const everyTile = board.tiles.map((_, index) => index);
-              const noneRemoved = board.tiles.map(() => false);
-              const tail = longestPath(board.graph, noneRemoved, everyTile, 400);
-              if (tail.length > 1 && await resetSamplePath()) {
-                for (let step = 0; step < tail.length; step += 1) {
-                  if (!(await clickSampleNode(board.tiles, tail[step], step + 1))) break;
-                }
+            // 마지막 콤보 뒤 남은 타일을 이어 훑어 미사용 감점을 줄인다.
+            // tail[0]은 이미 경로에 남아 있는 끝 타일이므로 그 다음 칸부터 누른다.
+            if (done && !failed && plan.tail.length > 1) {
+              for (let step = 1; step < plan.tail.length; step += 1) {
+                if (!(await clickSampleNode(board.tiles, plan.tail[step], step + 1))) break;
               }
-              // '다시 하기'를 부를 때마다 게임이 제거 표시를 지우기 때문에, AI가 시작 타일로
-              // 소모한 칸을 다시 칠해 무엇을 썼는지 보이게 한다.
-              // (.removed 규칙이 .selected 보다 뒤에 있어 경로와 겹쳐도 제거 색이 우선한다)
-              const slotList = sampleSlots();
-              plan.rounds.slice(0, done).forEach(round => {
-                const slot = slotList[board.tiles[round.path[0]].cellIndex];
-                const el = slot && slot.querySelector('.sample-hex-tile');
-                if (el) el.classList.add('removed');
-              });
             }
             await sleep(60);
             const parts = getScoreParts();
