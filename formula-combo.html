@@ -552,40 +552,48 @@
           };
 
           // --- 전체 계획 수립 ---
+          // 콤보가 끝난 뒤 남는 마지막 타일에서 다음 콤보를 이어 시작한다(강지후 샘플과 동일한 체이닝 규칙).
+          // 첫 콤보만 관절점/차수 기준으로 시작 타일을 고르고, 이후로는 이전 경로의 끝 타일로 고정된다.
           const planGame = (tiles, graph, opts) => {
             const removed = tiles.map(tile => tile.removed);
             const rounds = [];
             let sum = 0;
+            let startFrom = null;
             for (let round = 0; round < tiles.length; round += 1) {
               const alive = [];
               for (let i = 0; i < tiles.length; i += 1) if (!removed[i]) alive.push(i);
               if (alive.length < 2) break;
-              const cut = articulation(graph, removed, alive);
-              const degree = i => graph[i].filter(x => !removed[x]).length;
-              const ranked = alive.slice().sort((a, b) => {
-                const ca = cut.has(a) ? 1 : 0;
-                const cb = cut.has(b) ? 1 : 0;
-                if (ca !== cb) return ca - cb;
-                const pa = tiles[a].op === '×' || tiles[a].op === '÷' ? 1 : 0;
-                const pb = tiles[b].op === '×' || tiles[b].op === '÷' ? 1 : 0;
-                if (pa !== pb) return pa - pb;
-                return degree(a) - degree(b);
-              });
               let bestRound = null;
-              for (const start of ranked.slice(0, opts.startCandidates)) {
-                const found = findPath(tiles, graph, removed, start, opts);
-                if (found && (!bestRound || found.score > bestRound.score)) bestRound = found;
-              }
-              if (!bestRound) {
-                for (const start of alive) {
+              if (startFrom === null) {
+                const cut = articulation(graph, removed, alive);
+                const degree = i => graph[i].filter(x => !removed[x]).length;
+                const ranked = alive.slice().sort((a, b) => {
+                  const ca = cut.has(a) ? 1 : 0;
+                  const cb = cut.has(b) ? 1 : 0;
+                  if (ca !== cb) return ca - cb;
+                  const pa = tiles[a].op === '×' || tiles[a].op === '÷' ? 1 : 0;
+                  const pb = tiles[b].op === '×' || tiles[b].op === '÷' ? 1 : 0;
+                  if (pa !== pb) return pa - pb;
+                  return degree(a) - degree(b);
+                });
+                for (const start of ranked.slice(0, opts.startCandidates)) {
                   const found = findPath(tiles, graph, removed, start, opts);
                   if (found && (!bestRound || found.score > bestRound.score)) bestRound = found;
                 }
+                if (!bestRound) {
+                  for (const start of alive) {
+                    const found = findPath(tiles, graph, removed, start, opts);
+                    if (found && (!bestRound || found.score > bestRound.score)) bestRound = found;
+                  }
+                }
+              } else if (!removed[startFrom]) {
+                bestRound = findPath(tiles, graph, removed, startFrom, opts);
               }
               if (!bestRound) break;
               rounds.push(bestRound);
               sum += bestRound.score;
               removed[bestRound.path[0]] = true;
+              startFrom = bestRound.path[bestRound.path.length - 1];
             }
             const aliveEnd = [];
             for (let i = 0; i < tiles.length; i += 1) if (!removed[i]) aliveEnd.push(i);
@@ -902,6 +910,72 @@
             return adminSolverDecision;
           }).catch(() => { adminSolverDecision = false; return false; });
         };
+        // ---- 모바일 터치 드래그 폴리필 ----
+        // 게임 본체가 타일 배치를 네이티브 HTML5 Drag&Drop(onDragStart/onDrop)으로만 구현해서
+        // 터치 브라우저(iOS Safari, Android Chrome)에서는 dragstart/drop 이벤트가 전혀 발화하지
+        // 않는다. 터치 제스처를 감지해 같은 리액트 핸들러를 대신 호출해 대체한다.
+        (() => {
+          const reactPropsOf = element => {
+            if (!element) return null;
+            const propsKey = Object.keys(element).find(name => name.startsWith('__reactProps'));
+            return propsKey ? element[propsKey] : null;
+          };
+          let dragging = null;
+          const makeGhost = el => {
+            const rect = el.getBoundingClientRect();
+            const ghost = el.cloneNode(true);
+            ghost.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;margin:0;pointer-events:none;z-index:9999;opacity:.85;transform:scale(1.06);transition:none;`;
+            document.body.append(ghost);
+            return ghost;
+          };
+          const moveGhost = (ghost, x, y) => {
+            const rect = ghost.getBoundingClientRect();
+            ghost.style.left = `${x - rect.width / 2}px`;
+            ghost.style.top = `${y - rect.height / 2}px`;
+          };
+          document.addEventListener('touchstart', event => {
+            if (dragging) return;
+            const tile = event.target.closest('.tray-tile');
+            if (!tile) return;
+            const props = reactPropsOf(tile);
+            if (!props || !props.onDragStart) return;
+            const touch = event.touches[0];
+            event.preventDefault();
+            props.onDragStart();
+            dragging = { el: tile, ghost: makeGhost(tile) };
+            moveGhost(dragging.ghost, touch.clientX, touch.clientY);
+          }, { passive: false });
+          document.addEventListener('touchmove', event => {
+            if (!dragging) return;
+            event.preventDefault();
+            const touch = event.touches[0];
+            moveGhost(dragging.ghost, touch.clientX, touch.clientY);
+          }, { passive: false });
+          const endDrag = event => {
+            if (!dragging) return;
+            const { el, ghost } = dragging;
+            const touch = event.changedTouches && event.changedTouches[0];
+            event.preventDefault();
+            ghost.remove();
+            let dropped = false;
+            if (touch) {
+              const target = document.elementFromPoint(touch.clientX, touch.clientY);
+              const slot = target && target.closest('.hex-board .hex-slot');
+              const dropProps = slot && reactPropsOf(slot);
+              if (dropProps && dropProps.onDrop) { dropProps.onDrop({ preventDefault() {} }); dropped = true; }
+            }
+            if (!dropped) {
+              const endProps = reactPropsOf(el);
+              if (endProps && endProps.onDragEnd) endProps.onDragEnd();
+            }
+            dragging = null;
+          };
+          document.addEventListener('touchend', endDrag, { passive: false });
+          document.addEventListener('touchcancel', endDrag, { passive: false });
+          const style = document.createElement('style');
+          style.textContent = '.tray-tile{touch-action:none}';
+          document.head.append(style);
+        })();
         let modeSwitchBypass = false;
         document.addEventListener('click', event => {
           if (modeSwitchBypass) return;
