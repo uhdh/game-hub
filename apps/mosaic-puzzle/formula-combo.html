@@ -557,48 +557,44 @@
           };
 
           // --- 전체 계획 수립 ---
-          // 콤보가 끝난 뒤 남는 마지막 타일에서 다음 콤보를 이어 시작한다(강지후 샘플과 동일한 체이닝 규칙).
-          // 첫 콤보만 관절점/차수 기준으로 시작 타일을 고르고, 이후로는 이전 경로의 끝 타일로 고정된다.
+          // 콤보 사이에 '다시 하기'로 경로를 비우므로 매 라운드 시작 타일을 새로 고를 수 있다.
+          // (게임의 '다시 하기'는 경로만 비우고 콤보 기록과 제거된 타일은 그대로 둔다.
+          //  샘플 화면도 재생 쪽에서 같은 방식으로 맞춰 두었다.)
+          // 시작 타일은 제거되므로, 보드가 쪼개지지 않도록 관절점을 피해 가장자리부터 소모한다.
           const planGame = (tiles, graph, opts) => {
             const removed = tiles.map(tile => tile.removed);
             const rounds = [];
             let sum = 0;
-            let startFrom = null;
             for (let round = 0; round < tiles.length; round += 1) {
               const alive = [];
               for (let i = 0; i < tiles.length; i += 1) if (!removed[i]) alive.push(i);
               if (alive.length < 2) break;
+              const cut = articulation(graph, removed, alive);
+              const degree = i => graph[i].filter(x => !removed[x]).length;
+              const ranked = alive.slice().sort((a, b) => {
+                const ca = cut.has(a) ? 1 : 0;
+                const cb = cut.has(b) ? 1 : 0;
+                if (ca !== cb) return ca - cb;
+                const pa = tiles[a].op === '×' || tiles[a].op === '÷' ? 1 : 0;
+                const pb = tiles[b].op === '×' || tiles[b].op === '÷' ? 1 : 0;
+                if (pa !== pb) return pa - pb;
+                return degree(a) - degree(b);
+              });
               let bestRound = null;
-              if (startFrom === null) {
-                const cut = articulation(graph, removed, alive);
-                const degree = i => graph[i].filter(x => !removed[x]).length;
-                const ranked = alive.slice().sort((a, b) => {
-                  const ca = cut.has(a) ? 1 : 0;
-                  const cb = cut.has(b) ? 1 : 0;
-                  if (ca !== cb) return ca - cb;
-                  const pa = tiles[a].op === '×' || tiles[a].op === '÷' ? 1 : 0;
-                  const pb = tiles[b].op === '×' || tiles[b].op === '÷' ? 1 : 0;
-                  if (pa !== pb) return pa - pb;
-                  return degree(a) - degree(b);
-                });
-                for (const start of ranked.slice(0, opts.startCandidates)) {
+              for (const start of ranked.slice(0, opts.startCandidates)) {
+                const found = findPath(tiles, graph, removed, start, opts);
+                if (found && (!bestRound || found.score > bestRound.score)) bestRound = found;
+              }
+              if (!bestRound) {
+                for (const start of alive) {
                   const found = findPath(tiles, graph, removed, start, opts);
                   if (found && (!bestRound || found.score > bestRound.score)) bestRound = found;
                 }
-                if (!bestRound) {
-                  for (const start of alive) {
-                    const found = findPath(tiles, graph, removed, start, opts);
-                    if (found && (!bestRound || found.score > bestRound.score)) bestRound = found;
-                  }
-                }
-              } else if (!removed[startFrom]) {
-                bestRound = findPath(tiles, graph, removed, startFrom, opts);
               }
               if (!bestRound) break;
               rounds.push(bestRound);
               sum += bestRound.score;
               removed[bestRound.path[0]] = true;
-              startFrom = bestRound.path[bestRound.path.length - 1];
             }
             const aliveEnd = [];
             for (let i = 0; i < tiles.length; i += 1) if (!removed[i]) aliveEnd.push(i);
