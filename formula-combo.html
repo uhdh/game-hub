@@ -813,6 +813,15 @@
                   if (!(await clickSampleNode(board.tiles, tail[step], step + 1))) break;
                 }
               }
+              // '다시 하기'를 부를 때마다 게임이 제거 표시를 지우기 때문에, AI가 시작 타일로
+              // 소모한 칸을 다시 칠해 무엇을 썼는지 보이게 한다.
+              // (.removed 규칙이 .selected 보다 뒤에 있어 경로와 겹쳐도 제거 색이 우선한다)
+              const slotList = sampleSlots();
+              plan.rounds.slice(0, done).forEach(round => {
+                const slot = slotList[board.tiles[round.path[0]].cellIndex];
+                const el = slot && slot.querySelector('.sample-hex-tile');
+                if (el) el.classList.add('removed');
+              });
             }
             await sleep(60);
             const parts = getScoreParts();
