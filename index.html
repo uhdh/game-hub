@@ -881,15 +881,12 @@
     if (announcementVersion) localStorage.setItem(ANNOUNCEMENT_SEEN_KEY, announcementVersion);
     const latestHistoryItem = annHistoryList.querySelector('.ann-history-item');
     if (latestHistoryItem) {
-      const latestHistoryDate = latestHistoryItem.querySelector('.ann-history-date');
-      if (latestHistoryDate) {
-        const latestHistory = latestHistoryDate.parentElement;
-        const badge = latestHistory.querySelector('.ann-new-badge');
-        if (badge) badge.remove();
+      const badge = latestHistoryItem.querySelector('.ann-new-badge');
+      if (badge) badge.remove();
+      if (latestHistoryItem.dataset.historyId) {
+        localStorage.setItem(ANNOUNCEMENT_SEEN_HISTORY_KEY, latestHistoryItem.dataset.historyId);
       }
     }
-    const latestHistoryId = annHistoryList.querySelector('.ann-history-item')?.dataset.historyId;
-    if (latestHistoryId) localStorage.setItem(ANNOUNCEMENT_SEEN_HISTORY_KEY, latestHistoryId);
     annDot.classList.remove('show');
   }
   function closeAnnouncement() {
