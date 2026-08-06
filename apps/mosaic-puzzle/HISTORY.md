@@ -1,5 +1,16 @@
 # 작업 히스토리
 
+## 2026-08-07 · Claude Code · 홈화면에 유튜브 채널 링크 추가 (배포됨)
+
+- **요청**: 홈화면(`index.html`) 오른쪽 위에 유튜브 채널(`https://www.youtube.com/@pgamex_sim`) 링크를 걸어달라는 요청.
+- **변경**: `.header-actions`(우측 상단, 공지사항 버튼과 같은 위치)에 기존 `.announcement-btn` 스타일을 재사용한
+  `<a>` 링크를 공지사항 버튼 위에 추가했다. `target="_blank" rel="noopener"`로 새 탭에서 열림.
+- **부수 커밋**: 이전 세션에서 미커밋 상태로 남아 있던 `.gitignore` 수정(로컬 에이전트 작업 산출물 제외 규칙)과
+  신규 `AGENTS.md`/`CLAUDE.md`(Claude Code·Codex 공용 지침 문서)를 사용자 확인 후 같은 커밋에 함께 포함했다.
+- **배포**: 로컬 repo 커밋 `bbc2d3a` → game-hub에서 `git fetch origin`으로 선커밋 없음 확인 →
+  `git subtree pull --prefix=apps/mosaic-puzzle mosaic master` (충돌 없음, 병합 커밋) →
+  `git push origin master` (`911e0b4..1c35b6c`). Vercel Git 연동 자동 배포 트리거함, 수동 redeploy 불필요.
+
 ## 2026-08-04 · Claude Code · 링 더 벨: 포카드는 카드 교환 즉시 자동 선언 (배포됨)
 
 - **사용자 규칙 확정**: "자신의 턴에 카드 교환으로 같은 숫자 4장이 완성되면 즉시 자동으로 종을 치고
