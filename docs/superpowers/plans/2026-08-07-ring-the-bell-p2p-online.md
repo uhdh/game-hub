@@ -572,6 +572,11 @@ window.RingBellCore={
 })();
 ```
 
+**⚠️ 구현 후 리뷰에서 위 코드 블록에 3가지 결함이 추가로 발견되어 수정됨 (커밋 `9dbe173`, `80d2fb6` — 실제 배포된 코드는 이 두 커밋을 반영한 상태이며, 위 코드 블록 자체는 원래 초안 그대로 남겨둠):**
+1. `$('deck').onclick=()=>take('back');` / `$('discard').onclick=()=>take('front');` → 각각 `if(turn===mySeat)` 가드 추가. `#deck`/`#discard`는 실제 `<button>`이 아닌 `<div role="button">`라 `disabled` 스타일이 클릭을 막지 못해서, 원격 좌석 턴에 클릭하면 로컬에서 `take()`가 실행돼 상대 손패를 오염시키고 나중에 도착하는 진짜 행동을 무시하는 디싱크가 생겼음.
+2. `window.RingBellCore.start(seat,remoteSeat,randFn)`에 `players[seat].name='나'` 한 줄만 추가했던 첫 수정은 `seat===1`(게스트)일 때 이미 기본값으로 `'나'`인 `players[0].name`과 충돌해 두 좌석이 동시에 `'나'`가 되는 문제가 있었음 → **스왑** 방식으로 교체: `seat!==0`일 때 `players[seat].name`과 `players[0].name`을 맞바꿔 항상 정확히 한 좌석만 `'나'`가 되도록 함. 이걸로 (a) `take()`의 원격 드로우 메시지 오귀속과 (b) 38번째 줄 이후 패치 스크립트들이 `'나의 턴'` 문자열만 보고 게스트 화면에서 종 버튼을 잘못 활성화시키는 디싱크 위험을 동시에 해결.
+3. `take()`의 로그 메시지가 `replicateAction`을 통해 원격 좌석의 뒷면(비공개) 드로우를 재현할 때도 카드 값을 그대로 노출했음 → `turn===mySeat||source==='front'`일 때만 카드 값을 보여주고, 그 외(원격 좌석의 뒷면 드로우)에는 `${players[turn].name}님이 뒷면 카드를 가져왔습니다.`처럼 값 없이 표시하도록 수정.
+
 **이 교체에서 바뀐 지점 요약 (검증 시 참고):**
 - `mySeat`/`remoteHumanSeat`/`rand`/`isHumanControlled()` 신규 도입.
 - `makeDeck()`: `sort(()=>Math.random()-.5)` → Fisher-Yates(`rand` 사용) — 셔플 결정론 버그 수정.
