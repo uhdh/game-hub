@@ -141,9 +141,9 @@ function startSet(){
 }
 
 function take(source){
-  if(phase!=='playing'||!isHumanControlled(turn)||hasDrawn)return;
+  if(phase!=='playing'||!isHumanControlled(turn)||hasDrawn)return false;
   const c=source==='front'?discard.pop():draw();
-  if(!c)return;
+  if(!c)return false;
   lockSignalRule();
   players[turn].hand.push(c);
   hasDrawn=true;
@@ -153,21 +153,7 @@ function take(source){
     setMessage(`${players[turn].name}님이 뒷면 카드를 가져왔습니다.`);
   }
   render();
-}
-
-function discardSelected(){
-  if(!hasDrawn||selected.length!==1)return;
-  const c=players[0].hand.splice(selected[0],1)[0];
-  discard.push(c);
-  selected=[];
-  hasDrawn=false;
-  setMessage(`내가 ${c.num}${COLORS[c.color][2]}를 버렸습니다.`);
-  if(fourOf(players[0].hand)){
-    setMessage(`내가 포카드를 완성해 즉시 종을 쳤습니다! 상대 팀 모두 라이프 1개를 잃습니다.`);
-    showdown(0,true);
-    return;
-  }
-  nextTurn();
+  return true;
 }
 
 function aiTurn(p){
@@ -227,13 +213,14 @@ function nextTurn(){
 }
 
 function showBell(){
-  if(phase!=='playing'||!isHumanControlled(turn)||hasDrawn||bellFinalState)return;
+  if(phase!=='playing'||!isHumanControlled(turn)||hasDrawn||bellFinalState)return false;
   lockSignalRule();
   setMessage(`${turn===mySeat?'내가':players[turn].name+'님이'} 종을 쳤습니다! 다른 플레이어가 마지막 교환을 진행합니다.`);
   phase='showing';
   bellFinalState={who:turn,order:[1,2,3].map(off=>(turn+off)%4),index:0};
   render();
   advanceBellFinal();
+  return true;
 }
 
 function showAiBell(who){
@@ -329,7 +316,6 @@ function roundEnd(winner){
   };
 }
 
-$('discardBtn').onclick=discardSelected;
 $('bell').onclick=showBell;
 $('fourBtn').onclick=()=>showdown(turn,true);
 $('deck').onclick=()=>{if(turn===mySeat)take('back')};
@@ -362,6 +348,10 @@ window.RingBellCore={
     round=1;
     setNo=1;
     players.forEach(p=>p.lives=3);
+    signalLocked=false;
+    logLines=[];
+    const thresholdInput=document.getElementById('signalThreshold');
+    if(thresholdInput)thresholdInput.disabled=false;
     if(seat!==0){
       const originalName=players[seat].name;
       players[seat].name=players[0].name;
@@ -372,13 +362,17 @@ window.RingBellCore={
   getTurn(){return turn},
   getMySeat(){return mySeat},
   getChecksum(){
-    return players.map(p=>p.hand.map(c=>c.color+':'+c.num).sort().join(',')).join('|')+'#'+deck.length+'#'+discard.length;
+    const raw=players.map(p=>p.hand.map(c=>c.color+':'+c.num).sort().join(',')).join('|')+'#'+deck.length+'#'+discard.length;
+    let hash=0;
+    for(let i=0;i<raw.length;i++){hash=(Math.imul(31,hash)+raw.charCodeAt(i))|0;}
+    return String(hash);
   },
   replicateAction(kind,idx){
+    if(turn!==remoteHumanSeat)return false;
     if(kind==='draw-back')return take('back');
     if(kind==='draw-front')return take('front');
     if(kind==='discard'){
-      if(phase!=='playing'||!hasDrawn)return;
+      if(phase!=='playing'||!hasDrawn)return false;
       const c=players[turn].hand.splice(idx,1)[0];
       discard.push(c);
       selected=[];
@@ -387,13 +381,18 @@ window.RingBellCore={
       if(fourOf(players[turn].hand)){
         setMessage(`${players[turn].name}님이 포카드를 완성해 즉시 종을 쳤습니다! 상대 팀 모두 라이프 1개를 잃습니다.`);
         showdown(turn,true);
-        return;
+        return true;
       }
       nextTurn();
-      return;
+      return true;
     }
     if(kind==='bell')return showBell();
-    if(kind==='four')return showdown(turn,true);
+    if(kind==='four'){
+      if(phase==='done')return false;
+      showdown(turn,true);
+      return true;
+    }
+    return false;
   }
 };
 })();
@@ -444,6 +443,14 @@ window.RingBellCore={
   let mySeatRole = null;
   let myChecksum = null;
   let pendingRemoteChecksum = null;
+  let pumpTimer = null;
+
+  const actionQueue = [];
+  function pumpQueue() {
+    while (actionQueue.length && window.RingBellCore.replicateAction(actionQueue[0].kind, actionQueue[0].idx)) {
+      actionQueue.shift();
+    }
+  }
 
   function attachOutgoingListeners() {
     // 캡처 단계에서 document(모든 요소의 조상)에 붙여야 turn/mySeat이 게임 로직에 의해
@@ -457,7 +464,13 @@ window.RingBellCore={
       if (e.target.closest('#discard')) { send({ kind: 'draw-front' }); return; }
       const card = e.target.closest('#hand .card');
       if (card && card.dataset.idx !== undefined) { send({ kind: 'discard', idx: Number(card.dataset.idx) }); return; }
-      if (e.target.closest('#bell')) { send({ kind: 'bell' }); return; }
+      if (e.target.closest('#bell')) {
+        const nums = [...document.querySelectorAll('#hand .card .num')].map(el => el.textContent.trim());
+        const counts = nums.reduce((m, n) => (m[n] = (m[n] || 0) + 1, m), {});
+        const hasFour = Object.values(counts).some(n => n >= 4);
+        if (!hasFour) send({ kind: 'bell' });
+        return;
+      }
       if (e.target.closest('#fourBtn')) { send({ kind: 'four' }); return; }
     }, true);
   }
@@ -473,13 +486,11 @@ window.RingBellCore={
 
   function watchForChecksum() {
     const modalBox = document.getElementById('modalBox');
-    let lastText = '';
+    let lastBtn = null;
     new MutationObserver(() => {
-      const hasContinueBtn = !!document.getElementById('continueBtn');
-      if (!hasContinueBtn) return;
-      const text = modalBox.textContent || '';
-      if (text === lastText) return;
-      lastText = text;
+      const btn = document.getElementById('continueBtn');
+      if (!btn || btn === lastBtn) return;
+      lastBtn = btn;
       myChecksum = window.RingBellCore.getChecksum();
       sendAction({ type: 'checksum', value: myChecksum });
       compareChecksums();
@@ -498,7 +509,8 @@ window.RingBellCore={
       return;
     }
     if (msg.type === 'action') {
-      window.RingBellCore.replicateAction(msg.kind, msg.idx);
+      actionQueue.push(msg);
+      pumpQueue();
       return;
     }
     if (msg.type === 'checksum') {
@@ -517,6 +529,7 @@ window.RingBellCore={
         statusBar.textContent = '연결됨';
         document.getElementById('modal').classList.remove('show');
         window.RingBellP2P.deleteSignals(roomCode);
+        pumpTimer = setInterval(pumpQueue, 200);
         if (role === 'host') {
           const seed = Math.floor(Math.random() * 2 ** 31);
           const threshold = document.getElementById('signalThreshold')?.value || 15;
@@ -529,6 +542,8 @@ window.RingBellCore={
       },
       onMessage: handleIncoming,
       onClose: () => {
+        sendAction = null;
+        clearInterval(pumpTimer);
         statusBar.textContent = '상대와의 연결이 끊어졌습니다.';
         document.getElementById('modalBox').innerHTML = '<h2>연결 끊김</h2><p>상대와의 연결이 끊어졌습니다.</p><a class="action" href="./index.html" style="display:block;text-align:center;text-decoration:none">홈으로</a>';
         document.getElementById('modal').classList.add('show');

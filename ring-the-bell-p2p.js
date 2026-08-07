@@ -71,13 +71,16 @@
       clearInterval(poll);
       clearTimeout(connectTimeout);
       clearTimeout(disconnectTimer);
+      deleteSignals(roomCode).catch(() => {});
       onClose();
     }
 
     function attachDc(channel) {
       dc = channel;
       dc.addEventListener('open', () => { clearInterval(poll); clearTimeout(connectTimeout); onOpen(dc); });
-      dc.addEventListener('message', e => onMessage(JSON.parse(e.data)));
+      dc.addEventListener('message', e => {
+        try { onMessage(JSON.parse(e.data)); } catch (_e) {}
+      });
       dc.addEventListener('close', close);
       dc.addEventListener('error', close);
     }
@@ -133,8 +136,8 @@
             await pc.setLocalDescription(answer);
             await postSignal(roomCode, mySeatNum, 'answer', { type: answer.type, sdp: answer.sdp });
           } else if (row.msg_type === 'answer' && role === 'host' && !remoteSet) {
-            await pc.setRemoteDescription(row.payload);
             remoteSet = true;
+            await pc.setRemoteDescription(row.payload);
             for (const c of pendingIce.splice(0)) await pc.addIceCandidate(c).catch(() => {});
           } else if (row.msg_type === 'ice') {
             if (remoteSet) await pc.addIceCandidate(row.payload).catch(() => {});
