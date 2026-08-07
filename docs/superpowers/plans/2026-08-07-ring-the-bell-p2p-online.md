@@ -213,7 +213,7 @@ git commit -m "feat: 링더벨 P2P용 결정론적 PRNG/방코드 유틸 모듈 
 
 - [ ] **Step 2: 33~37번째 줄을 아래 코드로 교체**
 
-`ring-the-bell.html`에서 현재 33번째 줄(`(()=>{const COLORS=...`로 시작)부터 37번째 줄(`$('discardBtn').onclick=discardSelected;...startSet();...`로 끝나는 줄)까지를 정확히 찾아 아래 블록으로 전체 교체한다. (`Edit` 도구로 34~37번째 줄의 정확한 원문 전체를 `old_string`으로 지정해 `new_string`으로 교체 — 원문이 매우 길고 특수문자가 많으므로, 파일을 먼저 `Read`로 열어 정확한 문자열을 복사해 온 뒤 교체할 것. 아래는 교체될 **최종 내용**이다.)
+`ring-the-bell.html`에서 현재 33번째 줄(`(()=>{const COLORS=...`로 시작)부터 37번째 줄(`$('discardBtn').onclick=discardSelected;...startSet();...`로 끝나는 줄)까지를 정확히 찾아 아래 블록으로 전체 교체한다. (`Edit` 도구로 33~37번째 줄의 정확한 원문 전체를 `old_string`으로 지정해 `new_string`으로 교체 — 원문이 매우 길고 특수문자가 많으므로, 파일을 먼저 `Read`로 열어 정확한 문자열을 복사해 온 뒤 교체할 것. 아래는 교체될 **최종 내용**이다.)
 
 ```js
 (() => {
@@ -582,6 +582,8 @@ window.RingBellCore={
 - `roundEnd()`의 승리 팀 표시를 `winner===0` 하드코딩에서 `winner===players[mySeat].team` 비교로 수정 — 텍스트 `'팀 A'`는 그대로 유지(파일 뒤쪽의 리더보드 기록 스크립트가 이 문자열을 그대로 파싱하므로 문자열 자체는 바꾸면 안 됨).
 - `discardSelected()`는 손대지 않음 — 기존에도 `.actions`가 숨겨져 있어 도달 불가능한 죽은 코드이므로 그대로 둔다.
 - 맨 끝에 `window.RingBellCore` 브릿지 4개 함수 노출.
+
+**의도적 로직 중복에 대한 설계 노트:** `window.RingBellCore.replicateAction`의 `'discard'` 분기는 `render()` 안의 손패 카드 클릭 핸들러와 로직이 거의 동일하다(카드 splice + discard push + `fourOf` 체크 + `showdown`/`nextTurn` 분기). 이건 실수가 아니라 의도적 중복이다 — DOM은 항상 `players[mySeat]`의 손패만 렌더링하므로(`you.hand`), 클릭 핸들러는 구조적으로 `mySeat`의 카드에만 반응할 수 있다. 원격 좌석(`players[turn]`, `turn≠mySeat`)이 무엇을 버렸는지 재현하려면 DOM을 거치지 않고 배열을 직접 조작해야 하는데, 이걸 공용 헬퍼로 묶으려면 클릭 핸들러 자체를 "좌석 인덱스를 인자로 받는 함수"로 다시 설계해야 하고, 그건 이번 작업 범위를 넘어서는 리팩터라 하지 않기로 결정했다.
 
 - [ ] **Step 3: 솔로 모드 회귀 확인 (수동, 로컬 서버)**
 
