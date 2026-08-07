@@ -420,7 +420,143 @@ window.RingBellCore={
 (()=>{const status=document.getElementById('status'),board=document.getElementById('scoreboard'),style=document.createElement('style');style.textContent='#myHpDisplay,.team.you .my-hp{display:none!important}.status-hp{margin-left:8px;color:#e0786f;font-size:12px;letter-spacing:1px;font-weight:850}';document.head.appendChild(style);const hp=document.createElement('span');hp.className='status-hp';status.appendChild(hp);function update(){const team=board.querySelector('.team.you');if(team)hp.textContent='♥'.repeat(team.querySelectorAll('.life i:not(.off)').length)+'♡'.repeat(team.querySelectorAll('.life i.off').length)}new MutationObserver(update).observe(board,{childList:true});update()})();
 </script><script>
 (()=>{const log=document.getElementById('log'),labels={'◆':'빨강','●':'파랑','▲':'초록','■':'보라'};function clean(){const raw=log.innerHTML.replace(/<span class="log-color"[^>]*>(.*?)<\/span>/g,'$1'),colored=raw.replace(/(빨강|파랑|초록|보라)\s+(\d+)/g,(_,c,n)=>`<span class="log-color" style="color:${({빨강:'#e0786f',파랑:'#7fa4ef',초록:'#70c7b5',보라:'#b596d2'})[c]};font-weight:850">${c} ${n}</span>`);if(log.innerHTML!==colored)log.innerHTML=colored}new MutationObserver(clean).observe(log,{childList:true});clean()})();
-</script><script>document.getElementById('scoreboard').style.display='none';const handLabel=document.querySelector('.hand-label');if(handLabel&&handLabel.firstChild)handLabel.firstChild.textContent='';(()=>{})();</script><script>(()=>{})();</script></body></html>
+</script><script>document.getElementById('scoreboard').style.display='none';const handLabel=document.querySelector('.hand-label');if(handLabel&&handLabel.firstChild)handLabel.firstChild.textContent='';(()=>{})();</script><script>(()=>{})();</script><script src="ring-the-bell-p2p.js"></script>
+<script>
+(() => {
+  const roomParam = new URLSearchParams(location.search).get('room');
+
+  const onlineBtn = document.createElement('button');
+  onlineBtn.className = 'rules-btn';
+  onlineBtn.textContent = '친구와 온라인 대전';
+  onlineBtn.style.marginLeft = '8px';
+  document.getElementById('rulesBtn').insertAdjacentElement('afterend', onlineBtn);
+
+  const statusBar = document.createElement('div');
+  statusBar.id = 'onlineStatus';
+  statusBar.style.cssText = 'font-size:11px;color:#8992a0;margin:-8px 0 10px';
+  document.querySelector('.hero').insertAdjacentElement('afterend', statusBar);
+
+  let sendAction = null;
+  let mySeatRole = null;
+  let myChecksum = null;
+  let pendingRemoteChecksum = null;
+
+  function attachOutgoingListeners() {
+    const send = payload => { if (sendAction) sendAction({ type: 'action', ...payload }); };
+    const isMyTurn = () => window.RingBellCore.getTurn() === window.RingBellCore.getMySeat();
+    document.getElementById('deck').addEventListener('click', () => { if (isMyTurn()) send({ kind: 'draw-back' }); });
+    document.getElementById('discard').addEventListener('click', () => { if (isMyTurn()) send({ kind: 'draw-front' }); });
+    document.getElementById('hand').addEventListener('click', e => {
+      const card = e.target.closest('.card');
+      if (!card || card.dataset.idx === undefined) return;
+      if (isMyTurn()) send({ kind: 'discard', idx: Number(card.dataset.idx) });
+    });
+    document.getElementById('bell').addEventListener('click', () => { if (isMyTurn()) send({ kind: 'bell' }); });
+    document.getElementById('fourBtn').addEventListener('click', () => { if (isMyTurn()) send({ kind: 'four' }); });
+  }
+
+  function compareChecksums() {
+    if (myChecksum === null || pendingRemoteChecksum === null) return;
+    if (myChecksum !== pendingRemoteChecksum) {
+      statusBar.textContent = '⚠️ 동기화 오류가 발생했습니다. 게임을 다시 시작해주세요.';
+    }
+    myChecksum = null;
+    pendingRemoteChecksum = null;
+  }
+
+  function watchForChecksum() {
+    const modalBox = document.getElementById('modalBox');
+    let lastText = '';
+    new MutationObserver(() => {
+      const text = modalBox.textContent || '';
+      if (text === lastText) return;
+      if (!text.includes('세트 결과') && !text.includes('포카드 선언')) return;
+      lastText = text;
+      myChecksum = window.RingBellCore.getChecksum();
+      sendAction({ type: 'checksum', value: myChecksum });
+      compareChecksums();
+    }).observe(modalBox, { childList: true, subtree: true, characterData: true });
+  }
+
+  function handleIncoming(msg) {
+    if (msg.type === 'init') {
+      const seatNum = mySeatRole === 'host' ? 0 : 1;
+      const remoteNum = 1 - seatNum;
+      window.RingBellCore.start(seatNum, remoteNum, window.RingBellP2P.mulberry32(msg.seed));
+      const thresholdInput = document.getElementById('signalThreshold');
+      if (thresholdInput) thresholdInput.value = msg.threshold;
+      attachOutgoingListeners();
+      watchForChecksum();
+      return;
+    }
+    if (msg.type === 'action') {
+      window.RingBellCore.replicateAction(msg.kind, msg.idx);
+      return;
+    }
+    if (msg.type === 'checksum') {
+      pendingRemoteChecksum = msg.value;
+      compareChecksums();
+    }
+  }
+
+  function startOnline(role, roomCode) {
+    mySeatRole = role;
+    statusBar.textContent = role === 'host' ? '상대 접속을 기다리는 중…' : '접속 중…';
+    window.RingBellP2P.connect(role, roomCode, {
+      onOpen: channel => {
+        sendAction = obj => channel.send(JSON.stringify(obj));
+        statusBar.textContent = '연결됨';
+        document.getElementById('modal').classList.remove('show');
+        window.RingBellP2P.deleteSignals(roomCode);
+        if (role === 'host') {
+          const seed = Math.floor(Math.random() * 2 ** 31);
+          const threshold = document.getElementById('signalThreshold')?.value || 15;
+          const seatNum = 0, remoteNum = 1;
+          sendAction({ type: 'init', seed, threshold });
+          window.RingBellCore.start(seatNum, remoteNum, window.RingBellP2P.mulberry32(seed));
+          attachOutgoingListeners();
+          watchForChecksum();
+        }
+      },
+      onMessage: handleIncoming,
+      onClose: () => {
+        statusBar.textContent = '상대와의 연결이 끊어졌습니다.';
+        document.getElementById('modalBox').innerHTML = '<h2>연결 끊김</h2><p>상대와의 연결이 끊어졌습니다.</p><a class="action" href="./index.html" style="display:block;text-align:center;text-decoration:none">홈으로</a>';
+        document.getElementById('modal').classList.add('show');
+      },
+    });
+  }
+
+  onlineBtn.addEventListener('click', () => {
+    document.getElementById('modalBox').innerHTML = `
+      <h2>친구와 온라인 대전</h2>
+      <p style="font-size:12px;color:#8992a0">나 + 내 AI 팀원, 친구 + 친구 AI 팀원이 2:2로 맞붙습니다.</p>
+      <button class="action" id="onlineCreateBtn">방 만들기</button>
+      <button class="action secondary" id="onlineCloseBtn" style="margin-top:8px">닫기</button>
+    `;
+    document.getElementById('modal').classList.add('show');
+    document.getElementById('onlineCreateBtn').onclick = () => {
+      const code = window.RingBellP2P.makeRoomCode();
+      const link = `${location.origin}${location.pathname}?room=${code}`;
+      document.getElementById('modalBox').innerHTML = `
+        <h2>초대 링크</h2>
+        <input type="text" id="onlineLinkInput" value="${link}" readonly style="width:100%;padding:8px;border-radius:8px;border:1px solid #3b4853;background:#1c2024;color:#eef3f4">
+        <button class="action" id="onlineCopyBtn" style="margin-top:10px">링크 복사</button>
+        <p style="margin-top:14px;font-size:12px;color:#8992a0">이 링크를 친구에게 보내면 자동으로 참가합니다.</p>
+      `;
+      document.getElementById('onlineCopyBtn').onclick = () => navigator.clipboard.writeText(link);
+      startOnline('host', code);
+    };
+    document.getElementById('onlineCloseBtn').onclick = () => document.getElementById('modal').classList.remove('show');
+  });
+
+  if (roomParam) {
+    document.getElementById('modalBox').innerHTML = '<h2>온라인 대전 접속 중…</h2><p style="font-size:12px;color:#8992a0">호스트에게 연결하는 중입니다.</p>';
+    document.getElementById('modal').classList.add('show');
+    startOnline('guest', roomParam);
+  }
+})();
+</script></body></html>
 <script>
 (()=>{
   const nicknameKey='ringTheBellParticipantNickname', eloKey='ringTheBellElo', winsKey='ringTheBellWins', lossesKey='ringTheBellLosses', processedKey='ringTheBellProcessedRounds';
