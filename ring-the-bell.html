@@ -359,7 +359,11 @@ window.RingBellCore={
     mySeat=seat;
     remoteHumanSeat=typeof remoteSeat==='number'?remoteSeat:-1;
     if(randFn)rand=randFn;
-    players[seat].name='나';
+    if(seat!==0){
+      const originalName=players[seat].name;
+      players[seat].name=players[0].name;
+      players[0].name=originalName;
+    }
     startSet();
   },
   getTurn(){return turn},
