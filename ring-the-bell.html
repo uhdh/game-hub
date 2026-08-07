@@ -359,6 +359,9 @@ window.RingBellCore={
     mySeat=seat;
     remoteHumanSeat=typeof remoteSeat==='number'?remoteSeat:-1;
     if(randFn)rand=randFn;
+    round=1;
+    setNo=1;
+    players.forEach(p=>p.lives=3);
     if(seat!==0){
       const originalName=players[seat].name;
       players[seat].name=players[0].name;
@@ -375,6 +378,7 @@ window.RingBellCore={
     if(kind==='draw-back')return take('back');
     if(kind==='draw-front')return take('front');
     if(kind==='discard'){
+      if(phase!=='playing'||!hasDrawn)return;
       const c=players[turn].hand.splice(idx,1)[0];
       discard.push(c);
       selected=[];
@@ -468,9 +472,10 @@ window.RingBellCore={
     const modalBox = document.getElementById('modalBox');
     let lastText = '';
     new MutationObserver(() => {
+      const hasContinueBtn = !!document.getElementById('continueBtn');
+      if (!hasContinueBtn) return;
       const text = modalBox.textContent || '';
       if (text === lastText) return;
-      if (!text.includes('세트 결과') && !text.includes('포카드 선언')) return;
       lastText = text;
       myChecksum = window.RingBellCore.getChecksum();
       sendAction({ type: 'checksum', value: myChecksum });
@@ -500,6 +505,7 @@ window.RingBellCore={
   }
 
   function startOnline(role, roomCode) {
+    if (mySeatRole) return;
     mySeatRole = role;
     statusBar.textContent = role === 'host' ? '상대 접속을 기다리는 중…' : '접속 중…';
     window.RingBellP2P.connect(role, roomCode, {

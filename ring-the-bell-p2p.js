@@ -60,50 +60,69 @@
     const pendingIce = [];
     let remoteSet = false;
     let dc = null;
+    let poll;
+    let connectTimeout;
+    let closed = false;
+
+    function close() {
+      if (closed) return;
+      closed = true;
+      clearInterval(poll);
+      clearTimeout(connectTimeout);
+      onClose();
+    }
 
     function attachDc(channel) {
       dc = channel;
-      dc.addEventListener('open', () => { clearInterval(poll); onOpen(dc); });
+      dc.addEventListener('open', () => { clearInterval(poll); clearTimeout(connectTimeout); onOpen(dc); });
       dc.addEventListener('message', e => onMessage(JSON.parse(e.data)));
-      dc.addEventListener('close', onClose);
-      dc.addEventListener('error', onClose);
+      dc.addEventListener('close', close);
+      dc.addEventListener('error', close);
     }
 
     pc.onicecandidate = e => {
-      if (e.candidate) postSignal(roomCode, mySeatNum, 'ice', e.candidate.toJSON());
+      if (e.candidate) postSignal(roomCode, mySeatNum, 'ice', e.candidate.toJSON()).catch(() => {});
     };
 
     if (role === 'host') {
       attachDc(pc.createDataChannel('game'));
       pc.createOffer()
         .then(offer => pc.setLocalDescription(offer))
-        .then(() => postSignal(roomCode, mySeatNum, 'offer', { type: pc.localDescription.type, sdp: pc.localDescription.sdp }));
+        .then(() => postSignal(roomCode, mySeatNum, 'offer', { type: pc.localDescription.type, sdp: pc.localDescription.sdp }))
+        .catch(err => { console.error('signal error', err); close(); });
     } else {
       pc.ondatachannel = e => attachDc(e.channel);
     }
 
+    connectTimeout = setTimeout(close, 60000);
+
     let lastId = 0, handledOffer = false;
-    const poll = setInterval(async () => {
+    poll = setInterval(async () => {
       let rows;
       try { rows = await fetchSignals(roomCode, peerSeatNum, lastId); } catch (_e) { return; }
-      for (const row of rows) {
-        lastId = row.id;
-        if (row.msg_type === 'offer' && role === 'guest' && !handledOffer) {
-          handledOffer = true;
-          await pc.setRemoteDescription(row.payload);
-          remoteSet = true;
-          for (const c of pendingIce.splice(0)) await pc.addIceCandidate(c).catch(() => {});
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          await postSignal(roomCode, mySeatNum, 'answer', { type: answer.type, sdp: answer.sdp });
-        } else if (row.msg_type === 'answer' && role === 'host' && !remoteSet) {
-          await pc.setRemoteDescription(row.payload);
-          remoteSet = true;
-          for (const c of pendingIce.splice(0)) await pc.addIceCandidate(c).catch(() => {});
-        } else if (row.msg_type === 'ice') {
-          if (remoteSet) await pc.addIceCandidate(row.payload).catch(() => {});
-          else pendingIce.push(row.payload);
+      try {
+        for (const row of rows) {
+          lastId = row.id;
+          if (row.msg_type === 'offer' && role === 'guest' && !handledOffer) {
+            handledOffer = true;
+            await pc.setRemoteDescription(row.payload);
+            remoteSet = true;
+            for (const c of pendingIce.splice(0)) await pc.addIceCandidate(c).catch(() => {});
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            await postSignal(roomCode, mySeatNum, 'answer', { type: answer.type, sdp: answer.sdp });
+          } else if (row.msg_type === 'answer' && role === 'host' && !remoteSet) {
+            await pc.setRemoteDescription(row.payload);
+            remoteSet = true;
+            for (const c of pendingIce.splice(0)) await pc.addIceCandidate(c).catch(() => {});
+          } else if (row.msg_type === 'ice') {
+            if (remoteSet) await pc.addIceCandidate(row.payload).catch(() => {});
+            else pendingIce.push(row.payload);
+          }
         }
+      } catch (err) {
+        console.error('signal error', err);
+        close();
       }
     }, 800);
 
