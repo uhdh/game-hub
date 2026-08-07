@@ -147,7 +147,11 @@ function take(source){
   lockSignalRule();
   players[turn].hand.push(c);
   hasDrawn=true;
-  setMessage(`${source==='front'?'앞면':'뒷면'} 카드 ${c.num}${COLORS[c.color][2]}를 가져왔습니다.`);
+  if(turn===mySeat||source==='front'){
+    setMessage(`${source==='front'?'앞면':'뒷면'} 카드 ${c.num}${COLORS[c.color][2]}를 가져왔습니다.`);
+  }else{
+    setMessage(`${players[turn].name}님이 뒷면 카드를 가져왔습니다.`);
+  }
   render();
 }
 
@@ -328,8 +332,8 @@ function roundEnd(winner){
 $('discardBtn').onclick=discardSelected;
 $('bell').onclick=showBell;
 $('fourBtn').onclick=()=>showdown(turn,true);
-$('deck').onclick=()=>take('back');
-$('discard').onclick=()=>take('front');
+$('deck').onclick=()=>{if(turn===mySeat)take('back')};
+$('discard').onclick=()=>{if(turn===mySeat)take('front')};
 $('rulesBtn').onclick=()=>{
   $('modalBox').innerHTML='<h2>링 더 벨 규칙</h2><ul><li>4가지 색, 1~10 숫자 카드로 4인 2팀 게임을 진행합니다.</li><li>내 턴에는 카드 한 장을 가져오고 한 장을 버립니다.</li><li>2장 이상 조합은 같은 숫자 또는 같은 색이어야 하며, 합이 높을수록 좋습니다.</li><li>종을 치면 나머지 플레이어가 한 번씩 교환한 뒤 공개합니다.</li><li>같은 숫자 4장이 모이면 포카드 선언으로 상대 팀 모두에게 라이프 1개를 입힙니다.</li></ul><button class="action" id="closeRules">게임으로 돌아가기</button>';
   $('modal').classList.add('show');
@@ -355,6 +359,7 @@ window.RingBellCore={
     mySeat=seat;
     remoteHumanSeat=typeof remoteSeat==='number'?remoteSeat:-1;
     if(randFn)rand=randFn;
+    players[seat].name='나';
     startSet();
   },
   getTurn(){return turn},
