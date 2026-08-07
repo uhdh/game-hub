@@ -42,6 +42,7 @@ let deck=[],discard=[],turn=0,round=1,setNo=1,phase='playing',bellPlayer=null,be
     signalFlags=new Set(),signalLocked=false,teamStats={0:{wins:0,losses:0},1:{wins:0,losses:0}},
     leaderboardName=localStorage.getItem('ringTheBellNickname')||'나',selected=[],hasDrawn=false,logLines=[];
 let mySeat=0,remoteHumanSeat=-1,rand=Math.random;
+let onLocalActionCb=null;
 const isHumanControlled=t=>t===mySeat||t===remoteHumanSeat;
 
 const missing={disabled:false,style:{},classList:{toggle(){},add(){},remove(){}},click(){}};
@@ -108,6 +109,7 @@ function render(){
     selected=[];
     hasDrawn=false;
     setMessage(`내가 ${COLORS[c.color][0]} ${c.num}를 버렸습니다.`);
+    if(onLocalActionCb)onLocalActionCb({kind:'discard',idx:i});
     if(fourOf(players[mySeat].hand)){
       setMessage('내가 포카드를 완성해 즉시 종을 쳤습니다! 상대 팀 모두 라이프 1개를 잃습니다.');
       showdown(mySeat,true);
@@ -153,6 +155,7 @@ function take(source){
     setMessage(`${players[turn].name}님이 뒷면 카드를 가져왔습니다.`);
   }
   render();
+  if(turn===mySeat&&onLocalActionCb)onLocalActionCb({kind:source==='front'?'draw-front':'draw-back'});
   return true;
 }
 
@@ -214,12 +217,14 @@ function nextTurn(){
 
 function showBell(){
   if(phase!=='playing'||!isHumanControlled(turn)||hasDrawn||bellFinalState)return false;
+  const wasMe=turn===mySeat; // advanceBellFinal() below can reassign `turn`, so capture before it runs
   lockSignalRule();
   setMessage(`${turn===mySeat?'내가':players[turn].name+'님이'} 종을 쳤습니다! 다른 플레이어가 마지막 교환을 진행합니다.`);
   phase='showing';
   bellFinalState={who:turn,order:[1,2,3].map(off=>(turn+off)%4),index:0};
   render();
   advanceBellFinal();
+  if(wasMe&&onLocalActionCb)onLocalActionCb({kind:'bell'});
   return true;
 }
 
@@ -317,7 +322,11 @@ function roundEnd(winner){
 }
 
 $('bell').onclick=showBell;
-$('fourBtn').onclick=()=>showdown(turn,true);
+$('fourBtn').onclick=()=>{
+  const applied=turn===mySeat&&phase!=='done';
+  showdown(turn,true);
+  if(applied&&onLocalActionCb)onLocalActionCb({kind:'four'});
+};
 $('deck').onclick=()=>{if(turn===mySeat)take('back')};
 $('discard').onclick=()=>{if(turn===mySeat)take('front')};
 $('rulesBtn').onclick=()=>{
@@ -393,7 +402,8 @@ window.RingBellCore={
       return true;
     }
     return false;
-  }
+  },
+  onLocalAction(cb){onLocalActionCb=cb;}
 };
 })();
 </script><script>
@@ -447,32 +457,24 @@ window.RingBellCore={
 
   const actionQueue = [];
   function pumpQueue() {
-    while (actionQueue.length && window.RingBellCore.replicateAction(actionQueue[0].kind, actionQueue[0].idx)) {
+    while (actionQueue.length) {
+      let applied;
+      try { applied = window.RingBellCore.replicateAction(actionQueue[0].kind, actionQueue[0].idx); }
+      catch (err) { console.error('replicateAction error', err); break; }
+      if (!applied) break;
       actionQueue.shift();
     }
   }
 
+  // 코어가 로컬 액션이 '실제로 성공 적용됐을 때만' 콜백을 호출하므로, 클릭을 보고 추측할 필요가 없다.
+  // (이전 버전은 document 캡처 클릭 리스너가 getTurn()===getMySeat()만 보고 짐작해서 보냈는데,
+  // 드로우 전 카드 클릭·이미 드로우한 상태에서 덱/앞면 더블클릭 같은 순수 로컬 무시(no-op) 클릭도
+  // 메시지로 보내버렸다. replicateAction이 그 무시된 메시지를 거부(false)하면 pumpQueue의 while 루프가
+  // 큐 맨 앞에서 영구적으로 멈춰 이후 모든 진짜 액션이 막히는 회귀가 있었다.)
   function attachOutgoingListeners() {
-    // 캡처 단계에서 document(모든 요소의 조상)에 붙여야 turn/mySeat이 게임 로직에 의해
-    // 바뀌기 전에 값을 읽을 수 있다. #hand 등 개별 요소에 버블 단계로 붙이면 render()가
-    // 등록한 카드별 onclick(타겟 단계, 항상 먼저 실행)이 turn을 이미 넘겨버린 뒤에 읽게 되어
-    // isMyTurn() 판정이 틀어진다 (특히 discard가 영구 데드락으로 이어짐).
-    const send = payload => { if (sendAction) sendAction({ type: 'action', ...payload }); };
-    document.addEventListener('click', e => {
-      if (window.RingBellCore.getTurn() !== window.RingBellCore.getMySeat()) return;
-      if (e.target.closest('#deck')) { send({ kind: 'draw-back' }); return; }
-      if (e.target.closest('#discard')) { send({ kind: 'draw-front' }); return; }
-      const card = e.target.closest('#hand .card');
-      if (card && card.dataset.idx !== undefined) { send({ kind: 'discard', idx: Number(card.dataset.idx) }); return; }
-      if (e.target.closest('#bell')) {
-        const nums = [...document.querySelectorAll('#hand .card .num')].map(el => el.textContent.trim());
-        const counts = nums.reduce((m, n) => (m[n] = (m[n] || 0) + 1, m), {});
-        const hasFour = Object.values(counts).some(n => n >= 4);
-        if (!hasFour) send({ kind: 'bell' });
-        return;
-      }
-      if (e.target.closest('#fourBtn')) { send({ kind: 'four' }); return; }
-    }, true);
+    window.RingBellCore.onLocalAction(payload => {
+      if (sendAction) sendAction({ type: 'action', ...payload });
+    });
   }
 
   function compareChecksums() {
@@ -489,7 +491,7 @@ window.RingBellCore={
     let lastBtn = null;
     new MutationObserver(() => {
       const btn = document.getElementById('continueBtn');
-      if (!btn || btn === lastBtn) return;
+      if (!btn || btn === lastBtn || !sendAction) return;
       lastBtn = btn;
       myChecksum = window.RingBellCore.getChecksum();
       sendAction({ type: 'checksum', value: myChecksum });
