@@ -453,12 +453,12 @@ window.RingBellCore={
     const send = payload => { if (sendAction) sendAction({ type: 'action', ...payload }); };
     document.addEventListener('click', e => {
       if (window.RingBellCore.getTurn() !== window.RingBellCore.getMySeat()) return;
-      if (e.target.id === 'deck') { send({ kind: 'draw-back' }); return; }
-      if (e.target.id === 'discard') { send({ kind: 'draw-front' }); return; }
+      if (e.target.closest('#deck')) { send({ kind: 'draw-back' }); return; }
+      if (e.target.closest('#discard')) { send({ kind: 'draw-front' }); return; }
       const card = e.target.closest('#hand .card');
       if (card && card.dataset.idx !== undefined) { send({ kind: 'discard', idx: Number(card.dataset.idx) }); return; }
-      if (e.target.id === 'bell') { send({ kind: 'bell' }); return; }
-      if (e.target.id === 'fourBtn') { send({ kind: 'four' }); return; }
+      if (e.target.closest('#bell')) { send({ kind: 'bell' }); return; }
+      if (e.target.closest('#fourBtn')) { send({ kind: 'four' }); return; }
     }, true);
   }
 
