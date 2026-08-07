@@ -62,6 +62,7 @@
     let dc = null;
     let poll;
     let connectTimeout;
+    let disconnectTimer;
     let closed = false;
 
     function close() {
@@ -69,6 +70,7 @@
       closed = true;
       clearInterval(poll);
       clearTimeout(connectTimeout);
+      clearTimeout(disconnectTimer);
       onClose();
     }
 
@@ -82,6 +84,25 @@
 
     pc.onicecandidate = e => {
       if (e.candidate) postSignal(roomCode, mySeatNum, 'ice', e.candidate.toJSON()).catch(() => {});
+    };
+
+    // dc의 'close'/'error' 이벤트는 정상적인 종료 협상이 있어야만 발생하므로, 상대 탭이 갑자기
+    // 닫히거나 크래시하는 경우(작별 신호 없음)를 감지하지 못한다. ICE 연결 상태를 대신 감시한다:
+    // 'disconnected'는 일시적일 수 있어 5초 유예를 두고, 'failed'/'closed'는 즉시 종료로 간주한다.
+    pc.oniceconnectionstatechange = () => {
+      const state = pc.iceConnectionState;
+      if (state === 'failed' || state === 'closed') {
+        close();
+      } else if (state === 'disconnected') {
+        if (!disconnectTimer) {
+          disconnectTimer = setTimeout(() => {
+            if (pc.iceConnectionState === 'disconnected') close();
+          }, 5000);
+        }
+      } else if (disconnectTimer) {
+        clearTimeout(disconnectTimer);
+        disconnectTimer = null;
+      }
     };
 
     if (role === 'host') {

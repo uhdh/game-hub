@@ -446,17 +446,20 @@ window.RingBellCore={
   let pendingRemoteChecksum = null;
 
   function attachOutgoingListeners() {
+    // 캡처 단계에서 document(모든 요소의 조상)에 붙여야 turn/mySeat이 게임 로직에 의해
+    // 바뀌기 전에 값을 읽을 수 있다. #hand 등 개별 요소에 버블 단계로 붙이면 render()가
+    // 등록한 카드별 onclick(타겟 단계, 항상 먼저 실행)이 turn을 이미 넘겨버린 뒤에 읽게 되어
+    // isMyTurn() 판정이 틀어진다 (특히 discard가 영구 데드락으로 이어짐).
     const send = payload => { if (sendAction) sendAction({ type: 'action', ...payload }); };
-    const isMyTurn = () => window.RingBellCore.getTurn() === window.RingBellCore.getMySeat();
-    document.getElementById('deck').addEventListener('click', () => { if (isMyTurn()) send({ kind: 'draw-back' }); });
-    document.getElementById('discard').addEventListener('click', () => { if (isMyTurn()) send({ kind: 'draw-front' }); });
-    document.getElementById('hand').addEventListener('click', e => {
-      const card = e.target.closest('.card');
-      if (!card || card.dataset.idx === undefined) return;
-      if (isMyTurn()) send({ kind: 'discard', idx: Number(card.dataset.idx) });
-    });
-    document.getElementById('bell').addEventListener('click', () => { if (isMyTurn()) send({ kind: 'bell' }); });
-    document.getElementById('fourBtn').addEventListener('click', () => { if (isMyTurn()) send({ kind: 'four' }); });
+    document.addEventListener('click', e => {
+      if (window.RingBellCore.getTurn() !== window.RingBellCore.getMySeat()) return;
+      if (e.target.id === 'deck') { send({ kind: 'draw-back' }); return; }
+      if (e.target.id === 'discard') { send({ kind: 'draw-front' }); return; }
+      const card = e.target.closest('#hand .card');
+      if (card && card.dataset.idx !== undefined) { send({ kind: 'discard', idx: Number(card.dataset.idx) }); return; }
+      if (e.target.id === 'bell') { send({ kind: 'bell' }); return; }
+      if (e.target.id === 'fourBtn') { send({ kind: 'four' }); return; }
+    }, true);
   }
 
   function compareChecksums() {
