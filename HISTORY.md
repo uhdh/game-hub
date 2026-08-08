@@ -9,8 +9,12 @@
   `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4456213927158429" crossorigin="anonymous"></script>`
   삽입. 루트에 `ads.txt`(`google.com, pub-4456213927158429, DIRECT, f08c47fec0942fa0`) 신규 생성.
   `admin.html`과 `Color Connect - *.dc.html`(프로토타입, index에서 링크 안 됨)은 제외.
-- **미배포**: 로컬 repo에만 커밋됨. `game-hub`로 subtree pull → push 하는 표준 배포 흐름은 아직 실행 안 함
-  (사용자 확인 후 진행 필요). AdSense 승인 심사는 실제 배포된 URL에서 진행되므로 배포까지 마쳐야 유효함.
+- **배포**: 로컬 repo 커밋(`bddb530`) → game-hub `git fetch origin` 선커밋 없음 확인 →
+  `git subtree pull --prefix=apps/mosaic-puzzle mosaic master` (충돌 없음, 병합 커밋) →
+  `git push origin master` (`8494767..1ea6083`). Vercel Git 연동 자동 배포 트리거함.
+  `ads.txt`는 `apps/mosaic-puzzle/ads.txt`에 위치 — Vercel 프로젝트 root directory가 `apps/mosaic-puzzle`로
+  설정되어 있어 `pgamex.vercel.app/ads.txt`로 서빙될 것으로 예상(직접 vercel.json 확인은 못 함, 배포 후
+  실제 URL 접근으로 검증 필요).
 
 ## 2026-08-07 · Claude Code · 링 더 벨: 온라인 2:2 P2P 대전 모드 추가 (배포됨)
 
