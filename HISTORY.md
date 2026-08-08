@@ -1,5 +1,17 @@
 # 작업 히스토리
 
+## 2026-08-08 · Claude Code · Google AdSense 연결
+
+- **요청**: AdSense 스크립트(`ca-pub-4456213927158429`) 연결.
+- **변경**: `admin.html`을 제외한 게임/페이지 9개(`index.html`, `predict.html`, `requests.html`,
+  `gomoku-stack.html`, `color-connect.html`, `blind-auction.html`, `tectonic-shift.html`,
+  `rearrange.html`, `ring-the-bell.html`)의 `<head>` 최상단에
+  `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4456213927158429" crossorigin="anonymous"></script>`
+  삽입. 루트에 `ads.txt`(`google.com, pub-4456213927158429, DIRECT, f08c47fec0942fa0`) 신규 생성.
+  `admin.html`과 `Color Connect - *.dc.html`(프로토타입, index에서 링크 안 됨)은 제외.
+- **미배포**: 로컬 repo에만 커밋됨. `game-hub`로 subtree pull → push 하는 표준 배포 흐름은 아직 실행 안 함
+  (사용자 확인 후 진행 필요). AdSense 승인 심사는 실제 배포된 URL에서 진행되므로 배포까지 마쳐야 유효함.
+
 ## 2026-08-07 · Claude Code · 링 더 벨: 온라인 2:2 P2P 대전 모드 추가 (배포됨)
 
 - **요청**: "나 + 내 AI 팀원 : 상대 + 상대 AI 팀원" 형태로 두 사람이 실시간으로 맞붙는 온라인 2:2 모드를
