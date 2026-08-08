@@ -1,6 +1,6 @@
 # 작업 히스토리
 
-## 2026-08-07 · Claude Code · 링 더 벨: 온라인 2:2 P2P 대전 모드 추가 (master 병합됨, 미배포)
+## 2026-08-07 · Claude Code · 링 더 벨: 온라인 2:2 P2P 대전 모드 추가 (배포됨)
 
 - **요청**: "나 + 내 AI 팀원 : 상대 + 상대 AI 팀원" 형태로 두 사람이 실시간으로 맞붙는 온라인 2:2 모드를
   `ring-the-bell.html`에 추가. 브레인스토밍 → 설계 문서(`docs/superpowers/specs/2026-08-07-ring-the-bell-p2p-online-design.md`)
@@ -41,9 +41,10 @@
   나오는 극히 드문 경우(딜당 약 1/9139)에 로컬 라이프 오판정 + 디싱크를 일으킬 수 있음. 리뷰어 권고: 그
   인터셉터와 `#fourBtn` 자체를 통째로 삭제(포카드는 이미 버리는 시점에 자동 선언되므로 이 경로가 사실상
   유일하게 필요했던 상황이 없음).
-- **배포 안 됨**: 로컬 repo `master`에는 병합했지만(fast-forward, 커밋 `bab07c2..867ede0`), `game-hub`
-  모노레포로 subtree pull → push는 아직 안 했다. Supabase `ring_the_bell_signals` 테이블은 이미 프로덕션
-  프로젝트(`paktzmofotvwfdxcpmzv`)에 만들어져 있으니 배포 자체는 별도 요청 시 통상 흐름대로 진행하면 된다.
+- **배포**: 로컬 repo `master` 병합(fast-forward, 커밋 `bab07c2..867ede0`) → game-hub에서
+  `git fetch origin`으로 선커밋 없음 확인 → `git subtree pull --prefix=apps/mosaic-puzzle mosaic master`
+  (충돌 없음, 병합 커밋) → `git push origin master` (`182e8c3..175f586`). Vercel Git 연동 자동 배포 트리거함.
+  Supabase `ring_the_bell_signals` 테이블은 이미 프로덕션 프로젝트(`paktzmofotvwfdxcpmzv`)에 존재.
 
 ## 2026-08-07 · Claude Code · 홈화면 우측 상단 버튼 아이콘화 (배포됨)
 
