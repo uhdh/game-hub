@@ -1,5 +1,21 @@
 # 작업 히스토리
 
+## 2026-08-14 · Claude Code · 루트 구조 정리 — 죽은 프로토타입 파일 제거
+
+- **요청**: "구조를 단순화해줄 수 있어?" (직전에 archify로 아키텍처 다이어그램을 그린 뒤 이어진 요청).
+  실제 저장소 구조 단순화인지 다이어그램 단순화인지 먼저 확인받고 진행.
+- **조사**: 루트가 게임별 독립 html+js 규칙(AGENTS.md에 문서화됨)으로 이미 단순한 편이라, 게임별 폴더로
+  쪼개는 재구성은 game-hub로의 git subtree 배포 경로와 맞물려 있어 오히려 위험/과잉이라 판단해 하지 않음.
+  대신 `git ls-files`로 추적 파일을 훑어 실질적으로 죽은 중복만 골라냄.
+- **변경**: 루트의 `Color Connect - Prototype.dc.html`, `Color Connect - Rearrange.dc.html` 삭제.
+  둘 다 2026-07-16 최초 커밋 이후 수정 이력 없고, 어떤 페이지에서도 참조되지 않으며(grep 확인),
+  같은 내용이 이미 커밋된 `기존 웹 디자인안 3개.zip` 안의 `design_handoff_game_hub/`에 그대로 보존돼 있어
+  완전 중복이었다 (2026-08-08 AdSense 작업 때도 "index에서 링크 안 됨"으로 이미 제외 대상이었던 파일들).
+  `색-connect.html`/`rearrange.html`과 이름이 비슷해 루트에서 혼동을 주던 것도 제거 이유.
+- **배포**: 안 함 — 정적 자산 서빙 대상이 아닌 죽은 파일 삭제라 배포 필요 없음.
+- **남은 것**: 루트에 여전히 tracked zip 3종(`기존 웹 디자인안 3개.zip` 외 2개는 gitignore됨) 등 디자인
+  핸드오프 잔재가 있음 — 사용자가 명시적으로 요청하면 추가 정리 가능하나 이번엔 건드리지 않음.
+
 ## 2026-08-08 · Claude Code · Google AdSense 연결
 
 - **요청**: AdSense 스크립트(`ca-pub-4456213927158429`) 연결.
@@ -9,8 +25,12 @@
   `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4456213927158429" crossorigin="anonymous"></script>`
   삽입. 루트에 `ads.txt`(`google.com, pub-4456213927158429, DIRECT, f08c47fec0942fa0`) 신규 생성.
   `admin.html`과 `Color Connect - *.dc.html`(프로토타입, index에서 링크 안 됨)은 제외.
-- **미배포**: 로컬 repo에만 커밋됨. `game-hub`로 subtree pull → push 하는 표준 배포 흐름은 아직 실행 안 함
-  (사용자 확인 후 진행 필요). AdSense 승인 심사는 실제 배포된 URL에서 진행되므로 배포까지 마쳐야 유효함.
+- **배포**: 로컬 repo 커밋(`bddb530`) → game-hub `git fetch origin` 선커밋 없음 확인 →
+  `git subtree pull --prefix=apps/mosaic-puzzle mosaic master` (충돌 없음, 병합 커밋) →
+  `git push origin master` (`8494767..1ea6083`). Vercel Git 연동 자동 배포 트리거함.
+  `ads.txt`는 `apps/mosaic-puzzle/ads.txt`에 위치 — Vercel 프로젝트 root directory가 `apps/mosaic-puzzle`로
+  설정되어 있어 `pgamex.vercel.app/ads.txt`로 서빙될 것으로 예상(직접 vercel.json 확인은 못 함, 배포 후
+  실제 URL 접근으로 검증 필요).
 
 ## 2026-08-07 · Claude Code · 링 더 벨: 온라인 2:2 P2P 대전 모드 추가 (배포됨)
 
