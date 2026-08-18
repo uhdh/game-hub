@@ -1,5 +1,36 @@
 # 작업 히스토리
 
+## 2026-08-18 · Claude Code · 링더벨 "포카드 선언이 안돼요" 버그 확인 및 수정 (배포됨)
+
+- **요청**: 유저 피드백 "링더벨 포카드 선언이 안돼요 AI들은 잘만 하던데" — 실제 버그인지 확인 후 수정.
+- **조사(systematic-debugging)**: `ring-the-bell.html`을 열어보니 `#fourBtn`(포카드 선언 버튼)이 `.actions`
+  컨테이너 안에 있는데, "게임허브 공용 스킨" 리디자인 시점 CSS가 `.actions{display:none!important}`로
+  옛 버튼 바 전체를 숨겼다(드로우 버튼·버리기 버튼은 카드/덱 직접 클릭 방식으로 대체됐으므로 그 자체는
+  의도된 정리). 문제는 그 위에 **또 한 겹**, `#fourBtn{display:none!important}`이라는 전용 규칙까지
+  따로 있었던 것과, 훨씬 나중에 추가된 별도 IIFE(`/* 턴 시작에는 세 가지 선택지만 노출하고... */` 주석이
+  달린 `syncActions()` 패치, 손패가 5장이 되고 그중 4장이 같은 숫자면 `fourBtn.style.display='inline-block'`로
+  버튼을 다시 보여주려는 로직)가 이 두 겹의 `!important` 규칙에 막혀 인라인 스타일로는 절대 이길 수
+  없었다는 점 — 즉 실제로 포카드를 완성해도 선언 버튼이 화면에 뜨는 일 자체가 없었다. AI는 이 DOM/CSS
+  경로를 전혀 거치지 않고 `aiTurn()` 내부에서 직접 `fourOf()`로 체크해 바로 `showdown(turn,true)`를
+  호출하므로 언제나 정상 동작했던 것 — 유저가 "AI는 잘만 하던데"라고 느낀 이유가 정확히 여기 있었다.
+- **변경**: `ring-the-bell.html`에서 `#fourBtn` 엘리먼트를 `.actions` 밖으로 옮겨 `.your-hand`의 직속
+  자식으로 만들고(그리드 3번째 행에 배치하는 CSS 추가), `#fourBtn{display:none!important}` 강제 숨김
+  규칙을 삭제했다. `syncActions()`의 기존 표시/활성화 로직과 `fourBtn.onclick`(→`showdown(turn,true)`)은
+  건드리지 않음 — CSS/DOM 배치만 고쳐서 이미 있던 올바른 로직이 실제로 작동하게 만든 최소 수정.
+- **검증**: 로컬 `http.server` + 브라우저에서 `#hand`의 DOM을 4장 동일 숫자(+1장 다른 숫자)로 직접
+  조작 → `#fourBtn`의 computed display가 `none`→`block`, `disabled`가 `true`→`false`로 바뀌는 것 확인.
+  버튼 클릭 → "포카드 선언!" 모달이 뜨고 상대 팀 라이프가 정확히 1개씩 깎이는 것까지 end-to-end 확인.
+  정상적인(포카드 아닌) 손패 상태로 새로고침했을 때는 버튼이 계속 숨겨져 있어 평소 화면 회귀 없음도 확인.
+- **배포**: 로컬 repo 커밋(`022c992`) → game-hub `git fetch origin` 선커밋 없음 확인 →
+  `git subtree pull --prefix=apps/mosaic-puzzle mosaic master`(충돌 없음) →
+  `git push origin master`(`220f38d..8311a2b`). Vercel Git 연동 자동 배포 트리거함.
+- **남은 것**: 이번 수정은 "드로우 이후 5장 중 4장이 맞아떨어지는" 흔한 케이스만 되살렸다. "세트 시작
+  시 딜부터 바로 포카드가 나오는" 극희귀 케이스(~1/9139, 2026-08-07 기록 참고)는 `syncActions()`가
+  `hasDrawn`(5장)일 때만 버튼을 보여주도록 설계돼 있어 여전히 버튼으로는 못 쓴다 — 다만 이 경우도 아무
+  카드나 뽑았다가 새로 뽑힌 카드를 버리면(직접 클릭) 기존 `discard` 핸들러의 자동 포카드 감지로 정상
+  선언되므로 플레이 자체가 막히지는 않는다. 원한다면 다음에 이 초희귀 케이스까지 커버할지 검토.
+
+
 ## 2026-08-18 · Claude Code · 블라인드 경매 "물품 목록을 불러오지 못했습니다" 오류 — 근본 원인은 Vercel 정적 파일 404 (배포됨)
 
 - **요청**: 블라인드 경매(포브스 억만장자 카테고리)에서 "물품 목록을 불러오지 못했습니다. 다시 시도해주세요." 오류.
