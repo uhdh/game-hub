@@ -1,5 +1,43 @@
 # 작업 히스토리
 
+## 2026-08-18 · Claude Code · 블라인드 경매 "물품 목록을 불러오지 못했습니다" 오류 — 근본 원인은 Vercel 정적 파일 404 (배포됨)
+
+- **요청**: 블라인드 경매(포브스 억만장자 카테고리)에서 "물품 목록을 불러오지 못했습니다. 다시 시도해주세요." 오류.
+- **조사(systematic-debugging)**: 처음엔 Supabase 조회 실패로 의심했으나, `curl`과 브라우저 네트워크 탭으로 확인한 결과
+  `auction_items` 조회 자체는 매 카테고리 200 OK로 정상(각 카테고리 30~100건, `POOL_SIZE=22` 이상 충분).
+  `blind-auction.html`의 `chooseCategory()`는 `fetchAllItems()` 뒤에 `beginGame(items, category)`까지 같은
+  `try` 블록 안에서 실행하는데(`blind-auction.html:369` 부근), `beginGame → L.pickGamePool`에서 예외가 나도
+  fetch 실패와 똑같이 "물품 목록을 불러오지 못했습니다"로 뭉뚱그려 표시되는 구조였다. 실제로
+  프로덕션(`pgamex.vercel.app`)에서 `window.BlindAuctionLogic`을 실어주는 `blind-auction-logic.js` 자체가
+  **404**라서 `L`이 `undefined`였던 것이 진짜 원인.
+  전수 조사 결과 프로덕션에서 `.html`이 아닌 **모든 정적 파일**(`.js`/`.css`/`.png`/`.txt`)이 404였다 —
+  `gomoku-ai.js`/`gomoku-board.js`/`gomoku-rating.js`(3단 오목 AI), `ring-the-bell-p2p.js`(온라인 2:2),
+  `ads.txt`(애드센스), 심지어 **최초 커밋(2026-07-17)부터 있던 `assets/favicon.png`**까지 404였다.
+  반면 최초 게임 목록에 있던 `.html` 9개(`index.html`/`blind-auction.html`/`admin.html` 등)는 전부 200이었고,
+  나중에 추가된 `formula-combo.html`은 404 — 즉 캐시된 옛날 배포가 아니라 애초에 이 프로젝트가 특정 `.html`
+  묶음만 서빙하고 그 외 모든 파일을 404로 돌리는 구조였다(로컬 `http.server`로 같은 파일을 직접 띄우면 정상
+  동작 확인 — 코드 자체엔 문제 없음). `game-hub`/`apps/mosaic-puzzle`에는 `vercel.json`이 전혀 없어 이 라우팅
+  제한은 Vercel 대시보드 프로젝트 설정(Root Directory/Framework Preset 등)에 있는 것으로 추정되나, 이 세션에
+  연결된 Vercel MCP 계정은 `list_projects`가 빈 배열을 반환하고 `get_project`/`get_deployment` 모두 404라서
+  대시보드를 직접 열람은 못 했다.
+- **변경**: 저장소 루트에 `vercel.json` 신규 추가 —
+  `{ "version": 2, "builds": [{ "src": "**/*", "use": "@vercel/static" }] }`. 근본 원인(대시보드 설정)을 직접
+  못 본 상태의 시도였지만, 실제 배포 후 즉시 모든 정적 파일이 200으로 정상화되어 이 설정이 유효했음을 확인.
+- **검증**: 배포 후 `blind-auction-logic.js`/`gomoku-ai.js`/`gomoku-board.js`/`gomoku-rating.js`/
+  `ring-the-bell-p2p.js`/`ads.txt`/`assets/favicon.png` 전부 200 확인. `index.html`/`blind-auction.html`/
+  `admin.html` 등 기존에 되던 `.html`도 계속 200(회귀 없음). 브라우저로 `pgamex.vercel.app/blind-auction.html`
+  접속 → 포브스 억만장자 카테고리 선택 → 물품 22개 로드 → "경매 시작" → 실제 라운드 진행(AI 입찰까지)까지
+  end-to-end 확인.
+- **배포**: 로컬 repo 커밋(`578f975`) → game-hub `git fetch origin` 선커밋 없음 확인 →
+  `git subtree pull --prefix=apps/mosaic-puzzle mosaic master`(충돌 없음, 이전 세션에서 로컬에만 있던
+  "죽은 Color Connect 프로토타입 삭제" 커밋도 이번에 같이 실려감) → `git push origin master`
+  (`1ea6083..220f38d`). Vercel Git 연동 자동 배포, 배포 완료까지 약 1분 소요.
+- **남은 것**: `vercel.json`의 `builds`(legacy) 방식은 동작을 확인했지만, Vercel 대시보드의 진짜 원인(왜 애초에
+  `.html` 아닌 파일이 전부 404였는지 — Root Directory/Framework Preset/Rewrites 등)은 여전히 못 봤다. 대시보드
+  접근 권한이 있는 세션에서 한 번 확인해두면 좋다. 이번 건으로 3단 오목 AI와 링더벨 온라인 2:2도 실제로는
+  프로덕션에서 오랫동안(어쩌면 배포 이후 계속) 깨져 있었을 가능성이 있으니, 다음에 만지게 되면 실제 플레이까지
+  확인할 것.
+
 ## 2026-08-14 · Claude Code · 루트 구조 정리 — 죽은 프로토타입 파일 제거
 
 - **요청**: "구조를 단순화해줄 수 있어?" (직전에 archify로 아키텍처 다이어그램을 그린 뒤 이어진 요청).
