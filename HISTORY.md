@@ -1,5 +1,42 @@
 # 작업 히스토리
 
+## 2026-08-24 · Claude Code · 링더벨 덱 소진 시 마지막 플레이어 오인식 버그 수정 (배포됨)
+
+- **요청**: 유저 피드백 "종 치지 않고 더미에서 전부 가져왔을 때 마지막에 가져온 플레이어가 종 친 것처럼
+  인식되는 버그가 있다. 최저점일 경우 추가 라이프 손실까지 있다."
+- **조사(systematic-debugging)**: `ring-the-bell.html`의 `showdown(who, declared=false)`는 `who`를
+  "종을 친 사람"으로 취급해서, `who`가 최저점 손실자에 포함되면(즉 스스로 종을 쳤는데 자기가 최저면)
+  일반 손실자들과 달리 라이프를 한 번 더(`losers.forEach`의 공동 손실 1 + `who`용 추가 손실 1) 깎는
+  의도된 규칙이 있었다. 문제는 덱이 바닥나서 자연스럽게 세트가 끝나는 두 호출부
+  — `aiTurn()`의 `if(!deck.length){showdown(turn);return}`(당시 164줄)와 `nextTurn()`의 동일 패턴(당시
+  207줄) — 가 "아무도 종을 안 쳤다"는 사실 없이 그냥 현재 턴(마지막으로 카드를 뽑은 플레이어)을 그대로
+  `who`로 넘기고 있었던 것. 실제 종을 친 경로(`showBell`/`showAiBell` → `advanceBellFinal` →
+  `showdown(who)`, 당시 249줄)와 완전히 같은 함수를 공유하다 보니 showdown 내부에서는 "덱 소진"과
+  "실제 종 침"을 구분할 방법이 아예 없었다 — 그 결과 덱 소진으로 세트가 끝났을 때 마지막 턴 플레이어가
+  🔔 배지까지 달고, 자신이 최저점이면 부당하게 라이프를 2번 잃었다.
+- **변경**: `showdown(who, declared=false, rung=true)`에 `rung`(실제로 종이 울렸는지) 인자를 추가.
+  `bellPlayer` 설정, 결과 모달의 🔔 배지, "종 친 사람 추가 라이프 손실" 로직을 전부 `rung` 조건으로
+  감쌈. 덱 소진 호출부 2곳(`aiTurn`, `nextTurn`)만 `showdown(turn,false,false)`로 바꿔 `rung=false`를
+  넘기도록 수정 — 실제 종 침 경로(`advanceBellFinal`의 `showdown(who)`)는 인자를 그대로 둬서 함수
+  기본값(`rung=true`)으로 기존 동작을 그대로 유지했다. 포카드 선언(`declared=true`) 경로들은 이 분기와
+  무관해 영향 없음.
+- **검증**: 이 파일은 전체가 IIFE로 감싸여 있어(`window.RingBellCore`만 외부 노출) 브라우저 콘솔에서
+  내부 상태(`deck`/`players`/`showdown` 등)에 직접 접근할 수 없었다. 실제 UI로 덱을 다 소진시키려면
+  수십 턴의 자동 진행이 필요해 비용 대비 효과가 낮다고 판단, 대신 배포되는 `ring-the-bell.html`에서
+  `showdown()` 함수 소스를 정규식으로 그대로 추출해 Node에서 최소 스텁(`players`/`bestCombo`/`$`/
+  `render` 등)으로 실행하는 검증 스크립트를 작성해 실행했다. (1) 4명 전원 동점 최저 상태에서
+  `showdown(0,false,false)`(덱 소진 재현) → `bellPlayer===null`, 라이프가 전원 동일하게 1개씩만
+  깎임(`[2,2,2,2]`) 확인. (2) 같은 상태에서 `showdown(0,false,true)`(실제 종 침 재현) → `bellPlayer===0`,
+  종 친 사람만 추가로 더 깎여 `[1,2,2,2]`가 되는 기존 규칙이 그대로 유지됨을 확인 — 회귀 없음.
+- **배포**: 로컬 repo 커밋(`69ed5a4`) → game-hub `git fetch origin` 선커밋 없음 확인(로컬 master ==
+  origin/master) → `git subtree pull --prefix=apps/mosaic-puzzle mosaic master`(충돌 없음, 이전에
+  로컬에만 있던 "배포 완료 기록" docs 커밋도 이번에 같이 실려감) → `git push origin master`
+  (`8311a2b..ad7bfbe`). Vercel Git 연동 자동 배포. 배포 후 `curl`로 프로덕션의
+  `ring-the-bell.html`에 `showdown(turn,false,false)` 패턴이 실제로 실려 있는 것까지 확인.
+- **남은 것**: 없음. 온라인 2:2(`ring-the-bell-p2p.js`)는 덱 소진 판단을 각 클라이언트가 동일한
+  결정론적 로직(`nextTurn`/`aiTurn`)으로 로컬 계산하므로 이 수정이 자동으로 함께 적용된다 — 별도
+  프로토콜 변경 불필요.
+
 ## 2026-08-18 · Claude Code · 링더벨 "포카드 선언이 안돼요" 버그 확인 및 수정 (배포됨)
 
 - **요청**: 유저 피드백 "링더벨 포카드 선언이 안돼요 AI들은 잘만 하던데" — 실제 버그인지 확인 후 수정.
