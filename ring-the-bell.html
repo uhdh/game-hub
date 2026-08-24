@@ -161,7 +161,7 @@ function take(source){
 }
 
 function aiTurn(p){
-  if(!deck.length){showdown(turn);return}
+  if(!deck.length){showdown(turn,false,false);return}
   if(fourOf(p.hand)||bestCombo(p.hand).score>=24){showAiBell(turn);return}
   const evaluate=(hand,pick)=>{
     const source=pick?[...hand,pick]:hand.slice();
@@ -204,7 +204,7 @@ function nextTurn(){
     return;
   }
   if(phase!=='playing')return;
-  if(!deck.length){showdown(turn);return}
+  if(!deck.length){showdown(turn,false,false);return}
   turn=(turn+1)%4;
   if(isHumanControlled(turn)){
     hasDrawn=false;
@@ -277,21 +277,21 @@ function aiTurnForBell(p,isHuman=false){
   setMessage(`${isHuman?'내가':`${p.name}님이`} 뒷면 더미 카드를 가져간 후, ${COLORS[removed.color][0]} ${removed.num}을 버렸습니다.`);
 }
 
-function showdown(who,declared=false){
+function showdown(who,declared=false,rung=true){
   if(phase==='done')return;
   phase='showing';
-  bellPlayer=who;
+  bellPlayer=rung?who:null;
   const rows=players.map(p=>({p,combo:bestCombo(p.hand)})),
     min=Math.min(...rows.map(r=>r.combo.score)),
     losers=rows.filter(r=>r.combo.score===min);
   if(declared)players.filter(p=>p.team!==players[who].team).forEach(p=>p.lives=Math.max(0,p.lives-1));
   else{
     losers.forEach(r=>r.p.lives=Math.max(0,r.p.lives-1));
-    if(losers.some(r=>r.p===players[who]))players[who].lives=Math.max(0,players[who].lives-1);
+    if(rung&&losers.some(r=>r.p===players[who]))players[who].lives=Math.max(0,players[who].lives-1);
   }
   render();
-  const details=rows.map(r=>`<div class="result-row"><span>${r.p.name} ${r.p===players[who]?'🔔':''}</span><span>${r.combo.cards.map(c=>c.num+COLORS[c.color][2]).join(' ')} · ${r.combo.score}점</span><span style="color:#e0786f;letter-spacing:1px;white-space:nowrap">${'♥'.repeat(r.p.lives)}${'♡'.repeat(3-r.p.lives)}</span></div>`).join('');
-  const note=declared?'상대 팀 모두 라이프 1개를 잃습니다.':losers.length?`${losers.map(r=>r.p.name).join(', ')}이(가) 최저점입니다.${losers.some(r=>r.p===players[who])?' 종을 친 플레이어의 추가 라이프 손실!':''}`:'모두 무사히 넘어갔습니다.';
+  const details=rows.map(r=>`<div class="result-row"><span>${r.p.name} ${rung&&r.p===players[who]?'🔔':''}</span><span>${r.combo.cards.map(c=>c.num+COLORS[c.color][2]).join(' ')} · ${r.combo.score}점</span><span style="color:#e0786f;letter-spacing:1px;white-space:nowrap">${'♥'.repeat(r.p.lives)}${'♡'.repeat(3-r.p.lives)}</span></div>`).join('');
+  const note=declared?'상대 팀 모두 라이프 1개를 잃습니다.':losers.length?`${losers.map(r=>r.p.name).join(', ')}이(가) 최저점입니다.${rung&&losers.some(r=>r.p===players[who])?' 종을 친 플레이어의 추가 라이프 손실!':''}`:'모두 무사히 넘어갔습니다.';
   $('modalBox').innerHTML=`<h2>${declared?'포카드 선언!':'세트 결과'}</h2><p>${note}</p><div class="result-list">${details}</div><button class="action" id="continueBtn">다음 세트</button>`;
   $('modal').classList.add('show');
   $('continueBtn').onclick=advance;
