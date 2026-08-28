@@ -394,9 +394,59 @@
     }, 600);
   }
 
-  function showWinModal() {
-    // Task 10에서 구현
+  const SUPABASE_URL = 'https://paktzmofotvwfdxcpmzv.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_jWbstEn2pKJTNDxLTR4Jig_asglvzGW';
+  const AI_RATING = 1500;
+  const K_FACTOR = 32;
+
+  function sbHeaders(extra) {
+    return Object.assign({ apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }, extra || {});
   }
+
+  async function recordResult(won) {
+    const nickname = window.cardChessNickname;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/card_chess_leaderboard?select=id,rating,wins,losses&nickname=eq.${encodeURIComponent(nickname)}`, { headers: sbHeaders() });
+      const rows = await res.json();
+      const existing = rows[0];
+      const currentRating = existing ? existing.rating : 1200;
+      const newRating = E.computeNewRating(currentRating, won ? 1 : 0, AI_RATING, K_FACTOR);
+      const wins = (existing ? existing.wins : 0) + (won ? 1 : 0);
+      const losses = (existing ? existing.losses : 0) + (won ? 0 : 1);
+      if (existing) {
+        await fetch(`${SUPABASE_URL}/rest/v1/card_chess_leaderboard?id=eq.${existing.id}`, {
+          method: 'PATCH',
+          headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+          body: JSON.stringify({ rating: newRating, wins: wins, losses: losses, updated_at: new Date().toISOString() }),
+        });
+      } else {
+        await fetch(`${SUPABASE_URL}/rest/v1/card_chess_leaderboard`, {
+          method: 'POST',
+          headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
+          body: JSON.stringify({ nickname: nickname, rating: newRating, wins: wins, losses: losses }),
+        });
+      }
+    } catch (e) {
+      // 리더보드 기록 실패는 게임 결과 표시를 막지 않는다
+    }
+  }
+
+  function showWinModal() {
+    const won = state.winner === 'P1';
+    document.getElementById('win-title').textContent = won ? '승리!' : 'AI 승리';
+    document.getElementById('win-reason').textContent = state.winReason === 'elimination'
+      ? (won ? '상대 말을 모두 잡았습니다' : 'AI가 당신의 말을 모두 잡았습니다')
+      : (won ? '상대 성을 점령하고 버텼습니다' : 'AI가 당신의 성을 점령하고 버텼습니다');
+    document.getElementById('win-modal').classList.remove('hidden');
+    recordResult(won);
+  }
+
+  document.getElementById('win-restart-btn').addEventListener('click', function () {
+    document.getElementById('win-modal').classList.add('hidden');
+    document.getElementById('screen-game').classList.add('hidden');
+    document.getElementById('screen-start').classList.remove('hidden');
+    document.getElementById('new-game-btn').style.display = 'none';
+  });
 
   document.getElementById('start-btn').addEventListener('click', startGame);
   document.getElementById('new-game-btn').addEventListener('click', function () {
