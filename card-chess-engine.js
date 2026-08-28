@@ -201,6 +201,89 @@
     return finishTurn(next, mover);
   }
 
+  function chebyshev(a, b) { return Math.max(Math.abs(a.col - b.col), Math.abs(a.row - b.row)); }
+
+  function countMobility(state, player) {
+    return state.hands[player].reduce(function (sum, cardId) {
+      return sum + getLegalMoves(state, cardId, player).length;
+    }, 0);
+  }
+
+  function evaluate(state, forPlayer) {
+    if (state.winner) return state.winner === forPlayer ? 1000000 : -1000000;
+    const opp = other(forPlayer);
+    const myPieces = state.pieces.filter(function (p) { return p.owner === forPlayer; });
+    const oppPieces = state.pieces.filter(function (p) { return p.owner === opp; });
+    let score = (myPieces.length - oppPieces.length) * 100;
+    const myDist = Math.min.apply(null, myPieces.map(function (p) { return chebyshev(p, CASTLE[forPlayer]); }));
+    const oppDist = Math.min.apply(null, oppPieces.map(function (p) { return chebyshev(p, CASTLE[opp]); }));
+    score += 5 * (oppDist - myDist);
+    if (isHoldingCastle(state, forPlayer)) score += 50;
+    if (isHoldingCastle(state, opp)) score -= 50;
+    score += countMobility(state, forPlayer) - countMobility(state, opp);
+    return score;
+  }
+
+  function allActions(state) {
+    const player = state.turn;
+    const actions = [];
+    state.hands[player].forEach(function (cardId) {
+      const moves = getLegalMoves(state, cardId, player);
+      if (moves.length === 0) {
+        actions.push({ cardId: cardId, pass: true });
+      } else {
+        moves.forEach(function (mv) {
+          actions.push({ cardId: cardId, from: mv.from, to: mv.to });
+        });
+      }
+    });
+    return actions;
+  }
+
+  function applyAction(state, action) {
+    if (action.pass) return applyPass(state, action.cardId);
+    return applyMove(state, action.cardId, action.from, action.to);
+  }
+
+  function minimax(state, depth, alpha, beta, rootPlayer) {
+    if (state.winner || depth === 0) return evaluate(state, rootPlayer);
+    const maximizing = state.turn === rootPlayer;
+    const actions = allActions(state);
+    let best = maximizing ? -Infinity : Infinity;
+    for (let i = 0; i < actions.length; i++) {
+      const next = applyAction(state, actions[i]);
+      const val = minimax(next, depth - 1, alpha, beta, rootPlayer);
+      if (maximizing) {
+        if (val > best) best = val;
+        if (best > alpha) alpha = best;
+      } else {
+        if (val < best) best = val;
+        if (best < beta) beta = best;
+      }
+      if (beta <= alpha) break;
+    }
+    return best;
+  }
+
+  function chooseAiMove(state, depth) {
+    depth = depth || 4;
+    const rootPlayer = state.turn;
+    const actions = allActions(state);
+    let bestVal = -Infinity;
+    let bestActions = [];
+    actions.forEach(function (action) {
+      const next = applyAction(state, action);
+      const val = minimax(next, depth - 1, -Infinity, Infinity, rootPlayer);
+      if (val > bestVal) {
+        bestVal = val;
+        bestActions = [action];
+      } else if (val === bestVal) {
+        bestActions.push(action);
+      }
+    });
+    return bestActions[Math.floor(Math.random() * bestActions.length)];
+  }
+
   return {
     CARD_IDS: CARD_IDS,
     CASTLE: CASTLE,
@@ -213,5 +296,7 @@
     chooseAiDraft: chooseAiDraft,
     applyMove: applyMove,
     applyPass: applyPass,
+    evaluate: evaluate,
+    chooseAiMove: chooseAiMove,
   };
 });

@@ -289,3 +289,40 @@ test('castle win: opponent piece sits on my castle, and I fail to remove it duri
   assert.equal(next.winner, 'P2');
   assert.equal(next.winReason, 'castle');
 });
+
+test('chooseAiMove takes an immediate winning capture over anything else', () => {
+  let s = E.createInitialState('P2'); // P2 차례
+  s.pieces = [
+    { id: 'ai', owner: 'P2', col: 2, row: 2, facing: -1 },
+    { id: 'human', owner: 'P1', col: 2, row: 1, facing: 1 }, // 유일한 상대 말
+  ];
+  s.hands = { P1: ['rook', 'bishop'], P2: ['rook', 'knight'] };
+  s.waiting = 'attacker';
+  const action = E.chooseAiMove(s, 2);
+  assert.equal(action.cardId, 'rook');
+  assert.deepEqual(action.to, { col: 2, row: 1 });
+  const next = E.applyMove(s, action.cardId, action.from, action.to);
+  assert.equal(next.winner, 'P2');
+});
+
+test('chooseAiMove prefers capturing a free enemy piece over an unrelated move', () => {
+  let s = E.createInitialState('P2');
+  s.pieces = [
+    { id: 'ai1', owner: 'P2', col: 2, row: 2, facing: -1 },
+    { id: 'ai2', owner: 'P2', col: 0, row: 4, facing: -1 },
+    { id: 'prey', owner: 'P1', col: 2, row: 1, facing: 1 },
+    { id: 'safe', owner: 'P1', col: 0, row: 0, facing: 1 },
+  ];
+  s.hands = { P1: ['bishop', 'attacker'], P2: ['rook', 'knight'] };
+  s.waiting = 'jumper';
+  const action = E.chooseAiMove(s, 2);
+  const next = E.applyMove(s, action.cardId, action.from, action.to);
+  assert.equal(E.countAlive(next, 'P1'), 1); // prey가 사라졌어야 함
+});
+
+test('evaluate returns a large positive number for a state where forPlayer has already won', () => {
+  let s = E.createInitialState('P1');
+  s.winner = 'P1';
+  assert.ok(E.evaluate(s, 'P1') > 100000);
+  assert.ok(E.evaluate(s, 'P2') < -100000);
+});
