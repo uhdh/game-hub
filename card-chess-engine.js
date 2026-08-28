@@ -284,6 +284,15 @@
     return bestActions[Math.floor(Math.random() * bestActions.length)];
   }
 
+  function computeExpectedScore(aiRating, playerRating) {
+    return 1 / (1 + Math.pow(10, (aiRating - playerRating) / 400));
+  }
+
+  function computeNewRating(currentRating, actual, aiRating, kFactor) {
+    const expected = computeExpectedScore(aiRating, currentRating);
+    return Math.round(currentRating + kFactor * (actual - expected));
+  }
+
   return {
     CARD_IDS: CARD_IDS,
     CASTLE: CASTLE,
@@ -298,5 +307,7 @@
     applyPass: applyPass,
     evaluate: evaluate,
     chooseAiMove: chooseAiMove,
+    computeExpectedScore: computeExpectedScore,
+    computeNewRating: computeNewRating,
   };
 });

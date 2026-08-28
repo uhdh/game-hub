@@ -326,3 +326,17 @@ test('evaluate returns a large positive number for a state where forPlayer has a
   assert.ok(E.evaluate(s, 'P1') > 100000);
   assert.ok(E.evaluate(s, 'P2') < -100000);
 });
+
+test('computeExpectedScore returns 0.5 when ratings are equal', () => {
+  assert.equal(E.computeExpectedScore(1500, 1500), 0.5);
+});
+
+test('computeNewRating increases rating on a win against a higher-rated AI', () => {
+  const newRating = E.computeNewRating(1200, 1, 1500, 32);
+  assert.ok(newRating > 1200);
+});
+
+test('computeNewRating decreases rating on a loss against a lower-rated AI', () => {
+  const newRating = E.computeNewRating(1600, 0, 1500, 32);
+  assert.ok(newRating < 1600);
+});
