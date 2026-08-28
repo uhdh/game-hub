@@ -47,6 +47,7 @@
   .btn-primary { background: var(--accent); color: #0f1214; font-size: 14px; font-weight: 700; border: none; padding: 12px 18px; border-radius: 12px; cursor: pointer; }
   .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
   .btn-secondary { background: var(--panel-light); color: var(--text); font-size: 13.5px; font-weight: 700; border: 1px solid var(--border); padding: 10px 14px; border-radius: 12px; cursor: pointer; }
+  .btn-secondary:disabled { opacity: .4; cursor: not-allowed; }
 
   .status-bar { text-align: center; font-size: 13px; font-weight: 700; color: var(--gold); min-height: 18px; }
 
@@ -96,6 +97,8 @@
   .cell.castle { background: rgba(255,209,102,.10); box-shadow: inset 0 0 0 2px rgba(255,209,102,.5); }
   .cell.highlight-piece { box-shadow: inset 0 0 0 2px var(--accent); cursor: pointer; }
   .cell.highlight-dest { background: rgba(95,184,176,.22); cursor: pointer; }
+  .cell.last-move-from { border: 2px solid var(--gold); }
+  .cell.last-move-to { border: 2px solid var(--gold); background: rgba(255,209,102,.16); }
   .piece {
     width: 34px; height: 34px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
@@ -107,11 +110,20 @@
 
   .rules-summary { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; font-size: 11.5px; color: var(--text-dim); line-height: 1.6; }
 
+  .log-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; }
+  .log-title { font-size: 11.5px; font-weight: 700; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em; }
+  .log-list { max-height: 160px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+  .log-list .log-entry { color: var(--text-dim); }
+  .log-list .log-entry.me { color: var(--accent-hover); }
+  .log-list .log-entry.ai { color: var(--danger); }
+  .log-empty { color: var(--text-dim); font-size: 12px; }
+
   .modal { position: fixed; inset: 0; background: rgba(6,7,9,.75); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 50; }
   .modal.hidden { display: none; }
   .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; padding: 28px 24px; max-width: 320px; width: 100%; display: flex; flex-direction: column; gap: 10px; text-align: center; }
   .modal-title { font-size: 20px; font-weight: 800; }
   .modal-reason { font-size: 13px; color: var(--text-dim); }
+  .modal-note { font-size: 11px; color: var(--text-dim); }
 </style>
 </head>
 <body>
@@ -120,6 +132,7 @@
     <div class="header-row">
       <a href="./index.html" class="home-link">← 게임 허브</a>
       <span class="title">카드체스</span>
+      <button type="button" class="btn-secondary" id="takeback-btn" style="display:none;">무르기</button>
       <button type="button" class="btn-secondary" id="new-game-btn" style="display:none;">새 게임</button>
     </div>
 
@@ -155,6 +168,10 @@
       <div class="rules-summary">
         록: 상하좌우 1칸 · 비숍: 대각선 1칸 · 어태커: 전진 1~2칸/대각선-전진 1칸 · 나이트: 체스 나이트 · 점퍼: 인접 말 넘어 2칸(말 2개 남으면 퀸: 8방향 1칸)
       </div>
+      <div class="log-panel">
+        <div class="log-title">이동 기록</div>
+        <div class="log-list" id="log-list"><div class="log-empty">아직 기록이 없습니다</div></div>
+      </div>
     </div>
   </div>
 </div>
@@ -163,6 +180,7 @@
   <div class="modal-box">
     <div class="modal-title" id="win-title"></div>
     <div class="modal-reason" id="win-reason"></div>
+    <div class="modal-note" id="win-note" style="display:none;"></div>
     <button type="button" class="btn-primary" id="win-restart-btn">새 게임</button>
   </div>
 </div>
@@ -190,6 +208,29 @@
 
   let selection = { cardId: null, from: null };
   let draftState = null; // { pending: string[], self: string[], opponent: string[], picking: 'self'|'opponent' }
+  let lastMove = null; // { from: {col,row}, to: {col,row} } | null - 가장 최근 이동(패스 제외)
+  let moveLog = []; // { text: string, mine: boolean }[]
+  let lastHumanMoveSnapshot = null; // 내 직전 수를 두기 전 state (1회 무르기용)
+  let takebackUsed = false; // 이번 판에서 무르기를 썼는지 - 쓰면 랭킹 미등록
+
+  function updateTakebackButton() {
+    const btn = document.getElementById('takeback-btn');
+    btn.disabled = !lastHumanMoveSnapshot || !!(state && state.winner);
+  }
+
+  function logMove(text, mine) {
+    moveLog.push({ text: text, mine: mine });
+    renderLog();
+  }
+
+  function renderLog() {
+    const el = document.getElementById('log-list');
+    if (!moveLog.length) { el.innerHTML = '<div class="log-empty">아직 기록이 없습니다</div>'; return; }
+    el.innerHTML = moveLog.map(function (e) {
+      return '<div class="log-entry ' + (e.mine ? 'me' : 'ai') + '">' + e.text + '</div>';
+    }).join('');
+    el.scrollTop = el.scrollHeight;
+  }
 
   function startGame() {
     const nickname = nicknameInput.value.trim() || randomNickname();
@@ -199,10 +240,17 @@
     const first = Math.random() < 0.5 ? 'P1' : 'P2';
     state = E.createInitialState(first);
     selection = { cardId: null, from: null };
+    lastMove = null;
+    moveLog = [];
+    renderLog();
+    lastHumanMoveSnapshot = null;
+    takebackUsed = false;
 
     document.getElementById('screen-start').classList.add('hidden');
     document.getElementById('screen-game').classList.remove('hidden');
     document.getElementById('new-game-btn').style.display = '';
+    document.getElementById('takeback-btn').style.display = '';
+    updateTakebackButton();
 
     const second = E.other(first);
     if (second === 'P2') {
@@ -249,8 +297,11 @@
     if (moves.length === 0) {
       const ok = window.confirm('이 카드로 이동할 수 있는 말이 없습니다. 그대로 턴을 넘길까요?');
       if (ok) {
+        const label = cardDisplay(state, cardId)[1];
+        lastHumanMoveSnapshot = state;
         state = E.applyPass(state, cardId);
         selection = { cardId: null, from: null };
+        logMove('나: ' + label + ' - 이동 가능한 수 없음, 턴 넘김', true);
         afterStateChange();
       } else {
         selection = { cardId: null, from: null };
@@ -276,8 +327,14 @@
       return m.from.col === selection.from.col && m.from.row === selection.from.row && m.to.col === col && m.to.row === row;
     });
     if (isDest) {
+      const label = cardDisplay(state, selection.cardId)[1];
+      const captured = !!state.pieces.find(function (p) { return p.col === col && p.row === row; });
+      const from = selection.from;
+      lastHumanMoveSnapshot = state;
       state = E.applyMove(state, selection.cardId, selection.from, { col: col, row: row });
       selection = { cardId: null, from: null };
+      lastMove = { from: from, to: { col: col, row: row } };
+      logMove('나: ' + label + ' 이동' + (captured ? ' · 포획!' : ''), true);
       afterStateChange();
     } else {
       selection.from = null;
@@ -294,8 +351,13 @@
       return m.from.col === selection.from.col && m.from.row === selection.from.row;
     }).map(function (m) { return m.to.col + ',' + m.to.row; }) : [];
 
-    for (let row = 0; row < 5; row++) {
-      for (let col = 0; col < 5; col++) {
+    // 보드는 위아래로 그린다: 내 말(P1, col=0)이 하단, AI 말(P2, col=4)이 상단.
+    // 시각 좌표(visualRow: 0=상단..4=하단, visualCol: 0=좌..4=우) -> 엔진 좌표(col,row) 변환:
+    //   engineCol = 4 - visualRow, engineRow = visualCol
+    for (let visualRow = 0; visualRow < 5; visualRow++) {
+      for (let visualCol = 0; visualCol < 5; visualCol++) {
+        const col = 4 - visualRow;
+        const row = visualCol;
         const cell = document.createElement('div');
         cell.className = 'cell';
         const key = col + ',' + row;
@@ -303,12 +365,14 @@
         if (isCastle) cell.classList.add('castle');
         if (!selection.from && pieceCells.has(key)) cell.classList.add('highlight-piece');
         if (destCells.indexOf(key) !== -1) cell.classList.add('highlight-dest');
+        if (lastMove && lastMove.from.col === col && lastMove.from.row === row) cell.classList.add('last-move-from');
+        if (lastMove && lastMove.to.col === col && lastMove.to.row === row) cell.classList.add('last-move-to');
         cell.addEventListener('click', function () { onCellClick(col, row); });
         const piece = state.pieces.find(function (p) { return p.col === col && p.row === row; });
         if (piece) {
           const div = document.createElement('div');
           div.className = 'piece owner-' + piece.owner;
-          div.textContent = piece.facing === 1 ? '▶' : '◀';
+          div.textContent = piece.facing === 1 ? '▲' : '▼';
           cell.appendChild(div);
         }
         boardEl.appendChild(cell);
@@ -336,6 +400,7 @@
       document.getElementById('draft-picker') && document.getElementById('draft-picker').remove();
       document.getElementById('status-bar').textContent = state.turn === 'P1' ? '당신의 차례' : 'AI 차례';
     }
+    updateTakebackButton();
   }
 
   function renderDraftPicker() {
@@ -392,7 +457,16 @@
     aiTimer = setTimeout(function () {
       aiTimer = null;
       const action = E.chooseAiMove(state, 4);
-      state = action.pass ? E.applyPass(state, action.cardId) : E.applyMove(state, action.cardId, action.from, action.to);
+      const label = cardDisplay(state, action.cardId)[1];
+      if (action.pass) {
+        state = E.applyPass(state, action.cardId);
+        logMove('AI: ' + label + ' - 이동 가능한 수 없음, 턴 넘김', false);
+      } else {
+        const captured = !!state.pieces.find(function (p) { return p.col === action.to.col && p.row === action.to.row; });
+        state = E.applyMove(state, action.cardId, action.from, action.to);
+        lastMove = { from: action.from, to: action.to };
+        logMove('AI: ' + label + ' 이동' + (captured ? ' · 포획!' : ''), false);
+      }
       afterStateChange();
     }, 600);
   }
@@ -448,8 +522,15 @@
     document.getElementById('win-reason').textContent = state.winReason === 'elimination'
       ? (won ? '상대 말을 모두 잡았습니다' : 'AI가 당신의 말을 모두 잡았습니다')
       : (won ? '상대 성을 점령하고 버텼습니다' : 'AI가 당신의 성을 점령하고 버텼습니다');
+    const noteEl = document.getElementById('win-note');
+    if (takebackUsed) {
+      noteEl.textContent = '무르기를 사용한 판이라 리더보드에는 반영되지 않습니다.';
+      noteEl.style.display = '';
+    } else {
+      noteEl.style.display = 'none';
+    }
     document.getElementById('win-modal').classList.remove('hidden');
-    recordResult(won);
+    if (!takebackUsed) recordResult(won);
   }
 
   document.getElementById('win-restart-btn').addEventListener('click', function () {
@@ -458,6 +539,19 @@
     document.getElementById('screen-game').classList.add('hidden');
     document.getElementById('screen-start').classList.remove('hidden');
     document.getElementById('new-game-btn').style.display = 'none';
+    document.getElementById('takeback-btn').style.display = 'none';
+  });
+
+  document.getElementById('takeback-btn').addEventListener('click', function () {
+    if (!lastHumanMoveSnapshot) return;
+    cancelAiTimer();
+    state = lastHumanMoveSnapshot;
+    lastHumanMoveSnapshot = null;
+    takebackUsed = true;
+    selection = { cardId: null, from: null };
+    lastMove = null;
+    logMove('무르기 사용 (직전 내 수를 취소했습니다)', true);
+    render();
   });
 
   document.getElementById('start-btn').addEventListener('click', startGame);
@@ -466,6 +560,7 @@
     document.getElementById('screen-game').classList.add('hidden');
     document.getElementById('screen-start').classList.remove('hidden');
     document.getElementById('new-game-btn').style.display = 'none';
+    document.getElementById('takeback-btn').style.display = 'none';
   });
 </script>
 </body>
