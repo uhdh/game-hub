@@ -189,7 +189,7 @@
   nicknameInput.value = savedNickname || '';
 
   let selection = { cardId: null, from: null };
-  let draftState = null; // { pending: string[], self: string[], picking: 'self'|'opponent' }
+  let draftState = null; // { pending: string[], self: string[], opponent: string[], picking: 'self'|'opponent' }
 
   function startGame() {
     const nickname = nicknameInput.value.trim() || randomNickname();
@@ -385,13 +385,20 @@
     if (state.turn === 'P2') scheduleAiTurn();
   }
 
+  let aiTimer = null;
+
   function scheduleAiTurn() {
     document.getElementById('status-bar').textContent = 'AI가 생각하는 중...';
-    setTimeout(function () {
+    aiTimer = setTimeout(function () {
+      aiTimer = null;
       const action = E.chooseAiMove(state, 4);
       state = action.pass ? E.applyPass(state, action.cardId) : E.applyMove(state, action.cardId, action.from, action.to);
       afterStateChange();
     }, 600);
+  }
+
+  function cancelAiTimer() {
+    if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
   }
 
   const SUPABASE_URL = 'https://paktzmofotvwfdxcpmzv.supabase.co';
@@ -403,29 +410,33 @@
     return Object.assign({ apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }, extra || {});
   }
 
+  async function fetchPlayerRating(nickname) {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/card_chess_leaderboard?select=nickname,rating,wins,losses&nickname=eq.${encodeURIComponent(nickname)}`,
+      { headers: sbHeaders() }
+    );
+    if (!res.ok) throw new Error('레이팅 조회 실패');
+    const rows = await res.json();
+    return rows[0] || { nickname, rating: 1200, wins: 0, losses: 0 };
+  }
+
+  async function upsertPlayerRating(nickname, rating, wins, losses) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/card_chess_leaderboard?on_conflict=nickname`, {
+      method: 'POST',
+      headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify({ nickname, rating, wins, losses, updated_at: new Date().toISOString() }),
+    });
+    if (!res.ok) throw new Error('레이팅 등록 실패');
+  }
+
   async function recordResult(won) {
     const nickname = window.cardChessNickname;
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/card_chess_leaderboard?select=id,rating,wins,losses&nickname=eq.${encodeURIComponent(nickname)}`, { headers: sbHeaders() });
-      const rows = await res.json();
-      const existing = rows[0];
-      const currentRating = existing ? existing.rating : 1200;
-      const newRating = E.computeNewRating(currentRating, won ? 1 : 0, AI_RATING, K_FACTOR);
-      const wins = (existing ? existing.wins : 0) + (won ? 1 : 0);
-      const losses = (existing ? existing.losses : 0) + (won ? 0 : 1);
-      if (existing) {
-        await fetch(`${SUPABASE_URL}/rest/v1/card_chess_leaderboard?id=eq.${existing.id}`, {
-          method: 'PATCH',
-          headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-          body: JSON.stringify({ rating: newRating, wins: wins, losses: losses, updated_at: new Date().toISOString() }),
-        });
-      } else {
-        await fetch(`${SUPABASE_URL}/rest/v1/card_chess_leaderboard`, {
-          method: 'POST',
-          headers: sbHeaders({ 'Content-Type': 'application/json', Prefer: 'return=minimal' }),
-          body: JSON.stringify({ nickname: nickname, rating: newRating, wins: wins, losses: losses }),
-        });
-      }
+      const existing = await fetchPlayerRating(nickname);
+      const newRating = E.computeNewRating(existing.rating, won ? 1 : 0, AI_RATING, K_FACTOR);
+      const wins = existing.wins + (won ? 1 : 0);
+      const losses = existing.losses + (won ? 0 : 1);
+      await upsertPlayerRating(nickname, newRating, wins, losses);
     } catch (e) {
       // 리더보드 기록 실패는 게임 결과 표시를 막지 않는다
     }
@@ -442,6 +453,7 @@
   }
 
   document.getElementById('win-restart-btn').addEventListener('click', function () {
+    cancelAiTimer();
     document.getElementById('win-modal').classList.add('hidden');
     document.getElementById('screen-game').classList.add('hidden');
     document.getElementById('screen-start').classList.remove('hidden');
@@ -450,6 +462,7 @@
 
   document.getElementById('start-btn').addEventListener('click', startGame);
   document.getElementById('new-game-btn').addEventListener('click', function () {
+    cancelAiTimer();
     document.getElementById('screen-game').classList.add('hidden');
     document.getElementById('screen-start').classList.remove('hidden');
     document.getElementById('new-game-btn').style.display = 'none';

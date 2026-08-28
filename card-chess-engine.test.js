@@ -155,12 +155,6 @@ test('chooseAiDraft ranks knight/jumper for self, attacker/bishop for opponent, 
   assert.deepEqual(draft.firstCards.slice().sort(), ['attacker', 'bishop']);
 });
 
-function draftedState(first) {
-  let s = E.createInitialState(first || 'P1');
-  const draft = E.chooseAiDraft(); // 결정적 배분 재사용 (테스트 목적)
-  return E.applyDraft(s, draft.secondCards, draft.firstCards);
-}
-
 test('applyMove moves the piece and captures an enemy on the destination', () => {
   let s = E.createInitialState('P1');
   s.pieces = [
@@ -339,4 +333,27 @@ test('computeNewRating increases rating on a win against a higher-rated AI', () 
 test('computeNewRating decreases rating on a loss against a lower-rated AI', () => {
   const newRating = E.computeNewRating(1600, 0, 1500, 32);
   assert.ok(newRating < 1600);
+});
+
+test('chooseAiMove always takes an immediate win at depth 4, never declines it', () => {
+  for (let i = 0; i < 20; i++) {
+    const s = E.createInitialState('P2');
+    s.pieces = [
+      { id: 'ai', owner: 'P2', col: 2, row: 2, facing: -1 },
+      { id: 'human', owner: 'P1', col: 2, row: 1, facing: 1 },
+    ];
+    s.hands = { P1: ['bishop', 'attacker'], P2: ['rook', 'knight'] };
+    s.waiting = 'jumper';
+    const action = E.chooseAiMove(s, 4);
+    const next = action.pass ? E.applyPass(s, action.cardId) : E.applyMove(s, action.cardId, action.from, action.to);
+    assert.equal(next.winner, 'P2', 'AI must take the immediate win, iteration ' + i);
+  }
+});
+
+test('applyDraft works correctly when P2 is the first mover (P1 drafts as second)', () => {
+  const s = E.createInitialState('P2'); // P2=선, P1=후(드래프트 주도)
+  const next = E.applyDraft(s, ['knight', 'jumper'], ['attacker', 'bishop']);
+  assert.deepEqual(next.hands.P1, ['knight', 'jumper']); // P1 = second/drafter, gets secondCards
+  assert.deepEqual(next.hands.P2, ['attacker', 'bishop']); // P2 = first, gets firstCards
+  assert.equal(next.waiting, 'rook');
 });

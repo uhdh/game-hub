@@ -246,7 +246,10 @@
   }
 
   function minimax(state, depth, alpha, beta, rootPlayer) {
-    if (state.winner || depth === 0) return evaluate(state, rootPlayer);
+    if (state.winner) {
+      return state.winner === rootPlayer ? (1000000 + depth) : (-1000000 - depth);
+    }
+    if (depth === 0) return evaluate(state, rootPlayer);
     const maximizing = state.turn === rootPlayer;
     const actions = allActions(state);
     let best = maximizing ? -Infinity : Infinity;
@@ -269,6 +272,7 @@
     depth = depth || 4;
     const rootPlayer = state.turn;
     const actions = allActions(state);
+    if (actions.length === 0) throw new Error('chooseAiMove: no legal actions available for ' + rootPlayer);
     let bestVal = -Infinity;
     let bestActions = [];
     actions.forEach(function (action) {
