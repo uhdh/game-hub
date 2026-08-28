@@ -46,6 +46,71 @@
     };
   }
 
+  const ORTHO = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  const DIAG = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+  const ALL8 = ORTHO.concat(DIAG);
+  const KNIGHT_OFFSETS = [[1, 2], [1, -2], [-1, 2], [-1, -2], [2, 1], [2, -1], [-2, 1], [-2, -1]];
+
+  function inBounds(col, row) { return col >= 0 && col < 5 && row >= 0 && row < 5; }
+
+  function pieceAt(state, col, row) {
+    return state.pieces.find(function (p) { return p.col === col && p.row === row; }) || null;
+  }
+
+  function effectiveCard(state, cardId) {
+    if (cardId === 'jumper' && state.jumperConverted) return 'queen';
+    return cardId;
+  }
+
+  function destinationsFor(state, piece, kind) {
+    const out = [];
+    function ownAt(c, r) { const p = pieceAt(state, c, r); return !!p && p.owner === piece.owner; }
+    function anyAt(c, r) { return !!pieceAt(state, c, r); }
+
+    if (kind === 'rook' || kind === 'bishop' || kind === 'queen') {
+      const dirs = kind === 'rook' ? ORTHO : kind === 'bishop' ? DIAG : ALL8;
+      dirs.forEach(function (d) {
+        const c = piece.col + d[0], r = piece.row + d[1];
+        if (inBounds(c, r) && !ownAt(c, r)) out.push({ col: c, row: r });
+      });
+    } else if (kind === 'knight') {
+      KNIGHT_OFFSETS.forEach(function (d) {
+        const c = piece.col + d[0], r = piece.row + d[1];
+        if (inBounds(c, r) && !ownAt(c, r)) out.push({ col: c, row: r });
+      });
+    } else if (kind === 'jumper') {
+      ALL8.forEach(function (d) {
+        const mc = piece.col + d[0], mr = piece.row + d[1];
+        if (!inBounds(mc, mr) || !anyAt(mc, mr)) return;
+        const c = piece.col + 2 * d[0], r = piece.row + 2 * d[1];
+        if (inBounds(c, r) && !ownAt(c, r)) out.push({ col: c, row: r });
+      });
+    } else if (kind === 'attacker') {
+      const f = piece.facing;
+      const oneC = piece.col + f, oneR = piece.row;
+      if (inBounds(oneC, oneR) && !ownAt(oneC, oneR)) out.push({ col: oneC, row: oneR });
+      const twoC = piece.col + 2 * f, twoR = piece.row;
+      if (inBounds(twoC, twoR) && !anyAt(oneC, oneR) && !ownAt(twoC, twoR)) out.push({ col: twoC, row: twoR });
+      [1, -1].forEach(function (dr) {
+        const dc = piece.col + f, drow = piece.row + dr;
+        if (inBounds(dc, drow) && !ownAt(dc, drow)) out.push({ col: dc, row: drow });
+      });
+    }
+    return out;
+  }
+
+  function getLegalMoves(state, cardId, player) {
+    player = player || state.turn;
+    const kind = effectiveCard(state, cardId);
+    const moves = [];
+    state.pieces.filter(function (p) { return p.owner === player; }).forEach(function (piece) {
+      destinationsFor(state, piece, kind).forEach(function (d) {
+        moves.push({ pieceId: piece.id, from: { col: piece.col, row: piece.row }, to: d });
+      });
+    });
+    return moves;
+  }
+
   return {
     CARD_IDS: CARD_IDS,
     CASTLE: CASTLE,
@@ -53,5 +118,6 @@
     countAlive: countAlive,
     isHoldingCastle: isHoldingCastle,
     createInitialState: createInitialState,
+    getLegalMoves: getLegalMoves,
   };
 });

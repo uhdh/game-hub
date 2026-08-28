@@ -39,3 +39,98 @@ test('isHoldingCastle is true once a player\'s piece sits on its own target cast
   state.pieces.push({ id: 'test', owner: 'P1', col: 4, row: 2, facing: 1 });
   assert.equal(E.isHoldingCastle(state, 'P1'), true);
 });
+
+function emptyState(turn) {
+  const s = E.createInitialState(turn || 'P1');
+  s.pieces = [];
+  return s;
+}
+
+test('rook: orthogonal 1-step only, blocked by own piece, captures enemy', () => {
+  const s = emptyState();
+  s.pieces = [
+    { id: 'a', owner: 'P1', col: 2, row: 2, facing: 1 },
+    { id: 'b', owner: 'P1', col: 3, row: 2, facing: 1 },
+    { id: 'c', owner: 'P2', col: 2, row: 1, facing: -1 },
+  ];
+  const moves = E.getLegalMoves(s, 'rook', 'P1').filter(m => m.pieceId === 'a');
+  const dests = moves.map(m => m.to.col + ',' + m.to.row).sort();
+  assert.deepEqual(dests, ['1,2', '2,1', '2,3']);
+});
+
+test('bishop: diagonal 1-step only', () => {
+  const s = emptyState();
+  s.pieces = [{ id: 'a', owner: 'P1', col: 2, row: 2, facing: 1 }];
+  const moves = E.getLegalMoves(s, 'bishop', 'P1');
+  const dests = moves.map(m => m.to.col + ',' + m.to.row).sort();
+  assert.deepEqual(dests, ['1,1', '1,3', '3,1', '3,3']);
+});
+
+test('knight: 8 L-shaped destinations, jumps over pieces', () => {
+  const s = emptyState();
+  s.pieces = [
+    { id: 'a', owner: 'P1', col: 2, row: 2, facing: 1 },
+    { id: 'block', owner: 'P2', col: 2, row: 3, facing: -1 },
+  ];
+  const moves = E.getLegalMoves(s, 'knight', 'P1').filter(m => m.pieceId === 'a');
+  assert.equal(moves.length, 8);
+});
+
+test('jumper: only jumps over an adjacent occupied cell, lands 2 away, hopped piece survives', () => {
+  const s = emptyState();
+  s.pieces = [
+    { id: 'a', owner: 'P1', col: 2, row: 2, facing: 1 },
+    { id: 'hop', owner: 'P2', col: 3, row: 2, facing: -1 },
+  ];
+  const moves = E.getLegalMoves(s, 'jumper', 'P1').filter(m => m.pieceId === 'a');
+  assert.deepEqual(moves.map(m => m.to), [{ col: 4, row: 2 }]);
+});
+
+test('jumper: no move in a direction with no adjacent piece', () => {
+  const s = emptyState();
+  s.pieces = [{ id: 'a', owner: 'P1', col: 2, row: 2, facing: 1 }];
+  const moves = E.getLegalMoves(s, 'jumper', 'P1').filter(m => m.pieceId === 'a');
+  assert.equal(moves.length, 0);
+});
+
+test('jumper converts to queen movement once total pieces on board <= 2', () => {
+  const s = emptyState();
+  s.jumperConverted = true;
+  s.pieces = [
+    { id: 'a', owner: 'P1', col: 2, row: 2, facing: 1 },
+    { id: 'b', owner: 'P2', col: 4, row: 4, facing: -1 },
+  ];
+  const moves = E.getLegalMoves(s, 'jumper', 'P1').filter(m => m.pieceId === 'a');
+  const dests = moves.map(m => m.to.col + ',' + m.to.row).sort();
+  assert.deepEqual(dests, ['1,1', '1,2', '1,3', '2,1', '2,3', '3,1', '3,2', '3,3']);
+});
+
+test('attacker: forward 1/2 cells straight (blocked by any piece in between) plus forward-diagonal 1 cell', () => {
+  const s = emptyState();
+  s.pieces = [{ id: 'a', owner: 'P1', col: 1, row: 2, facing: 1 }];
+  let moves = E.getLegalMoves(s, 'attacker', 'P1').filter(m => m.pieceId === 'a');
+  let dests = moves.map(m => m.to.col + ',' + m.to.row).sort();
+  assert.deepEqual(dests, ['2,1', '2,2', '2,3', '3,2']);
+
+  s.pieces.push({ id: 'block', owner: 'P2', col: 2, row: 2, facing: -1 });
+  moves = E.getLegalMoves(s, 'attacker', 'P1').filter(m => m.pieceId === 'a');
+  dests = moves.map(m => m.to.col + ',' + m.to.row).sort();
+  // 2칸 전진(3,2)은 중간(2,2)이 막혀서 사라지고, 1칸 전진은 상대말 포획으로 남음
+  assert.deepEqual(dests, ['2,1', '2,2', '2,3']);
+});
+
+test('attacker uses facing to determine forward direction', () => {
+  const s = emptyState();
+  s.pieces = [{ id: 'a', owner: 'P2', col: 3, row: 2, facing: -1 }];
+  const moves = E.getLegalMoves(s, 'attacker', 'P2').filter(m => m.pieceId === 'a');
+  const dests = moves.map(m => m.to.col + ',' + m.to.row).sort();
+  assert.deepEqual(dests, ['1,2', '2,1', '2,2', '2,3']);
+});
+
+test('queen movement (post-conversion) covers all 8 adjacent cells from board center', () => {
+  const s = emptyState();
+  s.jumperConverted = true;
+  s.pieces = [{ id: 'a', owner: 'P1', col: 2, row: 2, facing: 1 }];
+  const moves = E.getLegalMoves(s, 'jumper', 'P1');
+  assert.equal(moves.length, 8);
+});
