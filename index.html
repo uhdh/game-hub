@@ -757,6 +757,13 @@
       target: '_self',
       emoji: '🔨',
     },
+    {
+      name: '카드체스',
+      desc: '카드로 말을 움직여 상대의 성을 점령하세요',
+      href: './card-chess.html',
+      target: '_self',
+      emoji: '🃏',
+    },
   ];
 
   const list = document.getElementById('game-list');
@@ -1192,6 +1199,11 @@
       label: '모자이크 퍼즐',
       fetch: (limit) => fetchSimpleTop('color_connect_leaderboard', 'nickname,score', 'score.desc,created_at.asc', limit),
       format: r => `${r.score}점`,
+    },
+    {
+      label: '카드체스',
+      fetch: (limit) => fetchSimpleTop('card_chess_leaderboard', 'nickname,rating,wins,losses', 'rating.desc', limit),
+      format: r => `${r.wins}승 ${r.losses}패 · ${r.rating}점`,
     },
   ];
 
