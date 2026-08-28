@@ -188,6 +188,9 @@
   const savedNickname = localStorage.getItem('cardChessNickname');
   nicknameInput.value = savedNickname || '';
 
+  let selection = { cardId: null, from: null };
+  let draftState = null; // { pending: string[], self: string[], picking: 'self'|'opponent' }
+
   function startGame() {
     const nickname = nicknameInput.value.trim() || randomNickname();
     localStorage.setItem('cardChessNickname', nickname);
@@ -195,19 +198,130 @@
 
     const first = Math.random() < 0.5 ? 'P1' : 'P2';
     state = E.createInitialState(first);
-    const second = E.other(first);
-    if (second === 'P2') {
-      const draft = E.chooseAiDraft();
-      state = E.applyDraft(state, draft.secondCards, draft.firstCards);
-    }
-    // second === 'P1'(사람)인 경우의 드래프트 UI는 Task 9에서 추가한다. 이 태스크에서는
-    // AI가 후공(second==='P2')인 케이스만 즉시 진행하고, 사람이 후공인 케이스는 그대로
-    // 게임 화면에 진입하되 손패가 비어 있는 상태로 보여준다(Task 9에서 드래프트 UI로 채움).
+    selection = { cardId: null, from: null };
 
     document.getElementById('screen-start').classList.add('hidden');
     document.getElementById('screen-game').classList.remove('hidden');
     document.getElementById('new-game-btn').style.display = '';
+
+    const second = E.other(first);
+    if (second === 'P2') {
+      const draft = E.chooseAiDraft();
+      state = E.applyDraft(state, draft.secondCards, draft.firstCards);
+      draftState = null;
+      afterStateChange();
+    } else {
+      draftState = { pending: E.CARD_IDS.slice(), self: [], picking: 'self' };
+      render();
+    }
+  }
+
+  function renderCardSlot(elId, cardId, selectable) {
+    const el = document.getElementById(elId);
+    if (!cardId) { el.innerHTML = ''; el.classList.remove('selectable', 'selected'); return; }
+    const [icon, label] = cardDisplay(state, cardId);
+    el.innerHTML = `<span class="card-icon">${icon}</span><span class="card-label-tiny">${label}</span>`;
+    el.classList.toggle('selectable', !!selectable);
+    el.classList.toggle('selected', selection.cardId === cardId);
+  }
+
+  function renderHand(elId, player) {
+    const el = document.getElementById(elId);
+    el.innerHTML = '';
+    (state.hands[player] || []).forEach(function (cardId) {
+      const slot = document.createElement('div');
+      slot.className = 'card-slot';
+      const [icon, label] = cardDisplay(state, cardId);
+      slot.innerHTML = `<span class="card-icon">${icon}</span><span class="card-label-tiny">${label}</span>`;
+      const isMyTurnCard = player === 'P1' && state.turn === 'P1' && !state.winner;
+      if (isMyTurnCard) {
+        slot.classList.add('selectable');
+        if (selection.cardId === cardId) slot.classList.add('selected');
+        slot.addEventListener('click', function () { onCardClick(cardId); });
+      }
+      el.appendChild(slot);
+    });
+  }
+
+  function onCardClick(cardId) {
+    selection = { cardId: cardId, from: null };
+    const moves = E.getLegalMoves(state, cardId, 'P1');
+    if (moves.length === 0) {
+      const ok = window.confirm('이 카드로 이동할 수 있는 말이 없습니다. 그대로 턴을 넘길까요?');
+      if (ok) {
+        state = E.applyPass(state, cardId);
+        selection = { cardId: null, from: null };
+        afterStateChange();
+      } else {
+        selection = { cardId: null, from: null };
+        render();
+      }
+      return;
+    }
     render();
+  }
+
+  function onCellClick(col, row) {
+    if (state.winner) return;
+    if (draftState) return;
+    if (state.turn !== 'P1') return;
+    if (!selection.cardId) return;
+    const moves = E.getLegalMoves(state, selection.cardId, 'P1');
+    if (!selection.from) {
+      const hasMoveFromHere = moves.some(function (m) { return m.from.col === col && m.from.row === row; });
+      if (hasMoveFromHere) { selection.from = { col: col, row: row }; render(); }
+      return;
+    }
+    const isDest = moves.some(function (m) {
+      return m.from.col === selection.from.col && m.from.row === selection.from.row && m.to.col === col && m.to.row === row;
+    });
+    if (isDest) {
+      state = E.applyMove(state, selection.cardId, selection.from, { col: col, row: row });
+      selection = { cardId: null, from: null };
+      afterStateChange();
+    } else {
+      selection.from = null;
+      render();
+    }
+  }
+
+  function renderBoard() {
+    const boardEl = document.getElementById('board');
+    boardEl.innerHTML = '';
+    const moves = (selection.cardId && !draftState) ? E.getLegalMoves(state, selection.cardId, 'P1') : [];
+    const pieceCells = new Set(moves.map(function (m) { return m.from.col + ',' + m.from.row; }));
+    const destCells = selection.from ? moves.filter(function (m) {
+      return m.from.col === selection.from.col && m.from.row === selection.from.row;
+    }).map(function (m) { return m.to.col + ',' + m.to.row; }) : [];
+
+    for (let row = 0; row < 5; row++) {
+      for (let col = 0; col < 5; col++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        const key = col + ',' + row;
+        const isCastle = (E.CASTLE.P1.col === col && E.CASTLE.P1.row === row) || (E.CASTLE.P2.col === col && E.CASTLE.P2.row === row);
+        if (isCastle) cell.classList.add('castle');
+        if (!selection.from && pieceCells.has(key)) cell.classList.add('highlight-piece');
+        if (destCells.indexOf(key) !== -1) cell.classList.add('highlight-dest');
+        cell.addEventListener('click', function () { onCellClick(col, row); });
+        const piece = state.pieces.find(function (p) { return p.col === col && p.row === row; });
+        if (piece) {
+          const div = document.createElement('div');
+          div.className = 'piece owner-' + piece.owner;
+          div.textContent = piece.facing === 1 ? '▶' : '◀';
+          cell.appendChild(div);
+        }
+        boardEl.appendChild(cell);
+      }
+    }
+  }
+
+  function renderDraftOverlay() {
+    const el = document.getElementById('status-bar');
+    if (!draftState) return;
+    el.textContent = draftState.picking === 'self'
+      ? '카드 5장 중 자신이 가질 카드 2장을 선택하세요'
+      : '남은 카드 중 상대(선)에게 줄 카드 2장을 선택하세요';
   }
 
   function render() {
@@ -215,52 +329,73 @@
     renderHand('hand-P1', 'P1');
     renderHand('hand-P2', 'P2');
     renderBoard();
-    document.getElementById('status-bar').textContent = state.hands.P1.length === 0
-      ? '카드 배분 대기 중'
-      : (state.turn === 'P1' ? '당신의 차례' : 'AI 차례');
+    if (draftState) {
+      renderDraftOverlay();
+      renderDraftPicker();
+    } else {
+      document.getElementById('draft-picker') && document.getElementById('draft-picker').remove();
+      document.getElementById('status-bar').textContent = state.turn === 'P1' ? '당신의 차례' : 'AI 차례';
+    }
   }
 
-  function renderCardSlot(elId, cardId, selectable) {
-    const el = document.getElementById(elId);
-    if (!cardId) { el.innerHTML = ''; return; }
-    const [icon, label] = cardDisplay(state, cardId);
-    el.innerHTML = `<span class="card-icon">${icon}</span><span class="card-label-tiny">${label}</span>`;
-    el.classList.toggle('selectable', !!selectable);
-  }
-
-  function renderHand(elId, player) {
-    const el = document.getElementById(elId);
-    el.innerHTML = '';
-    (state.hands[player] || []).forEach(function (cardId, idx) {
+  function renderDraftPicker() {
+    let picker = document.getElementById('draft-picker');
+    if (!picker) {
+      picker = document.createElement('div');
+      picker.id = 'draft-picker';
+      picker.style.display = 'flex';
+      picker.style.gap = '8px';
+      picker.style.justifyContent = 'center';
+      picker.style.flexWrap = 'wrap';
+      document.getElementById('screen-game').insertBefore(picker, document.querySelector('.table-layout'));
+    }
+    picker.innerHTML = '';
+    draftState.pending.forEach(function (cardId) {
       const slot = document.createElement('div');
-      slot.className = 'card-slot';
+      slot.className = 'card-slot selectable';
       const [icon, label] = cardDisplay(state, cardId);
       slot.innerHTML = `<span class="card-icon">${icon}</span><span class="card-label-tiny">${label}</span>`;
-      el.appendChild(slot);
+      slot.addEventListener('click', function () { onDraftPick(cardId); });
+      picker.appendChild(slot);
     });
   }
 
-  function renderBoard() {
-    const boardEl = document.getElementById('board');
-    boardEl.innerHTML = '';
-    for (let row = 0; row < 5; row++) {
-      for (let col = 0; col < 5; col++) {
-        const cell = document.createElement('div');
-        cell.className = 'cell';
-        cell.dataset.col = col;
-        cell.dataset.row = row;
-        const isCastle = (E.CASTLE.P1.col === col && E.CASTLE.P1.row === row) || (E.CASTLE.P2.col === col && E.CASTLE.P2.row === row);
-        if (isCastle) cell.classList.add('castle');
-        const piece = state.pieces.find(function (p) { return p.col === col && p.row === row; });
-        if (piece) {
-          const div = document.createElement('div');
-          div.className = 'piece owner-' + piece.owner;
-          div.textContent = piece.owner === 'P1' ? (piece.facing === 1 ? '▶' : '◀') : (piece.facing === 1 ? '▶' : '◀');
-          cell.appendChild(div);
-        }
-        boardEl.appendChild(cell);
-      }
+  function onDraftPick(cardId) {
+    if (draftState.picking === 'self') {
+      draftState.self.push(cardId);
+      draftState.pending = draftState.pending.filter(function (c) { return c !== cardId; });
+      if (draftState.self.length === 2) { draftState.picking = 'opponent'; draftState.opponent = []; }
+      render();
+      return;
     }
+    draftState.opponent.push(cardId);
+    draftState.pending = draftState.pending.filter(function (c) { return c !== cardId; });
+    if (draftState.opponent.length === 2) {
+      state = E.applyDraft(state, draftState.self, draftState.opponent);
+      draftState = null;
+      afterStateChange();
+      return;
+    }
+    render();
+  }
+
+  function afterStateChange() {
+    render();
+    if (state.winner) { showWinModal(); return; }
+    if (state.turn === 'P2') scheduleAiTurn();
+  }
+
+  function scheduleAiTurn() {
+    document.getElementById('status-bar').textContent = 'AI가 생각하는 중...';
+    setTimeout(function () {
+      const action = E.chooseAiMove(state, 4);
+      state = action.pass ? E.applyPass(state, action.cardId) : E.applyMove(state, action.cardId, action.from, action.to);
+      afterStateChange();
+    }, 600);
+  }
+
+  function showWinModal() {
+    // Task 10에서 구현
   }
 
   document.getElementById('start-btn').addEventListener('click', startGame);
