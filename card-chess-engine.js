@@ -204,9 +204,15 @@
   function chebyshev(a, b) { return Math.max(Math.abs(a.col - b.col), Math.abs(a.row - b.row)); }
 
   function countMobility(state, player) {
-    return state.hands[player].reduce(function (sum, cardId) {
-      return sum + getLegalMoves(state, cardId, player).length;
-    }, 0);
+    // 카드별 "합법 이동 수"를 그대로 더하면 나이트처럼 후보가 아주 많은 카드는
+    // 쓰지 않고 손에 쥐고만 있어도 점수가 실제로 쓰는 것보다 높아져버려
+    // AI가 좋은 카드를 계속 아끼기만 하는 역효과가 난다(깊이 4 탐색에서는
+    // 이 효과가 여러 턴에 걸쳐 누적되어 카드당 상한을 둬도 뒤집히지 않았음).
+    // 그래서 "몇 개나 가능한가"가 아니라 "쓸 수 있는 카드가 몇 장인가"(0~2)만
+    // 본다 — 스펙이 의도한 약한 타이브레이커 수준을 안정적으로 유지한다.
+    return state.hands[player].filter(function (cardId) {
+      return getLegalMoves(state, cardId, player).length > 0;
+    }).length;
   }
 
   function evaluate(state, forPlayer) {
@@ -226,8 +232,19 @@
 
   function allActions(state) {
     const player = state.turn;
+    const hand = state.hands[player];
+    // 손에 있는 카드 중 하나라도 실제로 이동 가능하다면, 이동 불가능한 카드를
+    // "일부러 골라서" 턴을 넘기는 선택지는 애초에 고려하지 않는다. 이 게임에서
+    // 카드가 있는데도 안 쓰는 건 규칙상 허용되지만 정상적인 수가 아니고,
+    // 카드 사이클 효과 때문에 깊은 탐색에서 패스가 실제 이동보다 더 높은 값으로
+    // 나오는 경우가 있어 그대로 두면 AI가 이유 없이 턴을 넘기는 것처럼 보인다.
+    // 양쪽 카드 모두 이동 불가능할 때만(진짜 패스가 강제될 때만) 패스를 고려한다.
+    const cardsWithMoves = hand.filter(function (cardId) {
+      return getLegalMoves(state, cardId, player).length > 0;
+    });
+    const cardsToConsider = cardsWithMoves.length ? cardsWithMoves : hand;
     const actions = [];
-    state.hands[player].forEach(function (cardId) {
+    cardsToConsider.forEach(function (cardId) {
       const moves = getLegalMoves(state, cardId, player);
       if (moves.length === 0) {
         actions.push({ cardId: cardId, pass: true });
