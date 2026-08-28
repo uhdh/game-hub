@@ -603,10 +603,13 @@ test('applyMove throws on an illegal destination', () => {
 
 test('applyPass cycles the card and passes the turn when no legal move exists', () => {
   let s = E.createInitialState('P1');
-  s.pieces = [{ id: 'a', owner: 'P1', col: 2, row: 2, facing: 1 }, { id: 'b', owner: 'P1', col: 2, row: 3, facing: 1 }];
+  s.pieces = [
+    { id: 'a', owner: 'P1', col: 2, row: 2, facing: 1 },
+    { id: 'b', owner: 'P2', col: 4, row: 4, facing: -1 },
+  ];
   s.hands = { P1: ['jumper', 'bishop'], P2: ['knight', 'attacker'] };
   s.waiting = 'rook';
-  // jumper: 인접 8칸 중 아무것도 없으면 이동 불가
+  // jumper: 인접 8칸에 아무 말도 없으면 이동 불가 (상대 말은 멀리 떨어져 있어 인접하지 않음)
   const moves = E.getLegalMoves(s, 'jumper', 'P1');
   assert.equal(moves.length, 0);
   const next = E.applyPass(s, 'jumper');
@@ -662,21 +665,25 @@ test('jumper converts to queen once total pieces drop to 2', () => {
   assert.equal(next.jumperConverted, true);
 });
 
-test('castle win: opponent piece sits on my castle at the end of my turn, and I fail to remove it during my turn', () => {
-  let s = E.createInitialState('P1'); // P1=선, 매 턴: P1 -> P2 -> P1 ...
-  // P2 말 하나를 P1의 성(0,2)에 미리 세워둔다 (자기 칸을 비우고 걸어 들어온 것으로 가정)
-  s.pieces = s.pieces.filter(p => !(p.owner === 'P1' && p.row === 2)); // P1 자신의 성 칸 말 제거(비워둠)
+test('castle win: opponent piece sits on my castle, and I fail to remove it during my turn', () => {
+  // finishTurn의 castleFlag는 "그 플레이어가 자기 턴을 마칠 때" 스냅샷된다. 따라서 승리가 감지되려면
+  // 먼저 침입한 쪽(P2)이 성을 점유한 채로 자기 턴을 한 번 마쳐 castleFlag.P2를 세우고, 그다음 상대(P1)가
+  // 침입자를 못 잡고 턴을 마쳐야 한다 — 그 두 번째 이동이 끝나 턴이 P2로 넘어가는 순간 승리가 확정된다.
+  // 그래서 이 시나리오는 P2가 먼저 두는 것으로 시작해야 한다(P1이 먼저 두면 한 번 더 왕복해야 함).
+  let s = E.createInitialState('P2'); // 이 테스트 한정으로 P2가 먼저 둔다
+  // P2 말 하나를 P2의 성(0,2)에 미리 세워둔다 (원래 그 자리에 있던 P1 말은 비워둔 것으로 취급)
+  s.pieces = s.pieces.filter(p => !(p.owner === 'P1' && p.row === 2));
   s.pieces = s.pieces.map(p => p.owner === 'P2' && p.row === 2 ? Object.assign({}, p, { col: 0, row: 2 }) : p);
   s.hands = { P1: ['rook', 'bishop'], P2: ['knight', 'jumper'] };
   s.waiting = 'attacker';
-  // P1 턴: 성 칸의 침입자를 못 잡는 다른 수를 둔다 (관계없는 말 이동)
-  const mover = s.pieces.find(p => p.owner === 'P1' && p.row === 0);
-  let next = E.applyMove(s, 'rook', { col: mover.col, row: mover.row }, { col: mover.col, row: mover.row === 0 ? 1 : 0 });
-  assert.equal(next.winner, null); // 아직 P2 턴이 안 끝났으니 승리 아님
-  assert.equal(next.turn, 'P2');
-  // P2 턴: 침입 말과 무관한 수를 둔다 (성 칸 유지)
-  const p2Mover = next.pieces.find(p => p.owner === 'P2' && p.row === 4);
-  next = E.applyMove(next, 'knight', { col: p2Mover.col, row: p2Mover.row }, E.getLegalMoves(next, 'knight', 'P2').find(m => m.pieceId === p2Mover.id).to);
+  // P2 턴: 성 점유와 무관한 수를 둬서 castleFlag.P2를 세운다
+  const p2Mover = s.pieces.find(p => p.owner === 'P2' && p.row === 4);
+  let next = E.applyMove(s, 'knight', { col: p2Mover.col, row: p2Mover.row }, E.getLegalMoves(s, 'knight', 'P2').find(m => m.pieceId === p2Mover.id).to);
+  assert.equal(next.winner, null); // 아직 P1 턴이 안 끝났으니 승리 아님
+  assert.equal(next.turn, 'P1');
+  // P1 턴: 침입자를 못 잡는 무관한 수를 둔다 (성 칸 유지)
+  const p1Mover = next.pieces.find(p => p.owner === 'P1' && p.row === 4);
+  next = E.applyMove(next, 'rook', { col: p1Mover.col, row: p1Mover.row }, { col: p1Mover.col + 1, row: p1Mover.row });
   assert.equal(next.winner, 'P2');
   assert.equal(next.winReason, 'castle');
 });
