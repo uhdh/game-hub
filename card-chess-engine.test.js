@@ -134,3 +134,23 @@ test('queen movement (post-conversion) covers all 8 adjacent cells from board ce
   const moves = E.getLegalMoves(s, 'jumper', 'P1');
   assert.equal(moves.length, 8);
 });
+
+test('applyDraft assigns hands and leaves exactly one waiting card', () => {
+  const s = E.createInitialState('P1'); // P1=선, P2=후
+  const next = E.applyDraft(s, ['knight', 'jumper'], ['attacker', 'bishop']);
+  assert.deepEqual(next.hands.P2, ['knight', 'jumper']);
+  assert.deepEqual(next.hands.P1, ['attacker', 'bishop']);
+  assert.equal(next.waiting, 'rook');
+});
+
+test('applyDraft throws on duplicate or wrong-count cards', () => {
+  const s = E.createInitialState('P1');
+  assert.throws(() => E.applyDraft(s, ['knight', 'knight'], ['attacker', 'bishop']));
+  assert.throws(() => E.applyDraft(s, ['knight'], ['attacker', 'bishop']));
+});
+
+test('chooseAiDraft ranks knight/jumper for self, attacker/bishop for opponent, rook waits', () => {
+  const draft = E.chooseAiDraft();
+  assert.deepEqual(draft.secondCards.slice().sort(), ['jumper', 'knight']);
+  assert.deepEqual(draft.firstCards.slice().sort(), ['attacker', 'bishop']);
+});

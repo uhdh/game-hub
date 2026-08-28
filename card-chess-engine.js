@@ -111,6 +111,41 @@
     return moves;
   }
 
+  const CARD_POWER = { knight: 5, jumper: 4, attacker: 3, bishop: 2, rook: 1 };
+
+  function cloneState(state) {
+    return {
+      pieces: state.pieces.map(function (p) { return Object.assign({}, p); }),
+      hands: { P1: state.hands.P1.slice(), P2: state.hands.P2.slice() },
+      waiting: state.waiting,
+      turn: state.turn,
+      turnCount: state.turnCount,
+      castleFlag: Object.assign({}, state.castleFlag),
+      jumperConverted: state.jumperConverted,
+      winner: state.winner,
+      winReason: state.winReason,
+    };
+  }
+
+  function applyDraft(state, secondCards, firstCards) {
+    const used = secondCards.concat(firstCards);
+    if (used.length !== 4) throw new Error('secondCards + firstCards must total 4 cards');
+    if (new Set(used).size !== 4) throw new Error('duplicate card in draft');
+    const first = state.turn;
+    const second = other(first);
+    const waiting = CARD_IDS.filter(function (c) { return used.indexOf(c) === -1; })[0];
+    const next = cloneState(state);
+    next.hands[second] = secondCards.slice();
+    next.hands[first] = firstCards.slice();
+    next.waiting = waiting;
+    return next;
+  }
+
+  function chooseAiDraft() {
+    const sorted = CARD_IDS.slice().sort(function (a, b) { return CARD_POWER[b] - CARD_POWER[a]; });
+    return { secondCards: sorted.slice(0, 2), firstCards: sorted.slice(2, 4) };
+  }
+
   return {
     CARD_IDS: CARD_IDS,
     CASTLE: CASTLE,
@@ -119,5 +154,7 @@
     isHoldingCastle: isHoldingCastle,
     createInitialState: createInitialState,
     getLegalMoves: getLegalMoves,
+    applyDraft: applyDraft,
+    chooseAiDraft: chooseAiDraft,
   };
 });
