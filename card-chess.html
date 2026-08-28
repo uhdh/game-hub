@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>카드체스 - 피의 게임 X 시뮬레이터</title>
+<link rel="icon" type="image/png" href="./assets/favicon.png">
+<script src="./card-chess-engine.js"></script>
+<style>
+  :root {
+    --bg: #0f0f12;
+    --panel: #15181c;
+    --panel-light: #1c2024;
+    --border: rgba(255,255,255,.08);
+    --text: #e7ebee;
+    --text-dim: #8992a0;
+    --accent: #5fb8b0;
+    --accent-hover: #7fcac3;
+    --danger: #e0786f;
+    --gold: #ffd166;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); min-height: 100vh; }
+  a { color: var(--accent); text-decoration: none; }
+  #app {
+    min-height: 100vh; display: flex; justify-content: center;
+    padding: 24px 16px 48px;
+    font-family: -apple-system, "Pretendard", "Segoe UI", "Malgun Gothic", sans-serif;
+    color: var(--text);
+  }
+  .col { width: 100%; max-width: 460px; display: flex; flex-direction: column; gap: 16px; }
+  .header-row { display: flex; align-items: center; justify-content: space-between; }
+  .home-link { font-size: 12.5px; font-weight: 700; color: var(--text-dim); }
+  .title { font-size: 18px; font-weight: 800; }
+
+  .screen { display: flex; flex-direction: column; gap: 16px; }
+  .screen.hidden { display: none; }
+
+  .rules-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
+  .rules-title { font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .04em; }
+  .rules-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--text-dim); line-height: 1.5; }
+
+  .nickname-row { display: flex; gap: 8px; align-items: center; }
+  .nickname-row label { font-size: 12.5px; color: var(--text-dim); flex-shrink: 0; }
+  #nickname-input { flex: 1; background: var(--panel-light); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 9px 10px; font-size: 13.5px; }
+
+  .btn-primary { background: var(--accent); color: #0f1214; font-size: 14px; font-weight: 700; border: none; padding: 12px 18px; border-radius: 12px; cursor: pointer; }
+  .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-secondary { background: var(--panel-light); color: var(--text); font-size: 13.5px; font-weight: 700; border: 1px solid var(--border); padding: 10px 14px; border-radius: 12px; cursor: pointer; }
+
+  .status-bar { text-align: center; font-size: 13px; font-weight: 700; color: var(--gold); min-height: 18px; }
+
+  .table-layout {
+    display: grid;
+    grid-template-columns: 62px 1fr 62px;
+    grid-template-rows: auto auto;
+    gap: 10px;
+    align-items: center;
+    justify-items: center;
+  }
+  .wait-slot-wrap { grid-column: 1 / 4; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .hand-left { grid-column: 1; grid-row: 2; display: flex; flex-direction: column; gap: 10px; }
+  .hand-right { grid-column: 3; grid-row: 2; display: flex; flex-direction: column; gap: 10px; }
+  .board-wrap { grid-column: 2; grid-row: 2; }
+
+  .card-slot {
+    width: 58px; height: 82px;
+    background: var(--panel-light);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: 10.5px; font-weight: 700; text-align: center; gap: 4px;
+    padding: 4px;
+    cursor: default;
+  }
+  .card-slot.selectable { cursor: pointer; border-color: var(--accent); }
+  .card-slot.selected { background: rgba(95,184,176,.22); border-color: var(--accent); }
+  .card-slot .card-icon { font-size: 18px; }
+  .card-slot .card-label-tiny { font-size: 9px; color: var(--text-dim); }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(5, 50px);
+    grid-template-rows: repeat(5, 50px);
+    gap: 2px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2px;
+  }
+  .cell {
+    background: var(--panel);
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+  .cell.castle { background: rgba(255,209,102,.10); box-shadow: inset 0 0 0 2px rgba(255,209,102,.5); }
+  .cell.highlight-piece { box-shadow: inset 0 0 0 2px var(--accent); cursor: pointer; }
+  .cell.highlight-dest { background: rgba(95,184,176,.22); cursor: pointer; }
+  .piece {
+    width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800;
+    border: 2px solid rgba(0,0,0,.3);
+  }
+  .piece.owner-P1 { background: #5fb8b0; color: #0f1214; }
+  .piece.owner-P2 { background: #e0786f; color: #23090a; }
+
+  .rules-summary { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; font-size: 11.5px; color: var(--text-dim); line-height: 1.6; }
+
+  .modal { position: fixed; inset: 0; background: rgba(6,7,9,.75); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 50; }
+  .modal.hidden { display: none; }
+  .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; padding: 28px 24px; max-width: 320px; width: 100%; display: flex; flex-direction: column; gap: 10px; text-align: center; }
+  .modal-title { font-size: 20px; font-weight: 800; }
+  .modal-reason { font-size: 13px; color: var(--text-dim); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="col">
+    <div class="header-row">
+      <a href="./index.html" class="home-link">← 게임 허브</a>
+      <span class="title">카드체스</span>
+      <button type="button" class="btn-secondary" id="new-game-btn" style="display:none;">새 게임</button>
+    </div>
+
+    <div id="screen-start" class="screen">
+      <div class="rules-card">
+        <div class="rules-title">규칙 요약</div>
+        <ul class="rules-list">
+          <li>5×5 보드, 말 5개씩. 매 턴 카드 2장 중 하나로 말 1개를 이동합니다.</li>
+          <li>록: 상하좌우 1칸 · 비숍: 대각선 1칸 · 나이트: 체스 나이트 이동 · 어태커: 전진 1~2칸 또는 대각선-전진 1칸 · 점퍼: 인접한 말을 넘어 2칸 이동(말 2개 남으면 퀸으로 전환)</li>
+          <li>상대 말을 모두 잡거나, 상대 성 칸에 말을 올리고 상대가 한 턴 동안 쫓아내지 못하면 승리합니다.</li>
+        </ul>
+      </div>
+      <div class="nickname-row">
+        <label for="nickname-input">닉네임</label>
+        <input type="text" id="nickname-input" maxlength="20" placeholder="비워두면 랜덤 배정">
+      </div>
+      <button type="button" class="btn-primary" id="start-btn">게임 시작</button>
+    </div>
+
+    <div id="screen-game" class="screen hidden">
+      <div class="status-bar" id="status-bar"></div>
+      <div class="table-layout">
+        <div class="wait-slot-wrap">
+          <span class="card-label-tiny">대기</span>
+          <div class="card-slot" id="wait-slot"></div>
+        </div>
+        <div class="hand-left" id="hand-P1"></div>
+        <div class="board-wrap">
+          <div class="board" id="board"></div>
+        </div>
+        <div class="hand-right" id="hand-P2"></div>
+      </div>
+      <div class="rules-summary">
+        록: 상하좌우 1칸 · 비숍: 대각선 1칸 · 어태커: 전진 1~2칸/대각선-전진 1칸 · 나이트: 체스 나이트 · 점퍼: 인접 말 넘어 2칸(말 2개 남으면 퀸: 8방향 1칸)
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="win-modal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-title" id="win-title"></div>
+    <div class="modal-reason" id="win-reason"></div>
+    <button type="button" class="btn-primary" id="win-restart-btn">새 게임</button>
+  </div>
+</div>
+
+<script>
+  const E = window.CardChessEngine;
+  const CARD_LABELS = { rook: ['♜', '록'], bishop: ['♝', '비숍'], attacker: ['⚔️', '어태커'], knight: ['♞', '나이트'], jumper: ['⛓️', '점퍼'], queen: ['♛', '퀸'] };
+
+  function cardDisplay(state, cardId) {
+    const kind = (cardId === 'jumper' && state.jumperConverted) ? 'queen' : cardId;
+    return CARD_LABELS[kind];
+  }
+
+  let state = null;
+
+  function randomNickname() {
+    const pool = ['이상민', '정근우', '박지민', '이태균', '하승진', '현성주', '윤비', '이진형', '홍진호', '서출구', '최혜선', '허성범', '김경훈', '김유현', '김남희', '강지후', '곽범', '이관희', '신승용', '덕후'];
+    const word = pool[Math.floor(Math.random() * pool.length)];
+    return `${word}#${Math.floor(Math.random() * 999) + 1}`;
+  }
+
+  const nicknameInput = document.getElementById('nickname-input');
+  const savedNickname = localStorage.getItem('cardChessNickname');
+  nicknameInput.value = savedNickname || '';
+
+  function startGame() {
+    const nickname = nicknameInput.value.trim() || randomNickname();
+    localStorage.setItem('cardChessNickname', nickname);
+    window.cardChessNickname = nickname;
+
+    const first = Math.random() < 0.5 ? 'P1' : 'P2';
+    state = E.createInitialState(first);
+    const second = E.other(first);
+    if (second === 'P2') {
+      const draft = E.chooseAiDraft();
+      state = E.applyDraft(state, draft.secondCards, draft.firstCards);
+    }
+    // second === 'P1'(사람)인 경우의 드래프트 UI는 Task 9에서 추가한다. 이 태스크에서는
+    // AI가 후공(second==='P2')인 케이스만 즉시 진행하고, 사람이 후공인 케이스는 그대로
+    // 게임 화면에 진입하되 손패가 비어 있는 상태로 보여준다(Task 9에서 드래프트 UI로 채움).
+
+    document.getElementById('screen-start').classList.add('hidden');
+    document.getElementById('screen-game').classList.remove('hidden');
+    document.getElementById('new-game-btn').style.display = '';
+    render();
+  }
+
+  function render() {
+    renderCardSlot('wait-slot', state.waiting, false);
+    renderHand('hand-P1', 'P1');
+    renderHand('hand-P2', 'P2');
+    renderBoard();
+    document.getElementById('status-bar').textContent = state.hands.P1.length === 0
+      ? '카드 배분 대기 중'
+      : (state.turn === 'P1' ? '당신의 차례' : 'AI 차례');
+  }
+
+  function renderCardSlot(elId, cardId, selectable) {
+    const el = document.getElementById(elId);
+    if (!cardId) { el.innerHTML = ''; return; }
+    const [icon, label] = cardDisplay(state, cardId);
+    el.innerHTML = `<span class="card-icon">${icon}</span><span class="card-label-tiny">${label}</span>`;
+    el.classList.toggle('selectable', !!selectable);
+  }
+
+  function renderHand(elId, player) {
+    const el = document.getElementById(elId);
+    el.innerHTML = '';
+    (state.hands[player] || []).forEach(function (cardId, idx) {
+      const slot = document.createElement('div');
+      slot.className = 'card-slot';
+      const [icon, label] = cardDisplay(state, cardId);
+      slot.innerHTML = `<span class="card-icon">${icon}</span><span class="card-label-tiny">${label}</span>`;
+      el.appendChild(slot);
+    });
+  }
+
+  function renderBoard() {
+    const boardEl = document.getElementById('board');
+    boardEl.innerHTML = '';
+    for (let row = 0; row < 5; row++) {
+      for (let col = 0; col < 5; col++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.dataset.col = col;
+        cell.dataset.row = row;
+        const isCastle = (E.CASTLE.P1.col === col && E.CASTLE.P1.row === row) || (E.CASTLE.P2.col === col && E.CASTLE.P2.row === row);
+        if (isCastle) cell.classList.add('castle');
+        const piece = state.pieces.find(function (p) { return p.col === col && p.row === row; });
+        if (piece) {
+          const div = document.createElement('div');
+          div.className = 'piece owner-' + piece.owner;
+          div.textContent = piece.owner === 'P1' ? (piece.facing === 1 ? '▶' : '◀') : (piece.facing === 1 ? '▶' : '◀');
+          cell.appendChild(div);
+        }
+        boardEl.appendChild(cell);
+      }
+    }
+  }
+
+  document.getElementById('start-btn').addEventListener('click', startGame);
+  document.getElementById('new-game-btn').addEventListener('click', function () {
+    document.getElementById('screen-game').classList.add('hidden');
+    document.getElementById('screen-start').classList.remove('hidden');
+    document.getElementById('new-game-btn').style.display = 'none';
+  });
+</script>
+</body>
+</html>
