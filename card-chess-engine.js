@@ -146,6 +146,61 @@
     return { secondCards: sorted.slice(0, 2), firstCards: sorted.slice(2, 4) };
   }
 
+  function cycleCards(state, cardId, mover) {
+    const hand = state.hands[mover];
+    if (hand.indexOf(cardId) === -1) throw new Error('card not in hand');
+    const remaining = hand.filter(function (c) { return c !== cardId; });
+    state.hands[mover] = [remaining[0], state.waiting];
+    state.waiting = cardId;
+  }
+
+  function finishTurn(state, mover) {
+    const opp = other(mover);
+    if (!state.jumperConverted && (countAlive(state, 'P1') + countAlive(state, 'P2')) <= 2) {
+      state.jumperConverted = true;
+    }
+    if (countAlive(state, opp) === 0) {
+      state.winner = mover;
+      state.winReason = 'elimination';
+      return state;
+    }
+    state.castleFlag[mover] = isHoldingCastle(state, mover);
+    state.turn = opp;
+    state.turnCount += 1;
+    if (state.castleFlag[opp] && isHoldingCastle(state, opp)) {
+      state.winner = opp;
+      state.winReason = 'castle';
+    }
+    return state;
+  }
+
+  function applyMove(state, cardId, from, to) {
+    const legal = getLegalMoves(state, cardId);
+    const match = legal.find(function (m) {
+      return m.from.col === from.col && m.from.row === from.row && m.to.col === to.col && m.to.row === to.row;
+    });
+    if (!match) throw new Error('illegal move');
+    const mover = state.turn;
+    const next = cloneState(state);
+    const piece = next.pieces.find(function (p) { return p.col === from.col && p.row === from.row && p.owner === mover; });
+    next.pieces = next.pieces.filter(function (p) { return !(p.col === to.col && p.row === to.row); });
+    piece.col = to.col;
+    piece.row = to.row;
+    if (piece.facing === 1 && piece.col === 4) piece.facing = -1;
+    else if (piece.facing === -1 && piece.col === 0) piece.facing = 1;
+    cycleCards(next, cardId, mover);
+    return finishTurn(next, mover);
+  }
+
+  function applyPass(state, cardId) {
+    const mover = state.turn;
+    const legal = getLegalMoves(state, cardId);
+    if (legal.length !== 0) throw new Error('cannot pass: legal moves exist for this card');
+    const next = cloneState(state);
+    cycleCards(next, cardId, mover);
+    return finishTurn(next, mover);
+  }
+
   return {
     CARD_IDS: CARD_IDS,
     CASTLE: CASTLE,
@@ -156,5 +211,7 @@
     getLegalMoves: getLegalMoves,
     applyDraft: applyDraft,
     chooseAiDraft: chooseAiDraft,
+    applyMove: applyMove,
+    applyPass: applyPass,
   };
 });
