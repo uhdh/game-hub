@@ -1294,6 +1294,13 @@ Run: `python -m http.server 8787` (프로젝트 루트에서)
 
 Expected: 게임 화면으로 전환되고 5×5 보드에 양쪽 말 5개씩(색 다름, 방향 화살표 표시)이 보임. 성 칸(각 진영 시작열 가운데 칸, 정확히는 자기 진영 시작열 3번째 행) 배경이 강조 표시됨. AI(P2)가 후공으로 뽑히면(약 50% 확률) 우측 카드 슬롯 2장과 대기 슬롯 1장이 즉시 채워짐 — 여러 번 새로고침해 양쪽 경우(사람이 후공일 때는 카드 슬롯이 비어 보이는 것)를 모두 확인.
 
+- [ ] **Step 3: 커밋**
+
+```bash
+git add card-chess.html
+git commit -m "feat: 카드체스 HTML 뼈대 - 시작 화면 + 보드/카드 정적 렌더링"
+```
+
 ---
 
 ## Task 9: 드래프트 UI + 턴 상호작용 (카드 → 말 → 목적지 선택, 패스 처리)
@@ -1535,6 +1542,13 @@ Expected: 상단에 "카드 5장 중 자신이 가질 카드 2장을 선택하�
 
 이동 가능한 말이 없는 카드를 클릭하면 확인창이 뜨고, 확인 시 턴이 그대로 넘어가는지도 확인.
 
+- [ ] **Step 3: 커밋**
+
+```bash
+git add card-chess.html
+git commit -m "feat: 카드체스 드래프트 UI + 턴 상호작용"
+```
+
 ---
 
 ## Task 10: AI 자동 진행 다듬기 + 승리 모달 + Supabase 리더보드
@@ -1623,6 +1637,13 @@ select nickname, rating, wins, losses from public.card_chess_leaderboard order b
 ```
 
 Expected: 방금 플레이한 닉네임 행이 승/패에 맞게 `wins`/`losses`/`rating`이 갱신되어 있음.
+
+- [ ] **Step 4: 커밋**
+
+```bash
+git add card-chess.html
+git commit -m "feat: 카드체스 AI 자동 진행 + 승리 모달 + Supabase 리더보드"
+```
 
 ---
 
