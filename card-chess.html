@@ -69,6 +69,7 @@
   }
   .card-slot.selectable { cursor: pointer; border-color: var(--accent); }
   .card-slot.selected { background: rgba(95,184,176,.22); border-color: var(--accent); }
+  .card-slot.unusable { opacity: .4; cursor: default; }
   .card-slot .card-icon { font-size: 18px; }
   img.card-icon { width: 30px; height: 30px; object-fit: contain; }
   .card-slot .card-label-tiny { font-size: 9px; color: var(--text-dim); }
@@ -271,6 +272,12 @@
       if (isMyTurnCard) {
         slot.classList.add('selectable');
         if (selection.cardId === cardId) slot.classList.add('selected');
+        if (!selection.cardId && selection.from) {
+          const usable = E.getLegalMoves(state, cardId, 'P1').some(function (m) {
+            return m.from.col === selection.from.col && m.from.row === selection.from.row;
+          });
+          if (!usable) slot.classList.add('unusable');
+        }
         slot.addEventListener('click', function () { onCardClick(cardId); });
       }
       el.appendChild(slot);
@@ -278,6 +285,16 @@
   }
 
   function onCardClick(cardId) {
+    if (selection.from) {
+      // 말 먼저 선택된 상태: 이 카드로 그 말을 이동할 수 있을 때만 카드 선택을 완료한다.
+      const canMoveThisPiece = E.getLegalMoves(state, cardId, 'P1').some(function (m) {
+        return m.from.col === selection.from.col && m.from.row === selection.from.row;
+      });
+      if (!canMoveThisPiece) return;
+      selection.cardId = cardId;
+      render();
+      return;
+    }
     selection = { cardId: cardId, from: null };
     const moves = E.getLegalMoves(state, cardId, 'P1');
     if (moves.length === 0) {
@@ -311,7 +328,21 @@
     if (state.winner) return;
     if (draftState) return;
     if (state.turn !== 'P1') return;
-    if (!selection.cardId) return;
+    if (!selection.cardId) {
+      // 카드가 아직 없으면 "말 먼저 선택" 흐름: 내 말이고, 손패 카드 중 하나로라도
+      // 이동시킬 수 있는 말일 때만 선택한다.
+      const piece = state.pieces.find(function (p) { return p.col === col && p.row === row; });
+      if (!piece || piece.owner !== 'P1') return;
+      const canMoveWithSomeCard = state.hands.P1.some(function (c) {
+        return E.getLegalMoves(state, c, 'P1').some(function (m) { return m.from.col === col && m.from.row === row; });
+      });
+      if (!canMoveWithSomeCard) return;
+      selection.from = (selection.from && selection.from.col === col && selection.from.row === row)
+        ? null
+        : { col: col, row: row };
+      render();
+      return;
+    }
     const moves = E.getLegalMoves(state, selection.cardId, 'P1');
     if (!selection.from) {
       const hasMoveFromHere = moves.some(function (m) { return m.from.col === col && m.from.row === row; });
@@ -365,6 +396,7 @@
           cell.appendChild(mark);
         }
         if (!selection.from && pieceCells.has(key)) cell.classList.add('highlight-piece');
+        if (!selection.cardId && selection.from && selection.from.col === col && selection.from.row === row) cell.classList.add('highlight-piece');
         if (destCells.indexOf(key) !== -1) cell.classList.add('highlight-dest');
         if (lastMove && lastMove.from.col === col && lastMove.from.row === row) cell.classList.add('last-move-from');
         if (lastMove && lastMove.to.col === col && lastMove.to.row === row) cell.classList.add('last-move-to');
