@@ -70,6 +70,7 @@
   .card-slot.selectable { cursor: pointer; border-color: var(--accent); }
   .card-slot.selected { background: rgba(95,184,176,.22); border-color: var(--accent); }
   .card-slot .card-icon { font-size: 18px; }
+  img.card-icon { width: 30px; height: 30px; object-fit: contain; }
   .card-slot .card-label-tiny { font-size: 9px; color: var(--text-dim); }
 
   .board {
@@ -94,13 +95,13 @@
   .cell.last-move-from { border: 2px solid var(--gold); }
   .cell.last-move-to { border: 2px solid var(--gold); background: rgba(255,209,102,.16); }
   .piece {
-    width: 34px; height: 34px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 14px; font-weight: 800;
+    width: 26px; height: 26px; border-radius: 50% 50% 50% 0;
     border: 2px solid rgba(0,0,0,.3);
   }
-  .piece.owner-P1 { background: #5fb8b0; color: #0f1214; }
-  .piece.owner-P2 { background: #e0786f; color: #23090a; }
+  .piece.facing-down { transform: rotate(45deg); }
+  .piece.facing-up { transform: rotate(225deg); }
+  .piece.owner-P1 { background: #5fb8b0; }
+  .piece.owner-P2 { background: #e0786f; }
 
   .rules-summary { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; font-size: 11.5px; color: var(--text-dim); line-height: 1.6; }
 
@@ -165,11 +166,24 @@
 
 <script>
   const E = window.CardChessEngine;
-  const CARD_LABELS = { rook: ['♜', '록'], bishop: ['♝', '비숍'], attacker: ['⚔️', '어태커'], knight: ['♞', '나이트'], jumper: ['⛓️', '점퍼'], queen: ['♛', '퀸'] };
+  const CARD_LABELS = {
+    rook: ['./assets/cards/rook.png', '록'],
+    bishop: ['./assets/cards/bishop.png', '비숍'],
+    attacker: ['./assets/cards/attacker.png', '어태커'],
+    knight: ['./assets/cards/knight.png', '나이트'],
+    jumper: ['./assets/cards/jumper.png', '점퍼'],
+    queen: ['♛', '퀸'],
+  };
 
   function cardDisplay(state, cardId) {
     const kind = (cardId === 'jumper' && state.jumperConverted) ? 'queen' : cardId;
     return CARD_LABELS[kind];
+  }
+
+  function iconMarkup(icon) {
+    return icon.endsWith('.png')
+      ? `<img class="card-icon" src="${icon}" alt="">`
+      : `<span class="card-icon">${icon}</span>`;
   }
 
   let state = null;
@@ -240,7 +254,7 @@
     const el = document.getElementById(elId);
     if (!cardId) { el.innerHTML = ''; el.classList.remove('selectable', 'selected'); return; }
     const [icon, label] = cardDisplay(state, cardId);
-    el.innerHTML = `<span class="card-icon">${icon}</span><span class="card-label-tiny">${label}</span>`;
+    el.innerHTML = `${iconMarkup(icon)}<span class="card-label-tiny">${label}</span>`;
     el.classList.toggle('selectable', !!selectable);
     el.classList.toggle('selected', selection.cardId === cardId);
   }
@@ -252,7 +266,7 @@
       const slot = document.createElement('div');
       slot.className = 'card-slot';
       const [icon, label] = cardDisplay(state, cardId);
-      slot.innerHTML = `<span class="card-icon">${icon}</span><span class="card-label-tiny">${label}</span>`;
+      slot.innerHTML = `${iconMarkup(icon)}<span class="card-label-tiny">${label}</span>`;
       const isMyTurnCard = player === 'P1' && state.turn === 'P1' && !state.winner;
       if (isMyTurnCard) {
         slot.classList.add('selectable');
@@ -358,8 +372,7 @@
         const piece = state.pieces.find(function (p) { return p.col === col && p.row === row; });
         if (piece) {
           const div = document.createElement('div');
-          div.className = 'piece owner-' + piece.owner;
-          div.textContent = piece.facing === 1 ? '▲' : '▼';
+          div.className = 'piece owner-' + piece.owner + ' facing-' + (piece.facing === 1 ? 'up' : 'down');
           cell.appendChild(div);
         }
         boardEl.appendChild(cell);
@@ -406,7 +419,7 @@
       const slot = document.createElement('div');
       slot.className = 'card-slot selectable';
       const [icon, label] = cardDisplay(state, cardId);
-      slot.innerHTML = `<span class="card-icon">${icon}</span><span class="card-label-tiny">${label}</span>`;
+      slot.innerHTML = `${iconMarkup(icon)}<span class="card-label-tiny">${label}</span>`;
       slot.addEventListener('click', function () { onDraftPick(cardId); });
       picker.appendChild(slot);
     });
