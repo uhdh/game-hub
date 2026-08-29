@@ -46,19 +46,19 @@
 
   .table-layout {
     display: grid;
-    grid-template-columns: 62px 1fr 62px;
+    grid-template-columns: minmax(48px, 62px) minmax(0, 1fr) minmax(48px, 62px);
     grid-template-rows: auto auto;
     gap: 10px;
     align-items: center;
     justify-items: center;
   }
   .wait-slot-wrap { grid-column: 1 / 4; display: flex; flex-direction: column; align-items: center; gap: 4px; }
-  .hand-left { grid-column: 1; grid-row: 2; display: flex; flex-direction: column; gap: 10px; }
-  .hand-right { grid-column: 3; grid-row: 2; display: flex; flex-direction: column; gap: 10px; }
-  .board-wrap { grid-column: 2; grid-row: 2; }
+  .hand-left { grid-column: 1; grid-row: 2; display: flex; flex-direction: column; gap: 10px; min-width: 0; width: 100%; }
+  .hand-right { grid-column: 3; grid-row: 2; display: flex; flex-direction: column; gap: 10px; min-width: 0; width: 100%; }
+  .board-wrap { grid-column: 2; grid-row: 2; min-width: 0; width: 100%; display: flex; justify-content: center; }
 
   .card-slot {
-    width: 58px; height: 82px;
+    width: 58px; max-width: 100%; height: 82px;
     background: var(--panel-light);
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -76,9 +76,11 @@
 
   .board {
     display: grid;
-    grid-template-columns: repeat(5, 50px);
-    grid-template-rows: repeat(5, 50px);
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(5, 1fr);
     gap: 2px;
+    width: min(262px, 100%);
+    aspect-ratio: 1;
     background: var(--border);
     border: 1px solid var(--border);
     border-radius: 8px;
