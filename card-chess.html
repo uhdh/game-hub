@@ -372,7 +372,7 @@
         const piece = state.pieces.find(function (p) { return p.col === col && p.row === row; });
         if (piece) {
           const div = document.createElement('div');
-          div.className = 'piece owner-' + piece.owner + ' facing-' + (piece.facing === 1 ? 'up' : 'down');
+          div.className = 'piece owner-' + piece.owner + ' facing-' + (piece.owner === 'P1' ? 'up' : 'down');
           cell.appendChild(div);
         }
         boardEl.appendChild(cell);
