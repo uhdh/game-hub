@@ -18,6 +18,7 @@
     --accent-hover: #7fcac3;
     --danger: #e0786f;
     --gold: #ffd166;
+    --castle: #7c9bff;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: var(--bg); min-height: 100vh; }
@@ -35,14 +36,6 @@
 
   .screen { display: flex; flex-direction: column; gap: 16px; }
   .screen.hidden { display: none; }
-
-  .rules-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
-  .rules-title { font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .04em; }
-  .rules-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--text-dim); line-height: 1.5; }
-
-  .nickname-row { display: flex; gap: 8px; align-items: center; }
-  .nickname-row label { font-size: 12.5px; color: var(--text-dim); flex-shrink: 0; }
-  #nickname-input { flex: 1; background: var(--panel-light); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 9px 10px; font-size: 13.5px; }
 
   .btn-primary { background: var(--accent); color: #0f1214; font-size: 14px; font-weight: 700; border: none; padding: 12px 18px; border-radius: 12px; cursor: pointer; }
   .btn-primary:disabled { opacity: .4; cursor: not-allowed; }
@@ -94,7 +87,8 @@
     display: flex; align-items: center; justify-content: center;
     position: relative;
   }
-  .cell.castle { background: rgba(255,209,102,.10); box-shadow: inset 0 0 0 2px rgba(255,209,102,.5); }
+  .cell.castle { background: rgba(124,155,255,.12); box-shadow: inset 0 0 0 2px rgba(124,155,255,.55); }
+  .cell.castle .castle-mark { position: absolute; top: 2px; left: 3px; font-size: 10px; line-height: 1; color: var(--castle); pointer-events: none; }
   .cell.highlight-piece { box-shadow: inset 0 0 0 2px var(--accent); cursor: pointer; }
   .cell.highlight-dest { background: rgba(95,184,176,.22); cursor: pointer; }
   .cell.last-move-from { border: 2px solid var(--gold); }
@@ -136,23 +130,7 @@
       <button type="button" class="btn-secondary" id="new-game-btn" style="display:none;">새 게임</button>
     </div>
 
-    <div id="screen-start" class="screen">
-      <div class="rules-card">
-        <div class="rules-title">규칙 요약</div>
-        <ul class="rules-list">
-          <li>5×5 보드, 말 5개씩. 매 턴 카드 2장 중 하나로 말 1개를 이동합니다.</li>
-          <li>록: 상하좌우 1칸 · 비숍: 대각선 1칸 · 나이트: 체스 나이트 이동 · 어태커: 전진 1~2칸 또는 대각선-전진 1칸 · 점퍼: 인접한 말을 넘어 2칸 이동(말 2개 남으면 퀸으로 전환)</li>
-          <li>상대 말을 모두 잡거나, 상대 성 칸에 말을 올리고 상대가 한 턴 동안 쫓아내지 못하면 승리합니다.</li>
-        </ul>
-      </div>
-      <div class="nickname-row">
-        <label for="nickname-input">닉네임</label>
-        <input type="text" id="nickname-input" maxlength="20" placeholder="비워두면 랜덤 배정">
-      </div>
-      <button type="button" class="btn-primary" id="start-btn">게임 시작</button>
-    </div>
-
-    <div id="screen-game" class="screen hidden">
+    <div id="screen-game" class="screen">
       <div class="status-bar" id="status-bar"></div>
       <div class="table-layout">
         <div class="wait-slot-wrap">
@@ -202,10 +180,6 @@
     return `${word}#${Math.floor(Math.random() * 999) + 1}`;
   }
 
-  const nicknameInput = document.getElementById('nickname-input');
-  const savedNickname = localStorage.getItem('cardChessNickname');
-  nicknameInput.value = savedNickname || '';
-
   let selection = { cardId: null, from: null };
   let draftState = null; // { pending: string[], self: string[], opponent: string[], picking: 'self'|'opponent' }
   let lastMove = null; // { from: {col,row}, to: {col,row} } | null - 가장 최근 이동(패스 제외)
@@ -233,7 +207,7 @@
   }
 
   function startGame() {
-    const nickname = nicknameInput.value.trim() || randomNickname();
+    const nickname = localStorage.getItem('cardChessNickname') || randomNickname();
     localStorage.setItem('cardChessNickname', nickname);
     window.cardChessNickname = nickname;
 
@@ -246,8 +220,6 @@
     lastHumanMoveSnapshot = null;
     takebackUsed = false;
 
-    document.getElementById('screen-start').classList.add('hidden');
-    document.getElementById('screen-game').classList.remove('hidden');
     document.getElementById('new-game-btn').style.display = '';
     document.getElementById('takeback-btn').style.display = '';
     updateTakebackButton();
@@ -295,6 +267,15 @@
     selection = { cardId: cardId, from: null };
     const moves = E.getLegalMoves(state, cardId, 'P1');
     if (moves.length === 0) {
+      const otherHasMoves = state.hands.P1.some(function (c) {
+        return c !== cardId && E.getLegalMoves(state, c, 'P1').length > 0;
+      });
+      if (otherHasMoves) {
+        window.alert('이 카드로 이동할 수 있는 말이 없습니다. 다른 카드를 사용하세요.');
+        selection = { cardId: null, from: null };
+        render();
+        return;
+      }
       const ok = window.confirm('이 카드로 이동할 수 있는 말이 없습니다. 그대로 턴을 넘길까요?');
       if (ok) {
         const label = cardDisplay(state, cardId)[1];
@@ -362,7 +343,13 @@
         cell.className = 'cell';
         const key = col + ',' + row;
         const isCastle = (E.CASTLE.P1.col === col && E.CASTLE.P1.row === row) || (E.CASTLE.P2.col === col && E.CASTLE.P2.row === row);
-        if (isCastle) cell.classList.add('castle');
+        if (isCastle) {
+          cell.classList.add('castle');
+          const mark = document.createElement('div');
+          mark.className = 'castle-mark';
+          mark.textContent = '♜';
+          cell.appendChild(mark);
+        }
         if (!selection.from && pieceCells.has(key)) cell.classList.add('highlight-piece');
         if (destCells.indexOf(key) !== -1) cell.classList.add('highlight-dest');
         if (lastMove && lastMove.from.col === col && lastMove.from.row === row) cell.classList.add('last-move-from');
@@ -536,10 +523,7 @@
   document.getElementById('win-restart-btn').addEventListener('click', function () {
     cancelAiTimer();
     document.getElementById('win-modal').classList.add('hidden');
-    document.getElementById('screen-game').classList.add('hidden');
-    document.getElementById('screen-start').classList.remove('hidden');
-    document.getElementById('new-game-btn').style.display = 'none';
-    document.getElementById('takeback-btn').style.display = 'none';
+    startGame();
   });
 
   document.getElementById('takeback-btn').addEventListener('click', function () {
@@ -554,14 +538,12 @@
     render();
   });
 
-  document.getElementById('start-btn').addEventListener('click', startGame);
   document.getElementById('new-game-btn').addEventListener('click', function () {
     cancelAiTimer();
-    document.getElementById('screen-game').classList.add('hidden');
-    document.getElementById('screen-start').classList.remove('hidden');
-    document.getElementById('new-game-btn').style.display = 'none';
-    document.getElementById('takeback-btn').style.display = 'none';
+    startGame();
   });
+
+  startGame();
 </script>
 </body>
 </html>
