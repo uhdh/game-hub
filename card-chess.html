@@ -199,12 +199,15 @@
   let draftState = null; // { pending: string[], self: string[], opponent: string[], picking: 'self'|'opponent' }
   let lastMove = null; // { from: {col,row}, to: {col,row} } | null - 가장 최근 이동(패스 제외)
   let moveLog = []; // { text: string, mine: boolean }[]
-  let lastHumanMoveSnapshot = null; // 내 직전 수를 두기 전 state (1회 무르기용)
+  let lastHumanMoveSnapshot = null; // 내 직전 수를 두기 전 state (무르기용)
   let takebackUsed = false; // 이번 판에서 무르기를 썼는지 - 쓰면 랭킹 미등록
+  let takebackCount = 0; // 이번 판에서 무르기를 쓴 횟수 (최대 3회)
+  const TAKEBACK_MAX = 3;
 
   function updateTakebackButton() {
     const btn = document.getElementById('takeback-btn');
-    btn.disabled = !lastHumanMoveSnapshot || !!(state && state.winner);
+    btn.disabled = !lastHumanMoveSnapshot || takebackCount >= TAKEBACK_MAX || !!(state && state.winner);
+    btn.textContent = '무르기 (' + (TAKEBACK_MAX - takebackCount) + '/' + TAKEBACK_MAX + ')';
   }
 
   function logMove(text, mine) {
@@ -234,6 +237,7 @@
     renderLog();
     lastHumanMoveSnapshot = null;
     takebackUsed = false;
+    takebackCount = 0;
 
     document.getElementById('new-game-btn').style.display = '';
     document.getElementById('takeback-btn').style.display = '';
@@ -262,7 +266,7 @@
 
   function renderHand(elId, player) {
     const el = document.getElementById(elId);
-    el.innerHTML = '';
+    el.innerHTML = `<span class="card-label-tiny">${player === 'P1' ? '내 카드' : '상대 카드'}</span>`;
     (state.hands[player] || []).forEach(function (cardId) {
       const slot = document.createElement('div');
       slot.className = 'card-slot';
@@ -320,6 +324,12 @@
         render();
       }
       return;
+    }
+    // 내 말이 하나만 남았으면 어느 카드를 골라도 그 말밖에 움직일 수 없으니
+    // 말 선택 단계를 생략하고 바로 도착 칸 선택으로 넘어간다.
+    const myPieces = state.pieces.filter(function (p) { return p.owner === 'P1'; });
+    if (myPieces.length === 1) {
+      selection.from = { col: myPieces[0].col, row: myPieces[0].row };
     }
     render();
   }
@@ -572,11 +582,12 @@
   });
 
   document.getElementById('takeback-btn').addEventListener('click', function () {
-    if (!lastHumanMoveSnapshot) return;
+    if (!lastHumanMoveSnapshot || takebackCount >= TAKEBACK_MAX) return;
     cancelAiTimer();
     state = lastHumanMoveSnapshot;
     lastHumanMoveSnapshot = null;
     takebackUsed = true;
+    takebackCount += 1;
     selection = { cardId: null, from: null };
     lastMove = null;
     logMove('무르기 사용 (직전 내 수를 취소했습니다)', true);
