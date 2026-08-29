@@ -96,11 +96,11 @@
   .cell.last-move-from { border: 2px solid var(--gold); }
   .cell.last-move-to { border: 2px solid var(--gold); background: rgba(255,209,102,.16); }
   .piece {
-    width: 26px; height: 26px; border-radius: 50% 50% 50% 0;
-    border: 2px solid rgba(0,0,0,.3);
+    width: 24px; height: 24px;
+    clip-path: path('M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z');
+    filter: drop-shadow(0 1px 1.5px rgba(0,0,0,.45));
   }
-  .piece.facing-down { transform: rotate(90deg); }
-  .piece.facing-up { transform: rotate(270deg); }
+  .piece.facing-up { transform: scaleY(-1); }
   .piece.owner-P1 { background: #5fb8b0; }
   .piece.owner-P2 { background: #e0786f; }
 
