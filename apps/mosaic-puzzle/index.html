@@ -1204,7 +1204,7 @@
   const LB_SECTIONS = [
     {
       label: '카드체스',
-      fetch: (limit) => fetchSimpleTop('card_chess_leaderboard', 'nickname,rating,wins,losses', 'rating.desc', limit),
+      fetch: (limit) => fetchSimpleTop('card_chess_leaderboard?nickname=not.like.wordgame*', 'nickname,rating,wins,losses', 'rating.desc', limit),
       format: r => `${r.wins}승 ${r.losses}패 · ${r.rating}점`,
     },
     {
