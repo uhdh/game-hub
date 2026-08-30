@@ -271,6 +271,7 @@
   }
 
   let currentDifficulty = localStorage.getItem('cardChessDifficulty') || 'easy';
+  let activeGameDifficulty = currentDifficulty;
 
   function setDifficulty(diff) {
     currentDifficulty = diff;
@@ -287,6 +288,7 @@
   }
 
   function startGame() {
+    activeGameDifficulty = currentDifficulty;
     const nickname = localStorage.getItem('cardChessNickname') || randomNickname();
     localStorage.setItem('cardChessNickname', nickname);
     window.cardChessNickname = nickname;
@@ -608,6 +610,7 @@
   }
 
   async function recordResult(won) {
+    if (activeGameDifficulty !== 'hard' || takebackUsed) return;
     const nickname = window.cardChessNickname;
     try {
       const existing = await fetchPlayerRating(nickname);
@@ -661,14 +664,14 @@
     if (takebackUsed) {
       noteEl.textContent = '무르기를 사용한 판이라 리더보드에는 반영되지 않습니다.';
       noteEl.style.display = '';
-    } else if (currentDifficulty !== 'hard') {
+    } else if (activeGameDifficulty !== 'hard') {
       noteEl.textContent = '리더보드 점수는 🔴 고수 난이도 판만 반영됩니다.';
       noteEl.style.display = '';
     } else {
       noteEl.style.display = 'none';
     }
     document.getElementById('win-modal').classList.remove('hidden');
-    if (!takebackUsed && currentDifficulty === 'hard') recordResult(won);
+    if (!takebackUsed && activeGameDifficulty === 'hard') recordResult(won);
   }
 
   document.getElementById('win-restart-btn').addEventListener('click', function () {
@@ -697,7 +700,11 @@
 
   document.querySelectorAll('.diff-btn').forEach(function (btn) {
     btn.addEventListener('click', function () {
-      setDifficulty(this.dataset.diff);
+      if (currentDifficulty !== this.dataset.diff) {
+        setDifficulty(this.dataset.diff);
+        cancelAiTimer();
+        startGame();
+      }
     });
   });
   setDifficulty(currentDifficulty);
