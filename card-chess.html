@@ -575,7 +575,7 @@
     const el = document.getElementById('lb-list');
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/card_chess_leaderboard?select=nickname,rating,wins,losses&order=rating.desc&limit=10`,
+        `${SUPABASE_URL}/rest/v1/card_chess_leaderboard?nickname=not.like.wordgame*&select=nickname,rating,wins,losses&order=rating.desc&limit=10`,
         { headers: sbHeaders() }
       );
       if (!res.ok) throw new Error('리더보드 조회 실패');
