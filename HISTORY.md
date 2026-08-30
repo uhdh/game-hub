@@ -13,6 +13,17 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 
 ---
 
+## 2026-08-30 10:01 — Antigravity — 게임 방법 안내 UI 개선 (빨강 힌트 배지 색상 적용, 회전 예시 분리, 모음 결합 예시 추가)
+- 변경 파일: `wordgame.html`, `assets/index-Cl_gRNEi.js`, `assets/index-Bwk44QJv.css`, `HISTORY.md`
+- 구현 내용:
+  - 힌트 색상 안내 항목의 '빨강' 텍스트에 초록/노랑과 동일하게 빨간색 배경 뱃지(`bg-red`) 적용.
+  - 자모 회전 예시에서 붙어있어 헷갈리던 `ㄱ ↔ ㄴ`과 `ㅣ ↔ ㅡ`를 별도 줄로 명확히 분리.
+  - 이중 모음 결합 안내를 위한 `✨ 모음 결합 예시` 섹션(ㅗ+ㅏ→와, ㅜ+ㅓ→워, ㅡ+ㅣ→의, ㅏ+ㅣ→애) 신설.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+
 ## 2026-08-30 09:57 — Antigravity — 언어의 조각 리더보드 백엔드 연동 정상화 (card_chess_leaderboard 기반 복합 식별자 적용)
 - 변경 파일: `index.html`, `wordgame.html`, `assets/index-DguvvTdg.js`, `HISTORY.md`
 - 구현 내용:
