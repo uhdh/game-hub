@@ -1,5 +1,30 @@
 # 작업 히스토리
 
+Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 **맨 위에** 새 항목을 추가한다 (최신이 위로 오도록 append). 지침은 `AGENTS.md` 참고.
+
+항목 형식:
+
+```
+## YYYY-MM-DD HH:mm — <에이전트 이름> — <한 줄 요약>
+- 변경 파일: ...
+- 배포: (했다면 어디까지 — 로컬 커밋만 / game-hub push까지 / Vercel 배포 확인까지. 안 했다면 "미배포")
+- 다음 작업/미해결: ...
+```
+
+---
+
+## 2026-08-30 15:27 — Antigravity — NYT Games (Figma Community Kit) 디자인 시스템 기반 UI 전면 재건축
+- 변경 파일: `wordgame.html`, `assets/index-DAtVoYsb.css`, `assets/index-BFPPMvaD.js`, `HISTORY.md`
+- 구현 내용:
+  - 뉴욕타임스 게임즈(Wordle, Connections, Spelling Bee)의 오리지널 디자인 가이드라인 반영:
+    - **타이포그래피**: `Lora` 세리프 서체 헤더(`언어의 조각`) 및 깔끔한 산세리프 타일 폰트 적용.
+    - **색상 시스템**: NYT 매트 딥 다크 모드(`#121213`), Wordle 정답 그린(`#538d4e`), 포함 옐로우(`#b59f3b`), 시그니처 옐로우 골드(`#f7da21`) 적용.
+    - **타일 & 컴포넌트**: 2px 테두리의 정교한 타일 칩, 둥근 캡슐형 아웃라인 버튼 및 스티키 서리유리 헤더 디자인 시스템 재건축.
+  - 웹 배포 및 안드로이드 Capacitor APK(app-debug.apk) 빌드 갱신 동기화 완료.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
 ## 2026-08-30 15:03 — Antigravity — 언어의 조각 모바일 터치 UX 최적화 (탭 회전/드래그 이동 직관화)
 - 변경 파일: `wordgame.html`, `assets/index-DXCZle_K.css`, `assets/index-DlpabusD.js`, `HISTORY.md`
 - 구현 내용:
