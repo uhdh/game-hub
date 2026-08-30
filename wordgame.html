@@ -11,8 +11,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800;900&family=Outfit:wght@600;700;800;900&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="./assets/index-BMQuxTyc.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-CExGSnHE.css">
+  <script type="module" crossorigin src="./assets/index-Esrru9Ov.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DXCZle_K.css">
 </head>
 <body>
   <div id="app" class="game-container">
@@ -44,6 +44,9 @@
         </div>
 
         <div class="header-actions">
+          <button id="btnShareStage" class="icon-btn" title="현재 단계 URL 공유하기" aria-label="단계 공유">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+          </button>
           <button id="btnLeaderboard" class="icon-btn" title="전체 랭킹" aria-label="랭킹">
             🏆
           </button>
@@ -311,8 +314,9 @@
       </div>
     </div>
 
-    <!-- Confetti Canvas -->
+    <!-- Confetti Canvas & Toast Notification -->
     <canvas id="confettiCanvas" class="confetti-canvas"></canvas>
+    <div id="toastNotification" class="toast-notification"></div>
   </div>
 
 </body>
