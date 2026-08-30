@@ -13,6 +13,16 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 
 ---
 
+## 2026-08-30 15:29 — Antigravity — 웹 버전 <언어의 조각> 기존 게임 허브 원본 디자인 유지 원복
+- 변경 파일: `wordgame.html`, `assets/index-DXCZle_K.css`, `assets/index-DlpabusD.js`, `HISTORY.md`
+- 구현 내용:
+  - 웹버전 게임 디자인을 변경하지 말라는 사용자 요구에 따라, 웹버전은 기존 게임 허브의 시그니처 테마(티일/민트 앰비언트 글로우, 오리지널 카드 및 헤더)로 완전 원복 유지.
+  - 최신 구현된 모바일 탭 회전/드래그 전용 이동 UX 및 스테이지별 URL 공유 기능(`?stage=N`)은 100% 정상 보존.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+
 ## 2026-08-30 15:27 — Antigravity — NYT Games (Figma Community Kit) 디자인 시스템 기반 UI 전면 재건축
 - 변경 파일: `wordgame.html`, `assets/index-DAtVoYsb.css`, `assets/index-BFPPMvaD.js`, `HISTORY.md`
 - 구현 내용:
