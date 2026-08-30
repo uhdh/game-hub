@@ -1,5 +1,13 @@
 # 작업 히스토리
 
+## 2026-08-30 10:18 — Antigravity — 카드체스 배경 Ambient Glow 제거 및 매트 블랙(#0b0c0e) 단색 배경 적용
+- 변경 파일: `card-chess.html`, `HISTORY.md`
+- 구현 내용:
+  - 사용자 피드백에 따라 배경의 Ambient Glow 조명 효과를 모두 제거하고, 시인성이 높고 눈이 편안한 딥 블랙(#0b0c0e) 매트 단색 배경으로 변경.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
 ## 2026-08-30 10:16 — Antigravity — 카드체스 UI/UX 전면 개편 (게임 허브 통합 다크 디자인 시스템 적용)
 - 변경 파일: `card-chess.html`, `HISTORY.md`
 - 구현 내용:
