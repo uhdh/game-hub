@@ -1163,6 +1163,20 @@
     return response.json();
   }
 
+  async function fetchWordgameTop(limit) {
+    const res = await fetch(
+      `${LB_SUPABASE_URL}/rest/v1/card_chess_leaderboard?nickname=like.wordgame:*&select=nickname,rating,wins&order=rating.desc,updated_at.asc&limit=${limit}`,
+      { headers: lbHeaders() }
+    );
+    if (!res.ok) throw new Error('언어의 조각 리더보드 조회 실패');
+    const rows = await res.json();
+    return rows.map(r => ({
+      nickname: (r.nickname || '').replace(/^wordgame:/, ''),
+      score: r.rating || 0,
+      stages: r.wins || 0
+    }));
+  }
+
   const LB_SECTIONS = [
     {
       label: '카드체스',
@@ -1211,8 +1225,8 @@
     },
     {
       label: '언어의 조각',
-      fetch: (limit) => fetchSimpleTop('wordgame_leaderboard', 'nickname,score', 'score.desc,created_at.asc', limit),
-      format: r => `${r.score}점`,
+      fetch: (limit) => fetchWordgameTop(limit),
+      format: r => `${r.stages}단계 클리어 · ${r.score}점`,
     },
   ];
 
