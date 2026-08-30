@@ -28,28 +28,8 @@
     --radius-sm: 8px;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; background: var(--bg); min-height: 100vh; overflow-x: hidden; }
+  html, body { margin: 0; padding: 0; background: #0b0c0e; min-height: 100vh; overflow-x: hidden; }
   a { color: var(--accent); text-decoration: none; }
-  
-  /* Ambient Lighting Glows */
-  .ambient-glow {
-    position: fixed;
-    border-radius: 50%;
-    filter: blur(100px);
-    pointer-events: none;
-    z-index: 0;
-    opacity: 0.15;
-  }
-  .glow-1 {
-    width: 340px; height: 340px;
-    background: var(--accent);
-    top: -80px; left: -80px;
-  }
-  .glow-2 {
-    width: 380px; height: 380px;
-    background: #9b87f5;
-    bottom: -100px; right: -100px;
-  }
 
   #app {
     position: relative;
@@ -347,9 +327,6 @@
 </style>
 </head>
 <body>
-  <div class="ambient-glow glow-1"></div>
-  <div class="ambient-glow glow-2"></div>
-
   <div id="app">
     <div class="col">
       <!-- App Header Bar -->
