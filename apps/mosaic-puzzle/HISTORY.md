@@ -1,5 +1,14 @@
 # 작업 히스토리
 
+## 2026-08-30 14:15 — Antigravity — 구글 플레이 스토어 제출용 개인정보 처리방침 페이지(privacy.html) 및 그래픽 자산 추가
+- 변경 파일: `privacy.html`, `HISTORY.md`
+- 구현 내용:
+  - 구글 플레이 콘솔 필수 입력 항목인 개인정보 처리방침 웹 페이지(`privacy.html`)를 생성하여 Vercel 프로덕션 URL(`https://pgamex.vercel.app/privacy.html`)로 배포.
+  - 플레이 스토어 등록용 512x512 고해상도 앱 아이콘 및 1024x500 메인 그래픽 이미지 배너 생성.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
 ## 2026-08-30 12:19 — Antigravity — 언어의 조각 스테이지별 URL 공유 기능 추가 (`?stage=N` 파라미터 동기화)
 - 변경 파일: `wordgame.html`, `assets/index-DXCZle_K.css`, `assets/index-Esrru9Ov.js`, `HISTORY.md`
 - 구현 내용:
