@@ -761,6 +761,20 @@
       target: '_self',
       emoji: '🔨',
     },
+    {
+      name: '언어의 조각',
+      desc: '한글 자음, 모음 타일을 회전하고 배치하여 정답 단어를 찾는 100단계 퍼즐',
+      href: './wordgame.html',
+      target: '_self',
+      emoji: '🧩',
+    },
+    {
+      name: '돈벌레 게임',
+      desc: '베팅하고 굴려서 배당을 노려보세요',
+      href: 'https://cockroach-gambling-board.web.app/',
+      target: '_self',
+      image: './assets/donbeolle-1.png',
+    },
   ];
 
   const list = document.getElementById('game-list');
@@ -1200,6 +1214,11 @@
     {
       label: '모자이크 퍼즐',
       fetch: (limit) => fetchSimpleTop('color_connect_leaderboard', 'nickname,score', 'score.desc,created_at.asc', limit),
+      format: r => `${r.score}점`,
+    },
+    {
+      label: '언어의 조각',
+      fetch: (limit) => fetchSimpleTop('wordgame_leaderboard', 'nickname,score', 'score.desc,created_at.asc', limit),
       format: r => `${r.score}점`,
     },
   ];
