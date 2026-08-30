@@ -1,5 +1,14 @@
 # 작업 히스토리
 
+## 2026-08-30 10:14 — Antigravity — 카드체스 시작 난이도(activeGameDifficulty) 고정 및 리더보드 예외 차단 강화
+- 변경 파일: `card-chess.html`, `HISTORY.md`
+- 구현 내용:
+  - 판 시작 시점의 난이도를 `activeGameDifficulty` 변수로 고정(Lock)하여, 게임 도중 난이도를 변경하거나 로컬스토리지 상태가 엇갈리더라도 초보/보통 판의 승패가 리더보드에 반영되는 현상을 이중 차단.
+  - `recordResult()` 함수 맨 상단에 `if (activeGameDifficulty !== 'hard') return;` 가드 클로즈를 추가하고, 난이도 버튼 클릭 시 새 게임이 즉시 시작되도록 개편.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
 ## 2026-08-30 10:12 — Antigravity — 카드체스 리더보드 점수 등록을 '🔴 고수' 난이도로 제한
 - 변경 파일: `card-chess.html`, `HISTORY.md`
 - 구현 내용:
