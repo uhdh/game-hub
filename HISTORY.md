@@ -13,6 +13,15 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 
 ---
 
+## 2026-08-30 10:03 — Antigravity — 허브 카드 목록 내 카드체스 & 언어의 조각 NEW 뱃지 표시 추가
+- 변경 파일: `index.html`, `HISTORY.md`
+- 구현 내용:
+  - 사용자 요청에 따라 메인 허브 화면(`index.html`)의 신규 게임 카드인 '카드체스' 및 '언어의 조각' 제목 옆에 레드 샌드위치 그라데이션의 `NEW` 뱃지 시각 효과 추가.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+
 ## 2026-08-30 10:01 — Antigravity — 게임 방법 안내 UI 개선 (빨강 힌트 배지 색상 적용, 회전 예시 분리, 모음 결합 예시 추가)
 - 변경 파일: `wordgame.html`, `assets/index-Cl_gRNEi.js`, `assets/index-Bwk44QJv.css`, `HISTORY.md`
 - 구현 내용:
