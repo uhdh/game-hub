@@ -1,5 +1,14 @@
 # 작업 히스토리
 
+## 2026-08-30 10:24 — Antigravity — 카드체스 '새 게임' 클릭 시 완전 리셋 및 무작위 카드 셔플 분배 보완
+- 변경 파일: `card-chess.html`, `HISTORY.md`
+- 구현 내용:
+  - '새 게임' 시 AI가 생각 중이던 기존 비동기 타이머가 새 게임에 개입하던 현상을 방지하기 위해 `startGame()` 시작 시 `cancelAiTimer()` 즉시 호출.
+  - 드래프트 UI 불일치 문제로 카드 분배가 고정되거나 누락되던 현상을 해결하고, 매 게임 시작 시 5개의 체스 카드를 완전 무작위 셔플하여 P1(2장), P2(2장), 대기슬롯(1장)으로 100% 새로 분배하도록 개선.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
 ## 2026-08-30 10:21 — Antigravity — 언어의 조각 1단계(쉬움) 단어 리스트 교체 (미나리, 개나리, 달무리 삭제)
 - 변경 파일: `wordgame.html`, `assets/index-CXUCwkYZ.js`, `HISTORY.md`
 - 구현 내용:
