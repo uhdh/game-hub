@@ -13,6 +13,16 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 
 ---
 
+## 2026-08-30 09:39 — Antigravity — 돈벌레 게임 허브 목록 제거 및 보유 타일 줄바꿈 레이아웃 전환
+- 변경 파일: `index.html` (돈벌레 게임 카드 제거), `wordgame.html`, `assets/index-Bx4HFt6m.js`, `assets/index-CO8mZaiR.css`, `HISTORY.md`
+- 구현 내용:
+  - 사용자의 요청에 따라 허브 메인 화면(`index.html`)의 `GAMES` 목록에서 돈벌레 게임 항목 제거.
+  - `wordgame` 보유 타일 카드에서 타일이 많을 때 가로 스크롤 대신 다줄 줄바꿈(`flex-wrap: wrap`)으로 표시되도록 CSS 수정.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+
 ## 2026-08-30 09:35 — Antigravity — '언어의 조각' 신규 게임 추가, 하드코어 워들 제거, 게임 허브 테마 통일 및 Supabase 랭킹 시스템 구축
 - 변경 파일: `index.html` (게임 허브 메인 카드 목록 및 리더보드 항목 추가), `wordgame.html` (언어의 조각 퍼즐 게임 빌드본 통합), `assets/index-BwMblmWZ.js`, `assets/index-DLQnN-4L.css`, `HISTORY.md`
 - 구현 내용:
