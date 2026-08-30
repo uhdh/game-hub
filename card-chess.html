@@ -661,11 +661,14 @@
     if (takebackUsed) {
       noteEl.textContent = '무르기를 사용한 판이라 리더보드에는 반영되지 않습니다.';
       noteEl.style.display = '';
+    } else if (currentDifficulty !== 'hard') {
+      noteEl.textContent = '리더보드 점수는 🔴 고수 난이도 판만 반영됩니다.';
+      noteEl.style.display = '';
     } else {
       noteEl.style.display = 'none';
     }
     document.getElementById('win-modal').classList.remove('hidden');
-    if (!takebackUsed) recordResult(won);
+    if (!takebackUsed && currentDifficulty === 'hard') recordResult(won);
   }
 
   document.getElementById('win-restart-btn').addEventListener('click', function () {
