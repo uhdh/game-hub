@@ -13,6 +13,18 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 
 ---
 
+## 2026-08-30 10:16 — Antigravity — 카드체스 UI/UX 전면 개편 (게임 허브 통합 다크 디자인 시스템 적용)
+- 변경 파일: `card-chess.html`, `HISTORY.md`
+- 구현 내용:
+  - 기존의 단조롭고 깨져 보이던 UI를 게임 허브 통일 디자인 시스템(Pretendard 폰트, Ambient Glow 은은한 배경 조명, 세련된 헤더 카드)으로 전면 리뉴얼.
+  - '내 카드'/'상대 카드' 텍스트가 좁아서 세로로 줄바꿈(`내 카/드`)되던 레이아웃 이격 현상을 컬럼 너비 조정(minmax 72px) 및 `white-space: nowrap` 적용으로 해결.
+  - Floating 턴 텍스트와 '대기' 카드가 포개지던 위치 간섭을 독립된 상태 바 뱃지(`status-bar-wrap`)로 분리.
+  - 세그먼티드 피크 디자인의 난이도 선택 바, 체스판 글래스모피즘 외곽 프레임, 카드 슬롯 그림자 및 네온 하이라이트 시각 효과 강화.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+
 ## 2026-08-30 10:14 — Antigravity — 카드체스 시작 난이도(activeGameDifficulty) 고정 및 리더보드 예외 차단 강화
 - 변경 파일: `card-chess.html`, `HISTORY.md`
 - 구현 내용:
