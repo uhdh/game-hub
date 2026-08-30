@@ -1,5 +1,14 @@
 # 작업 히스토리
 
+## 2026-08-30 10:11 — Antigravity — 카드체스 3단계 난이도 시스템 도입 (🟢 초보 모드 신설)
+- 변경 파일: `card-chess.html`, `card-chess-engine.js`, `HISTORY.md`
+- 구현 내용:
+  - 기존 높은 AI 탐색 깊이(Depth 4)로 인해 입문자에게 어렵던 난이도를 개선하기 위해 3단계 난이도 선택 바(🟢 초보 / 🟡 보통 / 🔴 고수) 추가.
+  - 🟢 초보 모드: 1-ply 수 읽기(Depth 1) + 수비적 드래프트 카드 랜덤화 + AI RATING 1000 적용으로 초보자도 쉽게 즐기고 승리 경험을 쌓을 수 있도록 조정.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
 ## 2026-08-30 10:05 — Antigravity — 카드체스 리더보드 격리 및 언어의 조각 테스팅 데이터 정리
 - 변경 파일: `card-chess.html`, `index.html`, `HISTORY.md`
 - 구현 내용:
