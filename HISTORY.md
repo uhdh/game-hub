@@ -13,6 +13,17 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 
 ---
 
+## 2026-08-30 12:17 — Antigravity — 언어의 조각 모바일(스마트폰) UI 레이아웃 반응형 최적화
+- 변경 파일: `wordgame.html`, `assets/index-CExGSnHE.css`, `assets/index-BMQuxTyc.js`, `HISTORY.md`
+- 구현 내용:
+  - 스마트폰 화면(375px~390px)에서 타일 7개 중 1개만 2행으로 넘어가서 어색하게 짤리던 현상을 타일 크기 가변화(`clamp(35px, 10.5vw, 44px)`) 및 갭/여백 최적화로 해결 (7개 타일이 1줄에 깔끔히 수평 배치됨).
+  - 스크롤 시 상단 헤더(`← 허브`, `STAGE`, 버튼)가 화면 밖으로 넘어가서 숨겨지던 불편함을 `position: sticky; top: 4px;` 고정으로 해결.
+  - 모바일에서 타일 랙 안내 텍스트 간섭을 정리하고, 프리뷰 박스 및 패널 여백을 줄여 세로 스크롤 없이 플레이할 수 있도록 최적화.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+
 ## 2026-08-30 10:24 — Antigravity — 카드체스 '새 게임' 클릭 시 완전 리셋 및 무작위 카드 셔플 분배 보완
 - 변경 파일: `card-chess.html`, `HISTORY.md`
 - 구현 내용:
