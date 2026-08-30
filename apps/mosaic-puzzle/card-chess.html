@@ -476,6 +476,7 @@
   }
 
   function startGame() {
+    cancelAiTimer();
     activeGameDifficulty = currentDifficulty;
     const nickname = localStorage.getItem('cardChessNickname') || randomNickname();
     localStorage.setItem('cardChessNickname', nickname);
@@ -495,16 +496,13 @@
     document.getElementById('takeback-btn').style.display = '';
     updateTakebackButton();
 
-    const second = E.other(first);
-    if (second === 'P2') {
-      const draft = E.chooseAiDraft(currentDifficulty);
-      state = E.applyDraft(state, draft.secondCards, draft.firstCards);
-      draftState = null;
-      afterStateChange();
-    } else {
-      draftState = { pending: E.CARD_IDS.slice(), self: [], picking: 'self' };
-      render();
-    }
+    // 매 새 게임 시작 시 5개 카드를 무작위로 셔플하여 2장 P1, 2장 P2, 1장 대기슬롯으로 분배
+    const shuffled = E.CARD_IDS.slice().sort(function () { return Math.random() - 0.5; });
+    state.hands.P1 = [shuffled[0], shuffled[1]];
+    state.hands.P2 = [shuffled[2], shuffled[3]];
+    state.waiting = shuffled[4];
+
+    afterStateChange();
   }
 
   function renderCardSlot(elId, cardId, selectable) {
