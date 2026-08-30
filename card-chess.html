@@ -116,6 +116,12 @@
   .log-list .log-entry.ai { color: var(--danger); }
   .log-empty { color: var(--text-dim); font-size: 12px; }
 
+  .lb-row { display: flex; align-items: center; gap: 8px; }
+  .lb-row .no { flex: 0 0 auto; width: 16px; color: var(--text-dim); font-weight: 700; }
+  .lb-row .nick { flex: 1; min-width: 0; color: var(--text); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb-row .meta { flex: 0 0 auto; color: var(--text-dim); }
+  .lb-row.me .nick { color: var(--accent-hover); }
+
   .modal { position: fixed; inset: 0; background: rgba(6,7,9,.75); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 50; }
   .modal.hidden { display: none; }
   .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; padding: 28px 24px; max-width: 320px; width: 100%; display: flex; flex-direction: column; gap: 10px; text-align: center; }
@@ -153,6 +159,10 @@
       <div class="log-panel">
         <div class="log-title">이동 기록</div>
         <div class="log-list" id="log-list"><div class="log-empty">아직 기록이 없습니다</div></div>
+      </div>
+      <div class="log-panel">
+        <div class="log-title">리더보드 TOP 10</div>
+        <div class="log-list" id="lb-list"><div class="log-empty">불러오는 중...</div></div>
       </div>
     </div>
   </div>
@@ -555,10 +565,40 @@
       const wins = existing.wins + (won ? 1 : 0);
       const losses = existing.losses + (won ? 0 : 1);
       await upsertPlayerRating(nickname, newRating, wins, losses);
+      loadLeaderboard();
     } catch (e) {
       // 리더보드 기록 실패는 게임 결과 표시를 막지 않는다
     }
   }
+
+  async function loadLeaderboard() {
+    const el = document.getElementById('lb-list');
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/card_chess_leaderboard?select=nickname,rating,wins,losses&order=rating.desc&limit=10`,
+        { headers: sbHeaders() }
+      );
+      if (!res.ok) throw new Error('리더보드 조회 실패');
+      const rows = await res.json();
+      if (!rows.length) {
+        el.innerHTML = '<div class="log-empty">아직 등록된 기록이 없습니다</div>';
+        return;
+      }
+      el.innerHTML = rows.map(function (r, idx) {
+        const mine = r.nickname === window.cardChessNickname;
+        return `
+          <div class="lb-row${mine ? ' me' : ''}">
+            <span class="no">${idx + 1}</span>
+            <span class="nick">${r.nickname}</span>
+            <span class="meta">${r.wins}승 ${r.losses}패 · ${r.rating}점</span>
+          </div>
+        `;
+      }).join('');
+    } catch (e) {
+      el.innerHTML = '<div class="log-empty">불러오지 못했습니다</div>';
+    }
+  }
+  loadLeaderboard();
 
   function showWinModal() {
     const won = state.winner === 'P1';

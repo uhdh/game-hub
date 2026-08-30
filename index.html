@@ -1158,6 +1158,11 @@
 
   const LB_SECTIONS = [
     {
+      label: '카드체스',
+      fetch: (limit) => fetchSimpleTop('card_chess_leaderboard', 'nickname,rating,wins,losses', 'rating.desc', limit),
+      format: r => `${r.wins}승 ${r.losses}패 · ${r.rating}점`,
+    },
+    {
       label: '수식 콤보',
       fetch: (limit) => fetchFormulaTop(limit),
       format: r => `${Number(r.combo_points || (r.combos ? Math.round(r.score / r.combos) : 0)).toLocaleString('ko-KR')}점 × ${r.combos}콤보 = ${Number(r.score).toLocaleString('ko-KR')}점`,
@@ -1196,11 +1201,6 @@
       label: '모자이크 퍼즐',
       fetch: (limit) => fetchSimpleTop('color_connect_leaderboard', 'nickname,score', 'score.desc,created_at.asc', limit),
       format: r => `${r.score}점`,
-    },
-    {
-      label: '카드체스',
-      fetch: (limit) => fetchSimpleTop('card_chess_leaderboard', 'nickname,rating,wins,losses', 'rating.desc', limit),
-      format: r => `${r.wins}승 ${r.losses}패 · ${r.rating}점`,
     },
   ];
 
