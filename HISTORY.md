@@ -1,5 +1,14 @@
 # 작업 히스토리
 
+## 2026-08-30 09:51 — Antigravity — 1단계 퍼즐 난이도 조정 (무지개 1단계 전진, 금메달 25단계 이동)
+- 변경 파일: `wordgame.html`, `assets/index-Cifj3gL7.js`, `HISTORY.md`
+- 구현 내용:
+  - 기존 1단계였던 '금메달'이 시작 단계로 다소 난이도가 높다는 의견에 따라 25단계로 이동 배치.
+  - 직관적이고 쉬운 '무지개'를 1단계로 전진시키고 나머지 3글자 단어를 1단계씩 앞으로 당김.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
 ## 2026-08-30 09:50 — Antigravity — 초성 힌트 감점 및 5회 초과 제출 감점 시스템 도입
 - 변경 파일: `wordgame.html`, `assets/index-DQ7h6bzC.js`, `assets/index-D8dUu88_.css`, `HISTORY.md`
 - 구현 내용:
