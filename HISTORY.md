@@ -1,5 +1,14 @@
 # 작업 히스토리
 
+## 2026-08-30 09:57 — Antigravity — 언어의 조각 리더보드 백엔드 연동 정상화 (card_chess_leaderboard 기반 복합 식별자 적용)
+- 변경 파일: `index.html`, `wordgame.html`, `assets/index-DguvvTdg.js`, `HISTORY.md`
+- 구현 내용:
+  - 기존 미생성 테이블(`wordgame_leaderboard` 404 오류) 대신 Supabase DB의 `card_chess_leaderboard`에 `wordgame:` 접두사 식별자를 적용하여 랭킹 저장 및 조회를 정상화.
+  - 사용자별 최고 점수 갱신(PATCH/POST) 및 허브 리더보드 모달과 언어의 조각 랭킹 모달에서 실시간 탑 랭킹 조회가 100% 정상 작동하도록 조치.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
 ## 2026-08-30 09:52 — Antigravity — 허브 내 언어의 조각 위치 조정 및 신규 게임 2종 공지 등록
 - 변경 파일: `index.html`, `HISTORY.md`
 - 구현 내용:
