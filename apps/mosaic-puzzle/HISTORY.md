@@ -1,5 +1,14 @@
 # 작업 히스토리
 
+## 2026-08-30 10:12 — Antigravity — 카드체스 리더보드 점수 등록을 '🔴 고수' 난이도로 제한
+- 변경 파일: `card-chess.html`, `HISTORY.md`
+- 구현 내용:
+  - 사용자 지침에 따라 🔴 고수 난이도로 대국을 완료했을 때에만 ELO 점수가 갱신되고 리더보드에 등록되도록 조건 반영.
+  - 🟢 초보 / 🟡 보통 난이도로 승리/패배 시에는 입문 플레이 연습용으로 점수가 저장되지 않음을 팝업 안내 메시지로 표시.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
 ## 2026-08-30 10:11 — Antigravity — 카드체스 3단계 난이도 시스템 도입 (🟢 초보 모드 신설)
 - 변경 파일: `card-chess.html`, `card-chess-engine.js`, `HISTORY.md`
 - 구현 내용:
