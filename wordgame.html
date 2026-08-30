@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>언어의 조각 - 한글 단어 추리 퍼즐</title>
+  <meta name="description" content="한글 자음, 모음 타일을 회전하고 배치하여 정답 단어를 찾는 100단계 퍼즐 게임 <언어의 조각>">
+  <meta name="theme-color" content="#0f0f12">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800;900&family=Outfit:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="./assets/index-BwMblmWZ.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DLQnN-4L.css">
+</head>
+<body>
+  <div id="app" class="game-container">
+    <!-- Ambient Background Lighting -->
+    <div class="ambient-glow glow-1"></div>
+    <div class="ambient-glow glow-2"></div>
+
+    <!-- Header Section -->
+    <header class="app-header">
+      <div class="header-top">
+        <a href="./index.html" class="back-hub-btn" title="게임 허브로 돌아가기">← 허브</a>
+        <div class="header-brand">
+          <span class="brand-icon">🧩</span>
+          <h1 class="game-title">언어의 조각</h1>
+        </div>
+      </div>
+
+      <div class="header-toolbar">
+        <div class="header-stage-badge" id="roundBadge">
+          <span class="stage-prefix">STAGE</span>
+          <span class="stage-current" id="roundNumber">1</span>
+          <span class="stage-total">/100</span>
+          <span class="difficulty-pill" id="difficultyPill">쉬움</span>
+        </div>
+
+        <div class="score-pill">
+          <span class="score-label">승점</span>
+          <span class="score-val" id="scoreVal">0점</span>
+        </div>
+
+        <div class="header-actions">
+          <button id="btnLeaderboard" class="icon-btn" title="전체 랭킹" aria-label="랭킹">
+            🏆
+          </button>
+          <button id="btnStageSelect" class="icon-btn" title="단계 선택 (1~100)" aria-label="단계 선택">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
+          </button>
+          <button id="btnRules" class="icon-btn" title="게임 규칙 안내" aria-label="규칙">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </button>
+          <button id="btnSound" class="icon-btn" title="효과음 켜기/끄기" aria-label="소리">
+            <svg id="soundIconOn" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+            <svg id="soundIconOff" class="hidden" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Game Area -->
+    <main class="main-content">
+      <div id="normalModeView" class="mode-view">
+        <!-- 1. Word Target & Assembled Preview Card -->
+        <section class="target-card">
+          <div class="target-card-header">
+            <div class="target-info">
+              <span class="target-badge">정답 목표</span>
+              <span class="target-desc" id="targetDesc">3글자 (9개 타일)</span>
+            </div>
+            <button id="btnToggleHint" class="hint-toggle-btn" title="초성 힌트 확인">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              <span>초성 힌트</span>
+            </button>
+          </div>
+
+          <!-- Chosung Initial Hint Box -->
+          <div class="stage-hint-box hidden" id="stageHintBox">
+            <span class="hint-label">💡 초성:</span>
+            <span class="hint-chosung-text" id="stageHintText">ㄱ ㅁ ㄷ</span>
+          </div>
+
+          <!-- Live Assembled Word Preview Deck -->
+          <div class="assembled-word-preview">
+            <div class="preview-tag">현재 조합된 단어</div>
+            <div class="preview-word-boxes" id="previewWordBoxes">
+              <!-- Dynamically populated assembled syllables -->
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. Draggable & Swappable Tile Rack Card -->
+        <section class="tile-row-card">
+          <div class="tile-row-header">
+            <div class="tile-row-title-wrap">
+              <h2 class="tile-row-title">보유 타일</h2>
+              <span class="tile-row-hint">드래그 삽입 • 탭 교환 • 🔄 회전</span>
+            </div>
+            <div class="tile-row-actions">
+              <button id="btnShuffleTiles" class="secondary-btn small-btn" title="타일 순서 섞기">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+                <span>섞기</span>
+              </button>
+              <button id="btnResetTiles" class="secondary-btn small-btn" title="초기 상태로 되돌리기">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><polyline points="3 3 3 8 8 8"/></svg>
+                <span>초기화</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Adaptive Smart Tiles Tray -->
+          <div class="tiles-track-container" id="tilesTrackContainer">
+            <div class="tiles-track" id="tilesTrack">
+              <!-- Draggable Tile Chips rendered here -->
+            </div>
+          </div>
+
+          <!-- Submit Button Row -->
+          <div class="submit-action-bar">
+            <button id="btnSubmitGuess" class="primary-btn submit-btn" disabled>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>단어 제출</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- 3. Deduction History Board -->
+        <section class="history-section">
+          <div class="history-header">
+            <div class="history-title-wrap">
+              <h2 class="history-title">등록 기록</h2>
+              <span class="history-count" id="historyCount">0회</span>
+            </div>
+            <div class="legend-pills">
+              <span class="legend-pill pill-green"><span class="dot"></span>일치</span>
+              <span class="legend-pill pill-yellow"><span class="dot"></span>포함</span>
+              <span class="legend-pill pill-red"><span class="dot"></span>미사용</span>
+            </div>
+          </div>
+
+          <div class="history-list" id="historyList">
+            <div class="empty-history-placeholder">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 13h6M9 17h3"/></svg>
+              <p>타일을 회전하고 배치한 뒤 <strong>[단어 제출]</strong>을 눌러보세요!</p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- Modals -->
+    <!-- 1. Rules Modal -->
+    <div class="modal-overlay hidden" id="rulesModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 class="modal-title">🎲 게임 방법 안내</h2>
+          <button class="modal-close-btn" id="btnCloseRules" aria-label="닫기">×</button>
+        </div>
+        <div class="modal-body">
+          <section class="rules-section">
+            <h3>🧩 단어 조각 맞추기</h3>
+            <p>주어진 한글 자모 타일을 회전하고 배치하여 정답 단어 타일 배열을 완성하세요!</p>
+            <div class="rule-chips-row">
+              <div class="rule-chip-group">
+                <span class="rule-chip">ㄱ</span> <span class="arrow">↔</span> <span class="rule-chip">ㄴ</span>
+                <span class="rule-chip">ㅣ</span> <span class="arrow">↔</span> <span class="rule-chip">ㅡ</span>
+              </div>
+              <div class="rule-chip-group">
+                <span class="rule-chip">ㅏ</span> <span class="arrow">→</span> <span class="rule-chip">ㅜ</span> <span class="arrow">→</span> <span class="rule-chip">ㅓ</span> <span class="arrow">→</span> <span class="rule-chip">ㅗ</span>
+              </div>
+              <div class="rule-chip-group">
+                <span class="rule-chip">ㅑ</span> <span class="arrow">→</span> <span class="rule-chip">ㅠ</span> <span class="arrow">→</span> <span class="rule-chip">ㅕ</span> <span class="arrow">→</span> <span class="rule-chip">ㅛ</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="rules-section">
+            <h3>💡 제출 결과 힌트 색상</h3>
+            <div class="feedback-examples">
+              <div class="feedback-item">
+                <span class="color-box bg-green">초록</span>
+                <span>위치가 정확히 일치함</span>
+              </div>
+              <div class="feedback-item">
+                <span class="color-box bg-yellow">노랑</span>
+                <span>단어에 포함되어 있으나 위치가 다름</span>
+              </div>
+              <div class="feedback-item">
+                <span class="color-box bg-dark">회색</span>
+                <span>단어에 사용되지 않음</span>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Stage Select Modal (1 ~ 100) -->
+    <div class="modal-overlay hidden" id="stageSelectModal">
+      <div class="modal-card modal-large">
+        <div class="modal-header">
+          <h2 class="modal-title">🗺️ 단계 선택 (총 100단계)</h2>
+          <button class="modal-close-btn" id="btnCloseStageSelect" aria-label="닫기">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="stage-filter-tabs">
+            <button class="tab-btn active" data-level="all">전체</button>
+            <button class="tab-btn" data-level="쉬움">쉬움 (3글자)</button>
+            <button class="tab-btn" data-level="보통">보통 (4글자)</button>
+            <button class="tab-btn" data-level="어려움">어려움 (5글자)</button>
+            <button class="tab-btn" data-level="최고난도">최고난도 (6~7글자)</button>
+          </div>
+          <div class="stages-grid" id="stagesGrid">
+            <!-- Dynamically populated 100 stage cards -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Round Clear Modal -->
+    <div class="modal-overlay hidden" id="roundClearModal">
+      <div class="modal-card celebration-card">
+        <div class="celebration-icon">🎉</div>
+        <h2 class="modal-title" id="roundClearTitle">정답입니다!</h2>
+        <p class="celebration-subtitle" id="roundClearWord">정답: 금메달</p>
+        <div class="points-awarded-box">
+          <span>획득 승점:</span>
+          <span class="points-number" id="awardedPoints">+3점</span>
+        </div>
+        <div class="modal-btn-row">
+          <button id="btnNextRound" class="primary-btn btn-large">
+            <span>다음 단계 진행</span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+          <button id="btnOpenLeaderboardFromClear" class="secondary-btn btn-large">
+            <span>🏆 랭킹 확인</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Final Victory Modal -->
+    <div class="modal-overlay hidden" id="gameOverModal">
+      <div class="modal-card celebration-card">
+        <div class="celebration-icon" id="gameOverIcon">🏆</div>
+        <h2 class="modal-title" id="gameOverTitle">100단계 완전 정복!</h2>
+        <p class="celebration-subtitle" id="gameOverDesc">축하합니다! 100개의 모든 단어 퍼즐을 성공적으로 클리어하셨습니다.</p>
+        <div class="final-score-box">
+          <div class="score-row">
+            <span>총 획득 승점</span>
+            <strong id="finalScoreText">100점</strong>
+          </div>
+        </div>
+        <button id="btnRestartGame" class="primary-btn btn-large">
+          <span>1단계부터 다시하기</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 5. Leaderboard Modal -->
+    <div class="modal-overlay hidden" id="leaderboardModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 class="modal-title">🏆 언어의 조각 랭킹</h2>
+          <button class="modal-close-btn" id="btnCloseLeaderboard" aria-label="닫기">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="nickname-form-row">
+            <span class="nickname-label">내 닉네임:</span>
+            <input type="text" id="leaderboardNicknameInput" maxlength="20" class="nickname-input">
+            <button id="btnSubmitScore" class="primary-btn small-btn">점수 등록</button>
+          </div>
+          <div id="leaderboardStatusMsg" class="status-msg"></div>
+
+          <div class="leaderboard-container">
+            <div class="leaderboard-header-row">
+              <span class="col-rank">순위</span>
+              <span class="col-nick">닉네임</span>
+              <span class="col-score">승점</span>
+              <span class="col-stages">클리어</span>
+            </div>
+            <div class="leaderboard-list" id="leaderboardList">
+              <div class="empty-history-placeholder">불러오는 중...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confetti Canvas -->
+    <canvas id="confettiCanvas" class="confetti-canvas"></canvas>
+  </div>
+
+</body>
+</html>
