@@ -13,6 +13,15 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 
 ---
 
+## 2026-08-30 09:41 — Antigravity — 미사용(absent) 단어 제출 기록 칩 색상을 빨간색으로 수정
+- 변경 파일: `wordgame.html`, `assets/index-C6mC4px3.css`, `HISTORY.md`
+- 구현 내용:
+  - 사용자의 요청 및 제출 기록 범례(🔴 미사용)에 맞게, 단어에 사용되지 않은 타일 칩(`.history-chip.absent`)의 배경색을 기존 검은색(`#2a2e33`)에서 선명한 빨간색(`var(--color-red)`)으로 변경.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+
 ## 2026-08-30 09:39 — Antigravity — 돈벌레 게임 허브 목록 제거 및 보유 타일 줄바꿈 레이아웃 전환
 - 변경 파일: `index.html` (돈벌레 게임 카드 제거), `wordgame.html`, `assets/index-Bx4HFt6m.js`, `assets/index-CO8mZaiR.css`, `HISTORY.md`
 - 구현 내용:
