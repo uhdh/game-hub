@@ -1,5 +1,13 @@
 # 작업 히스토리
 
+## 2026-08-30 09:47 — Antigravity — 단계 클리어 및 랭킹 모달 확인 시 리더보드 점수 자동 등록 강화
+- 변경 파일: `wordgame.html`, `assets/index-B28WjMKe.js`, `HISTORY.md`
+- 구현 내용:
+  - 각 퍼즐 단계를 클리어할 때 및 🏆 랭킹 모달을 열 때 최신 승점과 클리어 단계가 Supabase 리더보드에 자동으로 전송되어 무조건 실시간 자동 등록되도록 강화.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
 ## 2026-08-30 09:44 — Antigravity — 단어 제출 시 보유 타일 카드에도 피드백 색상(초록/노랑/빨강) 반영
 - 변경 파일: `wordgame.html`, `assets/index-ChZGR3S3.js`, `assets/index-erQEZmp1.css`, `HISTORY.md`
 - 구현 내용:
