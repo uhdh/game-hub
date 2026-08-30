@@ -1,5 +1,15 @@
 # 작업 히스토리
 
+## 2026-08-30 12:19 — Antigravity — 언어의 조각 스테이지별 URL 공유 기능 추가 (`?stage=N` 파라미터 동기화)
+- 변경 파일: `wordgame.html`, `assets/index-DXCZle_K.css`, `assets/index-Esrru9Ov.js`, `HISTORY.md`
+- 구현 내용:
+  - 스테이지 진행/변경 시 브라우저 주소창 URL에 `?stage=N` 쿼리 파라미터가 자동으로 실시간 반영되도록 동기화 (`history.replaceState`).
+  - 외부에서 `https://pgamex.vercel.app/wordgame.html?stage=25` 처럼 접속 시 해당 스테이지(25단계)가 자동으로 바로 로딩되는 기능 구현.
+  - 상단 헤더 툴바에 단계 공유 버튼(`🔗`) 추가: 스마트폰에서는 시스템 공유 시트(`navigator.share`)가 연동되고, 일반 브라우저에서는 클립보드로 해당 스테이지 URL이 복사되며 토스트 알림 팝업이 표시됨.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
 ## 2026-08-30 12:17 — Antigravity — 언어의 조각 모바일(스마트폰) UI 레이아웃 반응형 최적화
 - 변경 파일: `wordgame.html`, `assets/index-CExGSnHE.css`, `assets/index-BMQuxTyc.js`, `HISTORY.md`
 - 구현 내용:
