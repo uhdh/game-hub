@@ -141,8 +141,12 @@
     return next;
   }
 
-  function chooseAiDraft() {
+  function chooseAiDraft(difficulty) {
     const sorted = CARD_IDS.slice().sort(function (a, b) { return CARD_POWER[b] - CARD_POWER[a]; });
+    if (difficulty === 'easy') {
+      const shuffled = CARD_IDS.slice().sort(function () { return Math.random() - 0.5; });
+      return { secondCards: shuffled.slice(0, 2), firstCards: shuffled.slice(2, 4) };
+    }
     return { secondCards: sorted.slice(0, 2), firstCards: sorted.slice(2, 4) };
   }
 
