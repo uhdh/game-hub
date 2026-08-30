@@ -13,6 +13,15 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 
 ---
 
+## 2026-08-30 09:44 — Antigravity — 단어 제출 시 보유 타일 카드에도 피드백 색상(초록/노랑/빨강) 반영
+- 변경 파일: `wordgame.html`, `assets/index-ChZGR3S3.js`, `assets/index-erQEZmp1.css`, `HISTORY.md`
+- 구현 내용:
+  - 사용자의 요청에 따라 [단어 제출] 시 제출한 타일 배열의 채점 결과(🟢 일치 / 🟡 포함 / 🔴 미사용)가 '보유 타일' 랙의 각 타일 카드 배경에도 즉시 하이라이트되도록 기능 추가.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+
 ## 2026-08-30 09:41 — Antigravity — 미사용(absent) 단어 제출 기록 칩 색상을 빨간색으로 수정
 - 변경 파일: `wordgame.html`, `assets/index-C6mC4px3.css`, `HISTORY.md`
 - 구현 내용:
