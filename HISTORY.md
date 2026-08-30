@@ -13,6 +13,15 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 
 ---
 
+## 2026-08-30 10:21 — Antigravity — 언어의 조각 1단계(쉬움) 단어 리스트 교체 (미나리, 개나리, 달무리 삭제)
+- 변경 파일: `wordgame.html`, `assets/index-CXUCwkYZ.js`, `HISTORY.md`
+- 구현 내용:
+  - 사용자 지침에 따라 1단계(쉬움) 단어 중에서 `미나리`, `개나리`, `달무리` 3개 단어를 삭제하고 친숙한 3글자 단어인 `다람쥐`, `민들레`, `종이배`로 대체 반영.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+
 ## 2026-08-30 10:18 — Antigravity — 카드체스 배경 Ambient Glow 제거 및 매트 블랙(#0b0c0e) 단색 배경 적용
 - 변경 파일: `card-chess.html`, `HISTORY.md`
 - 구현 내용:
