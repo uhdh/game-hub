@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4456213927158429" crossorigin="anonymous"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>피의 게임 X 시뮬레이터</title>
+<title>서바이버 게임 시뮬레이터</title>
 <link rel="icon" type="image/png" href="./assets/favicon.png">
 <script defer src="/_vercel/insights/script.js"></script>
 <style>
@@ -47,9 +48,40 @@
   .header-actions {
     flex: 0 0 auto;
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
+    flex-direction: row;
+    align-items: center;
     gap: 8px;
+  }
+  .icon-btn {
+    position: relative;
+    flex: 0 0 auto;
+    width: 38px;
+    height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #15181c;
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 50%;
+    cursor: pointer;
+    padding: 0;
+    font-family: inherit;
+  }
+  .icon-btn:hover {
+    border-color: rgba(95, 184, 176, .4);
+  }
+  .icon-btn svg {
+    width: 19px;
+    height: 19px;
+  }
+  .icon-btn > span:not(.announcement-dot) {
+    font-size: 17px;
+    line-height: 1;
+  }
+  .icon-btn .announcement-dot {
+    position: absolute;
+    top: 1px;
+    right: 1px;
   }
   .header .title {
     font-size: 26px;
@@ -61,26 +93,6 @@
     color: #8992a0;
   }
 
-  .announcement-btn {
-    flex: 0 0 auto;
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12.5px;
-    font-weight: 600;
-    color: #c3c9d1;
-    background: #15181c;
-    border: 1px solid rgba(255, 255, 255, .08);
-    border-radius: 999px;
-    padding: 8px 14px;
-    cursor: pointer;
-    font-family: inherit;
-    margin-top: 2px;
-  }
-  .announcement-btn:hover {
-    border-color: rgba(95, 184, 176, .4);
-  }
   .announcement-dot {
     display: none;
     width: 7px;
@@ -595,12 +607,18 @@
     <div class="header">
       <div class="header-top">
         <div>
-          <span class="title">피의 게임 X 시뮬레이터</span>
+          <span class="title">서바이버 게임 시뮬레이터</span>
           <div class="subtitle">계속 새로운 게임이 추가됩니다.</div>
         </div>
         <div class="header-actions">
-          <button type="button" id="announcement-btn" class="announcement-btn">
-            <span>📢 공지사항</span>
+          <a href="https://www.youtube.com/@pgamex_sim" target="_blank" rel="noopener" class="icon-btn" aria-label="유튜브">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M23.5 6.6a3.02 3.02 0 0 0-2.12-2.14C19.5 4 12 4 12 4s-7.5 0-9.38.46A3.02 3.02 0 0 0 .5 6.6 31.6 31.6 0 0 0 0 12a31.6 31.6 0 0 0 .5 5.4 3.02 3.02 0 0 0 2.12 2.14C4.5 20 12 20 12 20s7.5 0 9.38-.46a3.02 3.02 0 0 0 2.12-2.14A31.6 31.6 0 0 0 24 12a31.6 31.6 0 0 0-.5-5.4Z" fill="#e7ebee"/>
+              <path d="M9.6 15.6V8.4L15.8 12l-6.2 3.6Z" fill="#0f0f12"/>
+            </svg>
+          </a>
+          <button type="button" id="announcement-btn" class="icon-btn" aria-label="공지사항">
+            <span>📢</span>
             <span id="announcement-dot" class="announcement-dot"></span>
           </button>
         </div>
@@ -616,11 +634,8 @@
     <span>💬 채팅</span>
   </button>
   <button type="button" class="floating-btn" id="leaderboard-btn">
-    <span>🏆 전체 리더보드</span>
+    <span>🏆 리더보드</span>
   </button>
-  <a href="./predict.html" class="floating-btn">
-    <span>🏆 우승자 예측</span>
-  </a>
   <a href="./requests.html" class="floating-btn">
     <span>📝 요청 게시판</span>
   </a>
@@ -677,7 +692,7 @@
   <div class="ann-box">
     <div class="ann-head">
       <div>
-        <span class="ann-head-title">전체 게임 리더보드</span>
+        <span class="ann-head-title">리더보드</span>
       </div>
       <button type="button" id="lb-close" class="ann-close" aria-label="닫기">✕</button>
     </div>
@@ -687,6 +702,39 @@
 
 <script>
   const GAMES = [
+    {
+      name: '카드체스',
+      desc: '카드로 말을 움직여 상대의 성을 점령하세요',
+      href: './card-chess.html',
+      target: '_self',
+      image: './assets/card-chess-icon.png',
+    },
+    {
+      name: '링 더 벨',
+      desc: '카드를 교체해 조합을 만들고 최적의 순간에 종을 울리세요',
+      href: './ring-the-bell.html',
+      target: '_self',
+      emoji: '🔔',
+    },
+    {
+      name: '언어의 조각',
+      desc: '한글 자음, 모음 타일을 회전하고 배치하여 정답 단어를 찾는 100단계 퍼즐',
+      href: './wordgame.html',
+      target: '_self',
+      emoji: '🧩',
+    },
+    {
+      name: '수식 콤보',
+      desc: '육각 타일을 이어 10의 거듭제곱을 만드는 콤보 게임',
+      href: './formula-combo.html',
+      target: '_self',
+      hexIcon: [
+        { left: 14, top: -9, bg: '#f0ece2', label: '+6', color: '#202020' },
+        { left: 28, top: 20, bg: '#73bdb0', label: '-7', color: '#202020' },
+        { left: 0, top: 20, bg: '#f0ece2', label: '+8', color: '#202020' },
+        { left: -14, top: -6, bg: '#f0ece2', label: '÷2', color: '#202020' },
+      ],
+    },
     {
       name: '모자이크 퍼즐',
       desc: '컬러 타일을 이어붙여 최고 점수를 노려보세요',
@@ -719,13 +767,6 @@
       href: './blind-auction.html',
       target: '_self',
       emoji: '🔨',
-    },
-    {
-      name: '언어의 조각',
-      desc: '한글 자음, 모음 타일을 회전하고 배치하여 정답 단어를 찾는 100단계 퍼즐',
-      href: './wordgame.html',
-      target: '_self',
-      emoji: '🧩',
     },
   ];
 
@@ -779,6 +820,7 @@
   const ANNOUNCEMENT_SUPABASE_URL = 'https://paktzmofotvwfdxcpmzv.supabase.co';
   const ANNOUNCEMENT_SUPABASE_ANON_KEY = 'sb_publishable_jWbstEn2pKJTNDxLTR4Jig_asglvzGW';
   const ANNOUNCEMENT_SEEN_KEY = 'gamehub_announcement_seen_version';
+  const ANNOUNCEMENT_SEEN_HISTORY_KEY = 'gamehub_announcement_seen_history_id';
 
   const annBtn = document.getElementById('announcement-btn');
   const annDot = document.getElementById('announcement-dot');
@@ -817,6 +859,10 @@
       document.getElementById('ann-version').textContent = head.version;
       document.getElementById('ann-date').textContent = head.deploy_date;
       annIntro.textContent = head.intro || '';
+      const latestHistoryId = history.length ? String(history[0].id) : '';
+      const hasNewHistory = Boolean(
+        latestHistoryId && localStorage.getItem(ANNOUNCEMENT_SEEN_HISTORY_KEY) !== latestHistoryId
+      );
 
       if (head.intro_more) {
         annIntroToggle.hidden = false;
@@ -835,9 +881,10 @@
           const bullets = Array.isArray(entry.bullets) ? entry.bullets : [];
           const item = document.createElement('div');
           item.className = 'ann-history-item';
+          item.dataset.historyId = String(entry.id);
           item.innerHTML = `
             <div class="ann-history-title-row">
-              ${idx === 0 ? '<span class="ann-new-badge">NEW</span>' : ''}
+              ${idx === 0 && hasNewHistory ? '<span class="ann-new-badge">NEW</span>' : ''}
               <span class="ann-history-date">${entry.entry_date}</span>
               <span>${entry.title}</span>
             </div>
@@ -849,7 +896,7 @@
         });
       }
 
-      if (localStorage.getItem(ANNOUNCEMENT_SEEN_KEY) !== announcementVersion) {
+      if (localStorage.getItem(ANNOUNCEMENT_SEEN_KEY) !== announcementVersion || hasNewHistory) {
         annDot.classList.add('show');
       }
     } catch (e) {
@@ -861,6 +908,14 @@
   function openAnnouncement() {
     annOverlay.classList.add('show');
     if (announcementVersion) localStorage.setItem(ANNOUNCEMENT_SEEN_KEY, announcementVersion);
+    const latestHistoryItem = annHistoryList.querySelector('.ann-history-item');
+    if (latestHistoryItem) {
+      const badge = latestHistoryItem.querySelector('.ann-new-badge');
+      if (badge) badge.remove();
+      if (latestHistoryItem.dataset.historyId) {
+        localStorage.setItem(ANNOUNCEMENT_SEEN_HISTORY_KEY, latestHistoryItem.dataset.historyId);
+      }
+    }
     annDot.classList.remove('show');
   }
   function closeAnnouncement() {
@@ -1062,6 +1117,11 @@
     return res.json();
   }
 
+  async function fetchFormulaTop(limit) {
+    const rows = await fetchSimpleTop('formula_combo_leaderboard', 'nickname,score,combos,combo_points', 'score.desc,created_at.asc', 1000);
+    return rows.filter(r => Number.isInteger(Number(r.combos)) && Number(r.combos) >= 0 && Number(r.combos) <= 75 && Number(r.combo_points) >= 0 && Number(r.score) === Number(r.combo_points) * Number(r.combos)).slice(0, limit);
+  }
+
   // 지각변동은 별도 랭킹 테이블이 없어, 대국 기록(1인 vs AI 2명, 사람은 항상 R)을
   // 닉네임별로 직접 집계한다. tectonic-shift.html의 fetchRanking과 동일한 로직.
   async function fetchTectonicTop(limit) {
@@ -1093,7 +1153,42 @@
       .slice(0, limit);
   }
 
+  async function fetchRingTheBellTop(limit) {
+    const url = 'https://paktzmofotvwfdxcpmzv.supabase.co/rest/v1/ring_the_bell_leaderboard';
+    const key = 'sb_publishable_jWbstEn2pKJTNDxLTR4Jig_asglvzGW';
+    const response = await fetch(`${url}?select=nickname,rating,wins,losses&order=rating.desc,wins.desc,updated_at.asc&limit=${encodeURIComponent(limit)}`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    });
+    if (!response.ok) throw new Error(`링 더 벨 리더보드 ${response.status}`);
+    return response.json();
+  }
+
   const LB_SECTIONS = [
+    {
+      label: '카드체스',
+      fetch: (limit) => fetchSimpleTop('card_chess_leaderboard', 'nickname,rating,wins,losses', 'rating.desc', limit),
+      format: r => `${r.wins}승 ${r.losses}패 · ${r.rating}점`,
+    },
+    {
+      label: '수식 콤보',
+      fetch: (limit) => fetchFormulaTop(limit),
+      format: r => `${Number(r.combo_points || (r.combos ? Math.round(r.score / r.combos) : 0)).toLocaleString('ko-KR')}점 × ${r.combos}콤보 = ${Number(r.score).toLocaleString('ko-KR')}점`,
+    },
+    {
+      label: '수식 콤보 · AI',
+      // AI 관전 기록은 사람 리더보드와 다른 테이블에 쌓인다.
+      // 홈 리더보드 렌더러가 nickname 을 쓰므로 label 을 맞춰 넘긴다.
+      fetch: async (limit) => {
+        const rows = await fetchSimpleTop('formula_combo_ai_leaderboard', 'label,score,combos,combo_points', 'score.desc,created_at.asc', limit);
+        return rows.map(r => ({ ...r, nickname: r.label || 'AI' }));
+      },
+      format: r => `${Number(r.combo_points).toLocaleString('ko-KR')}점 × ${r.combos}콤보 = ${Number(r.score).toLocaleString('ko-KR')}점`,
+    },
+    {
+      label: '링 더 벨',
+      fetch: (limit) => fetchRingTheBellTop(limit),
+      format: r => `${r.wins}승 ${r.losses}패 · ELO ${r.rating}`,
+    },
     {
       label: '3단 오목 · 최상',
       fetch: (limit) => fetchSimpleTop('gomoku_extreme_ranking', 'nickname,rating,wins,losses', 'rating.desc', limit),

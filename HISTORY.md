@@ -13,6 +13,16 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 
 ---
 
+## 2026-08-30 09:52 — Antigravity — 허브 내 언어의 조각 위치 조정 및 신규 게임 2종 공지 등록
+- 변경 파일: `index.html`, `HISTORY.md`
+- 구현 내용:
+  - 허브 메인 게임 리스트에서 '언어의 조각' 위치를 '링 더 벨' 직후(3번째)로 이동 배치.
+  - Supabase 공지사항 DB(`site_announcement`, `site_announcement_history`)에 신규 게임 2종(카드체스 & 언어의 조각) 출시 공지사항(v1.0.4) 등록 완료.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+
 ## 2026-08-30 09:51 — Antigravity — 1단계 퍼즐 난이도 조정 (무지개 1단계 전진, 금메달 25단계 이동)
 - 변경 파일: `wordgame.html`, `assets/index-Cifj3gL7.js`, `HISTORY.md`
 - 구현 내용:
