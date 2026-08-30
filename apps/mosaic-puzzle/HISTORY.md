@@ -1,5 +1,15 @@
 # 작업 히스토리
 
+## 2026-08-30 15:03 — Antigravity — 언어의 조각 모바일 터치 UX 최적화 (탭 회전/드래그 이동 직관화)
+- 변경 파일: `wordgame.html`, `assets/index-DXCZle_K.css`, `assets/index-DlpabusD.js`, `HISTORY.md`
+- 구현 내용:
+  - 기존 타일 탭 시 선택/교환과 회전 동작이 혼선되던 UX를 단순화: 타일을 탭/클릭하면 **무조건 타일 회전 동작**만 즉시 수행.
+  - 타일 간 순서/위치 이동은 **오직 드래그 앤 드롭(Drag-and-Drop)으로만 동작**하게 명확히 분리하여 모바일 손가락 터치 오류 완벽 차단.
+  - 웹 배포 및 안드로이드 Capacitor APK(app-debug.apk) 빌드 갱신 동기화 완료.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
 ## 2026-08-30 14:15 — Antigravity — 구글 플레이 스토어 제출용 개인정보 처리방침 페이지(privacy.html) 및 그래픽 자산 추가
 - 변경 파일: `privacy.html`, `HISTORY.md`
 - 구현 내용:
