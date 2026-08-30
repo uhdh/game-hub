@@ -13,6 +13,16 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 
 ---
 
+## 2026-08-30 09:50 — Antigravity — 초성 힌트 감점 및 5회 초과 제출 감점 시스템 도입
+- 변경 파일: `wordgame.html`, `assets/index-DQ7h6bzC.js`, `assets/index-D8dUu88_.css`, `HISTORY.md`
+- 구현 내용:
+  - 사용자의 요청에 따라 (1) 초성 힌트 열람 시 -1점 감점, (2) 제출 횟수가 5회를 초과할 경우 -1점 감점 적용.
+  - UI에 감점 안내 태그(`⚠️ 5회 초과 (-1점)`), 힌트 버튼 툴팁 및 클리어 팝업에 승점 세부 내역(기본 점수, 감점 항목) 표시.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+
 ## 2026-08-30 09:47 — Antigravity — 단계 클리어 및 랭킹 모달 확인 시 리더보드 점수 자동 등록 강화
 - 변경 파일: `wordgame.html`, `assets/index-B28WjMKe.js`, `HISTORY.md`
 - 구현 내용:
