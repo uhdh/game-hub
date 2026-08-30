@@ -1,5 +1,14 @@
 # 작업 히스토리
 
+## 2026-08-30 10:05 — Antigravity — 카드체스 리더보드 격리 및 언어의 조각 테스팅 데이터 정리
+- 변경 파일: `card-chess.html`, `index.html`, `HISTORY.md`
+- 구현 내용:
+  - `card-chess.html` 및 메인 허브 리더보드 모달의 카드체스 섹션에서 `nickname=not.like.wordgame*` 조건 필터를 추가하여 '언어의 조각' 랭킹 데이터가 카드체스 순위표에 섞여 나오던 문제 완전 방지.
+  - DB에 임시로 쌓였던 `wordgame*` 테스트 데이터를 깔끔히 삭제 완료.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
 ## 2026-08-30 10:03 — Antigravity — 허브 카드 목록 내 카드체스 & 언어의 조각 NEW 뱃지 표시 추가
 - 변경 파일: `index.html`, `HISTORY.md`
 - 구현 내용:
