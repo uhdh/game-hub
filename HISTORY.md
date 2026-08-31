@@ -13,6 +13,13 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 
 ---
 
+## 2026-08-31 17:57 — Codex — 카드체스 친구 초대 온라인 친선전 구현
+- 변경 파일: `card-chess.html`, `card-chess-online.js`, `card-chess-online.test.js`, `card-chess-online-integration.test.js`, `docs/superpowers/specs/2026-08-31-card-chess-friend-invite-design.md`, `docs/superpowers/plans/2026-08-31-card-chess-friend-invite.md`, `HISTORY.md`
+- 구현 내용: 링더벨의 기존 WebRTC/Supabase 신호 통신을 재사용해 `CC` 방 코드 초대 링크, 방장 P1·참가자 P2, 초기 상태 및 이동/패스 동기화, 상태 체크섬 검증, 연결 끊김 안내를 추가했다. 온라인에서는 각 사용자의 말과 카드가 아래쪽에 보이도록 관점을 뒤집고 AI·난이도·무르기·새 게임을 비활성화했으며, 승패는 리더보드에 기록하지 않는다.
+- 검증: Node 테스트 45개 통과. 로컬 Chrome에서 AI 모드, 초대 모달, 게스트 관점과 온라인 전용 UI를 확인했다. 자동화 도중 Chrome 다중 창 선택이 어긋나 실제 두 탭 간 WebRTC 한 수 교환까지는 완료하지 못했다.
+- 배포: 미배포. 분리 작업 브랜치 `deploy-card-chess-20260831`에 구현됨.
+- 다음 작업/미해결: 실제 두 기기 또는 정확히 분리된 브라우저 컨텍스트에서 초대 링크 연결과 양방향 한 수 교환을 최종 확인한 뒤 원본 repo 및 `game-hub`에 반영·배포할 것.
+
 ## 2026-08-31 00:00 — Codex — 카드체스 보드·카드 배치·물방울 말 시인성 개선
 - 변경 파일: `card-chess.html`, `HISTORY.md`
 - 구현 내용: 내 카드·대기·상대 카드를 상단 한 줄로 정리하고, 보드를 420px까지 확대했다. 체스칸은 명암 체크무늬로 구분했으며, 물방울 말은 50px 크기의 SVG 곡선 마스크를 적용해 커져도 외곽이 매끄럽게 표시되도록 했다.
