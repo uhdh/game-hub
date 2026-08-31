@@ -57,7 +57,8 @@
     var pool = shuffle(allItems, rng).slice(0, POOL_SIZE);
     var poolTotal = pool.reduce(function (sum, item) { return sum + item.value; }, 0);
     var playQueue = shuffle(pool, rng).slice(0, TOTAL_ROUNDS);
-    return { pool: pool, poolTotal: poolTotal, playQueue: playQueue };
+    var auctionTotal = playQueue.reduce(function (sum, item) { return sum + item.value; }, 0);
+    return { pool: pool, poolTotal: poolTotal, playQueue: playQueue, auctionTotal: auctionTotal };
   }
 
   function rotateOrder(order, startId) {

@@ -1,0 +1,1093 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>수식 콤보</title>
+    <script>
+      (() => {
+        const api = 'https://paktzmofotvwfdxcpmzv.supabase.co/rest/v1/formula_combo_leaderboard';
+        // AI 자동 플레이 기록은 사람 리더보드와 완전히 분리된 테이블에 쌓는다
+        const aiApi = 'https://paktzmofotvwfdxcpmzv.supabase.co/rest/v1/formula_combo_ai_leaderboard';
+        const key = 'sb_publishable_jWbstEn2pKJTNDxLTR4Jig_asglvzGW';
+        const headers = { apikey: key, Authorization: `Bearer ${key}` };
+        const nativeFetch = window.fetch.bind(window);
+        const esc = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const scorePattern = /총점\s*\(([-\d,.]+)\s*-\s*[-\d,.]+\)\s*[×x]\s*(\d+)\s*=\s*[-\d,.]+/;
+        // React가 그리는 총점 줄은 손대지 않고 값만 읽는다. textContent를 덮어쓰면
+        // React가 붙잡고 있던 텍스트 노드가 떨어져 나가 이후 갱신이 화면에 반영되지 않는다.
+        const getScoreParts = () => {
+          const match = document.querySelector('.total-score-line')?.textContent.match(scorePattern);
+          if (!match) return null;
+          return { comboPoints: Number(match[1].replace(/,/g, '')), combos: Number(match[2]) };
+        };
+        const normalizeScore = () => {
+          const line = document.querySelector('.total-score-line');
+          const parts = getScoreParts();
+          if (!line || !parts) return;
+          line.classList.add('is-raw-total');
+          let view = document.querySelector('.formula-final-score');
+          if (!view) {
+            view = document.createElement('small');
+            view.className = 'formula-final-score';
+            line.after(view);
+          }
+          const text = `최종점수 ${parts.comboPoints.toLocaleString('ko-KR')} × ${parts.combos} = ${(parts.comboPoints * parts.combos).toLocaleString('ko-KR')}`;
+          if (view.textContent !== text) view.textContent = text;
+        };
+        const getReplay = parts => ({
+          mode: document.querySelector('.sample-card') ? 'sample' : 'new_game',
+          comboPoints: parts.comboPoints,
+          combos: parts.combos,
+          scoreFormula: `${parts.comboPoints.toLocaleString('ko-KR')} × ${parts.combos} = ${(parts.comboPoints * parts.combos).toLocaleString('ko-KR')}`,
+          comboCounts: getComboCounts(),
+          board: getBoardLayout(),
+          snapshot: document.querySelector('.board-card')?.innerText?.slice(0, 4000) || ''
+        });
+        // 콤보 로그 패널(.combo-log)은 일반 게임 화면에만 렌더링되고 강지후 샘플 화면에는
+        // 없어서 DOM 스크래핑으로는 샘플 모드의 집계를 얻을 수 없다. 대신 두 모드 모두에
+        // 존재하는 "콤보 완성 선언" 버튼 클릭을 캡처 단계에서 관찰해 직접 집계한다.
+        let comboCountsTally = {};
+        const resetComboTally = () => { comboCountsTally = {}; };
+        const readComboBadge = () => Number(document.querySelector('.score-card span')?.textContent.match(/\d+/)?.[0] ?? -1);
+        const readActiveFormulaResult = () => {
+          const el = document.querySelector('.top-sample-formula strong') || document.querySelector('.board-sample-formula strong');
+          const match = el?.textContent.match(/=\s*([-\d,.]+)/);
+          if (!match || match[1].trim() === '—') return null;
+          return Number(match[1].replace(/,/g, ''));
+        };
+        // 점수 제출은 React 이펙트의 setTimeout(0)으로 거의 즉시 발생하므로, 콤보 선언
+        // 판정도 같은 매크로태스크 큐 지연(setTimeout)으로 확인하면 제출이 먼저 실행되는
+        // 경쟁이 생긴다. MutationObserver 콜백은 마이크로태스크라 어떤 setTimeout(0)보다도
+        // 먼저 실행되므로 이걸로 배지 변화를 감지해 제출 전에 집계를 확정한다.
+        let pendingDeclare = null;
+        new MutationObserver(() => {
+          if (!pendingDeclare) return;
+          const badge = readComboBadge();
+          if (badge <= pendingDeclare.beforeBadge) return;
+          const { result } = pendingDeclare;
+          pendingDeclare = null;
+          if (result === null) return;
+          const zeros = String(Math.abs(Math.trunc(result))).replace(/[^0]/g, '').length;
+          if (zeros < 1) return;
+          const key = String(10 ** zeros);
+          comboCountsTally[key] = (comboCountsTally[key] || 0) + 1;
+        }).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
+        document.addEventListener('click', event => {
+          const button = event.target.closest('button');
+          if (!button) return;
+          const label = button.textContent.trim();
+          // 사람이 새 판을 시작하면 AI 판이 아니게 되므로 제출 차단을 푼다
+          if (label === '새 게임') { resetComboTally(); aiSession = false; return; }
+          if (!label.includes('콤보 완성 선언')) return;
+          pendingDeclare = { beforeBadge: readComboBadge(), result: readActiveFormulaResult() };
+        }, true);
+        const getComboCounts = () => ({ ...comboCountsTally });
+        const getBoardLayout = () => {
+          const board = document.querySelector('.hex-board');
+          if (!board) return null;
+          return { width: board.style.width, height: board.style.height, tiles: [...board.querySelectorAll('.hex-slot')].map(slot => { const tile = slot.querySelector('.hex-tile'); return tile ? { style: slot.getAttribute('style') || '', label: tile.querySelector('strong')?.textContent || '', removed: tile.classList.contains('removed') } : null; }).filter(Boolean) };
+        };
+        const isValidEntry = entry => Number.isInteger(Number(entry.combos)) && Number(entry.combos) >= 0 && Number(entry.combos) <= 75 && Number(entry.combo_points) >= 0 && Number(entry.score) === Number(entry.combo_points) * Number(entry.combos);
+        const refreshLeaderboardFormula = async () => {
+          try {
+            const response = await nativeFetch(`${api}?select=nickname,score,combos,combo_points,combo_counts,replay&order=score.desc,created_at.asc&limit=1000`, { headers });
+            const entries = (await response.json()).filter(isValidEntry);
+            document.querySelectorAll('.leaderboard-row').forEach((row, index) => {
+              row.hidden = index >= 10;
+              const entry = entries[index];
+              if (!entry) return;
+              const points = entry.combo_points || (entry.combos ? Math.round(entry.score / entry.combos) : 0);
+              const small = row.querySelector('small');
+              const score = row.querySelector('b');
+              if (small) small.textContent = `${points}점 × ${entry.combos}콤보`;
+              if (score) score.textContent = `= ${entry.score.toLocaleString('ko-KR')}점`;
+              let source = row.querySelector('.formula-source');
+              if (!source) { source = document.createElement('em'); source.className = 'formula-source'; row.append(source); }
+              source.textContent = entry.replay?.mode === 'sample' ? '강지후 샘플' : '새 게임';
+              let counts = row.querySelector('.formula-counts');
+              if (!counts) { counts = document.createElement('span'); counts.className = 'formula-counts'; row.append(counts); }
+              const comboCounts = entry.combo_counts || entry.replay?.comboCounts;
+              counts.textContent = comboCounts ? ['10', '100', '1,000', '10,000', '100,000', '1,000,000'].map(label => `${label} ${comboCounts[label.replace(/,/g, '')] || 0}개`).join(' · ') : '달성 콤보 집계 없음';
+            });
+          } catch (_) {}
+        };
+        const refreshMyRank = async rank => {
+          try {
+            const nickname = window.localStorage.getItem('formulaComboNickname');
+            const response = await nativeFetch(`${api}?select=nickname,score,combos,combo_points&order=score.desc,created_at.asc`, { headers });
+            const entries = (await response.json()).filter(isValidEntry);
+            const position = entries.findIndex(entry => entry.nickname === nickname);
+            rank.textContent = position >= 0 ? `내 순위 ${position + 1}위 · ${Number(entries[position].score).toLocaleString('ko-KR')}점` : '내 순위 미등록';
+          } catch (_) { rank.textContent = '내 순위 확인 실패'; }
+        };
+        let suppressSubmit = false;
+        // AI가 만든 판인 동안에는 사람 리더보드 제출을 계속 막는다.
+        // 재생이 끝난 뒤에도 게임이 걸어둔 지연 제출이 늦게 도착할 수 있어서, 시간(타이머)이 아니라
+        // "지금 화면이 AI가 만든 판인가"라는 상태로 판단해야 한다. 사람이 새 게임을 눌러야 풀린다.
+        let aiSession = false;
+        window.fetch = async (input, init = {}) => {
+          const target = typeof input === 'string' ? input : input?.url || '';
+          if ((suppressSubmit || aiSession) && target.startsWith(api) && (init.method === 'POST' || init.method === 'PATCH')) {
+            // 자동 솔버가 콤보를 연달아 선언하는 동안에는 중간 점수를 제출하지 않는다
+            return new Response(null, { status: 204 });
+          }
+          if (target.startsWith(api) && init.body && (init.method === 'POST' || init.method === 'PATCH')) {
+            try {
+              const body = JSON.parse(init.body);
+              const parts = getScoreParts();
+              if (parts) {
+                body.combo_points = parts.comboPoints;
+                body.score = parts.comboPoints * Number(body.combos || parts.combos);
+                body.combo_counts = getComboCounts();
+                body.replay = body.score > 100000
+                  ? getReplay({ ...parts, combos: Number(body.combos || parts.combos) })
+                  : null;
+                init = { ...init, body: JSON.stringify(body) };
+              }
+            } catch (_) {}
+          }
+          return nativeFetch(input, init);
+        };
+        // 자동 솔버가 끝난 뒤 현재 화면의 최종 점수를 한 번만 제출한다.
+        const submitFinalScore = async () => {
+          try {
+            const parts = getScoreParts();
+            if (!parts || !parts.combos) return false;
+            const nickname = window.localStorage.getItem('formulaComboNickname');
+            if (!nickname) return false;
+            const score = Math.max(0, parts.comboPoints * parts.combos);
+            const lookup = await nativeFetch(`${api}?nickname=eq.${encodeURIComponent(nickname)}&select=id,score`, { headers });
+            if (!lookup.ok) return false;
+            const [existing] = await lookup.json();
+            if (existing && Number(existing.score) >= score) return false;
+            // window.fetch 오버라이드가 combo_points·replay·combo_counts를 채워준다
+            const response = await window.fetch(existing ? `${api}?id=eq.${existing.id}` : api, {
+              method: existing ? 'PATCH' : 'POST',
+              headers: { ...headers, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+              body: JSON.stringify({ nickname, score, combos: parts.combos })
+            });
+            return response.ok;
+          } catch (_) { return false; }
+        };
+        // AI 플레이 결과는 사람 리더보드가 아니라 AI 전용 테이블에 한 판씩 쌓는다.
+        // 보관 비용을 낮추려고 기보(replay)는 저장하지 않고 자릿수별 집계만 남긴다.
+        const submitAiScore = async () => {
+          try {
+            const parts = getScoreParts();
+            if (!parts || !parts.combos) return false;
+            const score = Math.max(0, parts.comboPoints * parts.combos);
+            const response = await nativeFetch(aiApi, {
+              method: 'POST',
+              headers: { ...headers, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+              body: JSON.stringify({
+                label: 'AI',
+                score,
+                combos: parts.combos,
+                combo_points: parts.comboPoints,
+                combo_counts: getComboCounts()
+              })
+            });
+            return response.ok;
+          } catch (_) { return false; }
+        };
+        const renderAiBoard = async (panel = document.getElementById('formula-ai-panel')) => {
+          if (!panel) return;
+          panel.innerHTML = '<strong>AI 기록</strong><p>불러오는 중입니다.</p>';
+          try {
+            const response = await nativeFetch(`${aiApi}?select=label,score,combos,combo_points,combo_counts,created_at&order=score.desc,created_at.asc&limit=5`, { headers });
+            if (!response.ok) throw new Error('fetch failed');
+            const rows = await response.json();
+            if (!rows.length) { panel.innerHTML = '<strong>AI 기록</strong><p>아직 AI 플레이 기록이 없습니다. 상단 <b>AI 플레이 구경</b>을 눌러보세요.</p>'; return; }
+            const labels = ['10', '100', '1,000', '10,000', '100,000', '1,000,000'];
+            panel.innerHTML = `<strong>AI 기록 · 상위 ${rows.length}판</strong><p>사람 리더보드와 별도로 집계됩니다.</p>` + rows.map((row, index) => {
+              const counts = row.combo_counts || {};
+              const detail = labels.map(item => `${item} ${counts[item.replace(/,/g, '')] || 0}개`).join(' · ');
+              return `<div class="ai-row"><b>${String(index + 1).padStart(2, '0')}</b><span>${Number(row.combo_points).toLocaleString('ko-KR')}점 × ${row.combos}콤보</span><em>= ${Number(row.score).toLocaleString('ko-KR')}점</em><small>${detail}</small></div>`;
+            }).join('');
+          } catch (_) { panel.innerHTML = '<strong>AI 기록</strong><p>AI 기록을 불러오지 못했습니다.</p>'; }
+        };
+        // PLAY GUIDE 자리에 LIVE COMBO 를 보여준다.
+        // React가 그리는 원본 노드를 다른 부모로 옮기면 이후 리렌더에서 깨지므로,
+        // 원본은 숨기고 내용만 복제해 동기화한다(normalizeScore 와 같은 방식).
+        const relocateLiveCombo = () => {
+          const panel = document.querySelector('.side-panel');
+          if (!panel) return;
+          const rules = panel.querySelector('.rules');
+          if (rules && rules.style.display !== 'none') rules.style.display = 'none';
+          const source = document.querySelector('.top-sample-formula');
+          let view = document.getElementById('formula-live-combo');
+          // 강지후 샘플 화면에는 상단 LIVE COMBO 가 없다. 그때는 복제본도 감춘다.
+          if (!source) { if (view) view.hidden = true; return; }
+          if (!view) {
+            view = document.createElement('div');
+            view.id = 'formula-live-combo';
+            view.className = 'sample-formula';
+            panel.prepend(view);
+          }
+          if (view.hidden) view.hidden = false;
+          if (view.innerHTML !== source.innerHTML) view.innerHTML = source.innerHTML;
+          if (source.style.display !== 'none') source.style.display = 'none';
+        };
+        // 강지후 샘플의 '숫자 계산'을 보드 위가 아니라 타일 바로 아래에 보여준다.
+        // React가 그리는 원본은 옮기지 않고 숨긴 뒤 내용만 복제해 동기화한다
+        // (relocateLiveCombo·normalizeScore 와 같은 방식).
+        const relocateSampleFormula = () => {
+          const card = document.querySelector('.sample-card');
+          if (!card) return;
+          const source = card.querySelector('.board-sample-formula');
+          const board = card.querySelector('.sample-hex-board');
+          if (!source || !board) return;
+          let view = document.getElementById('formula-sample-calc');
+          if (!view) {
+            view = document.createElement('div');
+            view.id = 'formula-sample-calc';
+            board.after(view);
+          }
+          if (view.innerHTML !== source.innerHTML) view.innerHTML = source.innerHTML;
+          if (source.style.display !== 'none') source.style.display = 'none';
+        };
+        // 모바일에서 상단 버튼이 한 줄에 들어가도록 짧은 라벨을 달아준다.
+        // React가 그리는 버튼의 텍스트를 직접 바꾸면 다음 갱신에서 되돌아가므로,
+        // data-short 속성만 붙이고 실제 축약 표시는 CSS(::after)가 담당한다.
+        const SHORT_LABELS = { '홈 화면': '홈', '강지후 샘플': '강지후', 'AI 플레이 구경': 'AI 관전', 'AI 샘플 풀기': 'AI 샘플' };
+        const compactTopbar = () => {
+          const bar = document.querySelector('.topbar');
+          if (!bar) return;
+          // 샘플 화면에서는 같은 버튼이 그 고정 배치를 푸는 역할을 하므로 이름도 바꾼다
+          const aiRun = bar.querySelector('#formula-ai-show [data-ai-run]');
+          if (aiRun && !aiRun.disabled) {
+            const label = document.querySelector('.sample-card') ? 'AI 샘플 풀기' : 'AI 플레이 구경';
+            if (aiRun.textContent !== label) aiRun.textContent = label;
+          }
+          bar.querySelectorAll('a, button').forEach(el => {
+            const short = SHORT_LABELS[el.textContent.trim()];
+            if (short && el.dataset.short !== short) el.dataset.short = short;
+          });
+        };
+        const mount = () => {
+          normalizeScore();
+          relocateLiveCombo();
+          relocateSampleFormula();
+          compactTopbar();
+          const head = document.querySelector('.leaderboard-head');
+          const card = document.querySelector('.leaderboard-card');
+          if (!head || !card || document.getElementById('formula-ai-panel')) return;
+          const rank = document.createElement('small');
+          rank.id = 'formula-my-rank';
+          rank.textContent = '내 순위 확인 중…';
+          head.append(rank);
+          // AI 기록은 접지 않고 항상 상위 5판을 보여준다
+          const aiPanel = document.createElement('div');
+          aiPanel.id = 'formula-ai-panel';
+          card.append(aiPanel);
+          setTimeout(refreshLeaderboardFormula, 600);
+          refreshMyRank(rank);
+          renderAiBoard(aiPanel);
+        };
+        const formulaSolver = (() => {
+          const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+          const waitFor = async (check, timeout = 2000) => {
+            const start = performance.now();
+            while (performance.now() - start < timeout) {
+              if (check()) return true;
+              await new Promise(resolve => setTimeout(resolve, 4));
+            }
+            return check();
+          };
+          const reactProps = element => {
+            if (!element) return null;
+            const key = Object.keys(element).find(name => name.startsWith('__reactProps'));
+            return key ? element[key] : null;
+          };
+
+          // --- 게임 규칙 복제 (번들 로직과 동일) ---
+          const DIRS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+          const CELLS = (() => {
+            const out = [];
+            for (let q = -6; q <= 6; q += 1) {
+              for (let r = -6; r <= 6; r += 1) {
+                if (Math.max(Math.abs(q), Math.abs(r), Math.abs(q + r)) > 6) continue;
+                out.push({ q, r });
+              }
+            }
+            return out;
+          })();
+          const CELL_AT = new Map(CELLS.map((cell, index) => [`${cell.q},${cell.r}`, index]));
+          const hexDist = cell => (Math.abs(cell.q) + Math.abs(cell.r) + Math.abs(cell.q + cell.r)) / 2;
+          const parseLabel = label => {
+            const text = String(label || '').replace(/\s+/g, '');
+            if (text.startsWith('÷')) return { op: '÷', value: Number(text.slice(1)) };
+            if (text.startsWith('×')) return { op: '×', value: Number(text.slice(1).replace(/[()]/g, '')) };
+            if (text.startsWith('+')) return { op: '+', value: Number(text.slice(1)) };
+            return { op: '−', value: Number(text.slice(1).replace(/[()]/g, '')) };
+          };
+          const labelOf = tile => (tile.op === '×' && tile.value < 0 ? `×(${tile.value})` : `${tile.op}${tile.value}`);
+          const applyOp = (value, tile) => {
+            if (tile.op === '+') return value + tile.value;
+            if (tile.op === '−') return value - tile.value;
+            if (tile.op === '×') return value * tile.value;
+            return tile.value === 0 ? value : value / tile.value;
+          };
+          const isPower = value => {
+            if (value < 10 || !Number.isInteger(value)) return false;
+            const log = Math.log10(value);
+            return Math.abs(log - Math.round(log)) < 1e-9;
+          };
+          const zerosOf = value => String(Math.abs(Math.trunc(value))).replace(/[^0]/g, '').length;
+
+          // --- DOM 접근 ---
+          const slots = () => [...document.querySelectorAll('.hex-board .hex-slot')];
+          const trayTiles = () => [...document.querySelectorAll('.tray-stack .tray-tile, .tray-tile')].map(el => {
+            const match = (el.getAttribute('aria-label') || '').match(/타일\s*(\d+)\s*개/);
+            return { el, label: (el.querySelector('strong') || {}).textContent.trim(), count: match ? Number(match[1]) : 1 };
+          });
+          const pathCount = () => document.querySelectorAll('.hex-board .hex-tile.path').length;
+          const comboCount = () => {
+            const head = document.querySelector('.combo-log .log-head b');
+            return Number(((head || {}).textContent || '').match(/\d+/) || [0]);
+          };
+          const buttonByText = text => [...document.querySelectorAll('button')].find(button => button.textContent.trim() === text);
+
+          // --- 배치 계획 ---
+          // 곱셈·나눗셈 타일을 값이 큰 순서로 보드 중앙에 모으고, +/− 타일은 큰 값부터 번갈아 채운다.
+          const buildPlan = () => {
+            const tiles = [];
+            trayTiles().forEach(entry => {
+              const parsed = parseLabel(entry.label);
+              for (let i = 0; i < entry.count; i += 1) tiles.push({ ...parsed, label: entry.label });
+            });
+            if (!tiles.length) return null;
+            const scale = tiles.filter(tile => tile.op === '×' || tile.op === '÷').sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+            const plus = tiles.filter(tile => tile.op === '+').sort((a, b) => b.value - a.value);
+            const minus = tiles.filter(tile => tile.op === '−').sort((a, b) => b.value - a.value);
+            const mixed = [];
+            for (let i = 0; i < Math.max(plus.length, minus.length); i += 1) {
+              if (plus[i]) mixed.push(plus[i]);
+              if (minus[i]) mixed.push(minus[i]);
+            }
+            const ordered = [...scale, ...mixed];
+            const targets = CELLS.map((cell, index) => ({ index, cell }))
+              .sort((a, b) => hexDist(a.cell) - hexDist(b.cell) || a.index - b.index)
+              .slice(0, ordered.length);
+            return ordered.map((tile, i) => ({ tile, cellIndex: targets[i].index }));
+          };
+
+          // 타일 한 장을 목표 칸에 놓는다.
+          // 드래그 시작 → 리렌더 → 드롭 순서를 지켜야 한다. 게임의 슬롯 onDrop 은 렌더 시점의
+          // "드래그 중인 타일 id"를 클로저로 붙잡고 있어서, 리렌더 전에 드롭하면 그 값이 아직
+          // null 이라 조용히 무시된다. 느린 기기에서 배치가 첫 타일 뒤로 진행되지 않던 원인이다.
+          // 트레이 타일에는 드래그 상태가 dragging 클래스로 나타나므로 그걸 기다린다.
+          const placeOne = async step => {
+            const source = trayTiles().find(entry => entry.label === step.tile.label);
+            if (!source) return 'no-tile';
+            const startProps = reactProps(source.el);
+            if (!startProps || !startProps.onDragStart) return 'no-handler';
+            startProps.onDragStart();
+            const ready = await waitFor(() => {
+              const current = trayTiles().find(entry => entry.label === step.tile.label);
+              return !!current && current.el.classList.contains('dragging');
+            }, 1500);
+            if (!ready) return 'drag-not-applied';
+            const slot = slots()[step.cellIndex];
+            const dropProps = reactProps(slot);
+            if (!dropProps || !dropProps.onDrop) return 'no-slot';
+            dropProps.onDrop({ preventDefault() {} });
+            const ok = await waitFor(() => {
+              const target = slots()[step.cellIndex];
+              return !!target && target.classList.contains('occupied');
+            }, 2000);
+            return ok ? 'ok' : 'drop-ignored';
+          };
+
+          const placeAll = async status => {
+            const plan = buildPlan();
+            if (!plan) { status.textContent = '배치할 타일이 없습니다.'; return null; }
+            let placed = 0;
+            let lastReason = '';
+            for (const step of plan) {
+              let result = '';
+              // 느린 기기에서 렌더가 밀릴 수 있으므로 몇 번 더 시도한다
+              for (let attempt = 0; attempt < 3; attempt += 1) {
+                result = await placeOne(step);
+                if (result === 'ok' || result === 'no-tile') break;
+                // 실패했으면 드래그 상태를 정리하고 한 박자 쉬었다가 다시 시도한다
+                const stale = trayTiles().find(entry => entry.label === step.tile.label);
+                const staleProps = stale && reactProps(stale.el);
+                if (staleProps && staleProps.onDragEnd) staleProps.onDragEnd();
+                await sleep(60 * (attempt + 1));
+              }
+              if (result !== 'ok') { lastReason = result; break; }
+              placed += 1;
+              if (placed % 5 === 0) status.textContent = `자동 배치 중 · ${placed}/${plan.length}`;
+            }
+            const finish = buttonByText('배치 완료');
+            if (finish) { finish.click(); await waitFor(() => !buttonByText('배치 완료'), 1200); }
+            status.textContent = placed === plan.length
+              ? `자동 배치 완료 · ${placed}개`
+              : `자동 배치 중단 · ${placed}/${plan.length}개 (${lastReason})`;
+            return placed;
+          };
+
+          // --- 현재 보드 상태 읽기 ---
+          // 슬롯의 DOM 순서가 게임의 셀 배열과 1:1이라 인덱스로 육각 좌표를 복원할 수 있다.
+          // 일반 게임과 강지후 샘플은 클래스 이름만 다르고 구조가 같다.
+          const readBoardFrom = (slotList, tileSelector) => {
+            const tiles = [];
+            const cellToNode = new Map();
+            slotList.forEach((slot, cellIndex) => {
+              const el = slot.querySelector(tileSelector);
+              if (!el) return;
+              const tile = parseLabel((el.querySelector('strong') || el).textContent);
+              cellToNode.set(cellIndex, tiles.length);
+              tiles.push({ ...tile, cellIndex, removed: el.classList.contains('removed') });
+            });
+            const graph = tiles.map(tile => {
+              const cell = CELLS[tile.cellIndex];
+              return DIRS.map(([dq, dr]) => cellToNode.get(CELL_AT.get(`${cell.q + dq},${cell.r + dr}`)))
+                .filter(index => index !== undefined);
+            });
+            return { tiles, graph };
+          };
+          const readBoard = () => readBoardFrom(slots(), '.hex-tile');
+          const sampleSlots = () => [...document.querySelectorAll('.sample-hex-board .sample-hex-slot')];
+          const readSampleBoard = () => readBoardFrom(sampleSlots(), '.sample-hex-tile');
+
+          // --- 라운드 경로 탐색 (beam search) ---
+          const findPath = (tiles, graph, removed, start, opts) => {
+            const words = Math.ceil(tiles.length / 32);
+            const hasBit = (mask, i) => (mask[i >> 5] & (1 << (i & 31))) !== 0;
+            const setBit = (mask, i) => { const copy = mask.slice(); copy[i >> 5] |= (1 << (i & 31)); return copy; };
+            const first = new Uint32Array(words);
+            first[start >> 5] |= (1 << (start & 31));
+            let beam = [{ pos: start, value: tiles[start].value, mask: first, len: 1, prev: null }];
+            let best = null;
+            for (let depth = 1; depth <= opts.maxDepth && beam.length; depth += 1) {
+              const buckets = new Map();
+              for (const state of beam) {
+                for (const to of graph[state.pos]) {
+                  if (removed[to] || hasBit(state.mask, to)) continue;
+                  const value = applyOp(state.value, tiles[to]);
+                  if (!Number.isFinite(value) || Math.abs(value) > 2e6) continue;
+                  const len = state.len + 1;
+                  const next = { pos: to, value, mask: setBit(state.mask, to), len, prev: state };
+                  if (isPower(value)) {
+                    const score = len * zerosOf(value);
+                    // 이 라운드가 끝나면 남은 타일은 여기서 끝난 타일에서만 이어 시작할 수 있으므로,
+                    // 점수가 같다면 이웃이 더 많이 살아있는 쪽(막다른 골목이 아닌 쪽)을 우선한다.
+                    const endDegree = graph[to].filter(n => !removed[n] && n !== start).length;
+                    if (!best || score > best.score || (score === best.score && endDegree > best.endDegree)) {
+                      best = { score, value, len, node: next, endDegree };
+                    }
+                  }
+                  const key = String(value);
+                  let bucket = buckets.get(key);
+                  if (!bucket) { bucket = []; buckets.set(key, bucket); }
+                  if (bucket.length < opts.perValue) bucket.push(next);
+                  else {
+                    let worst = 0;
+                    for (let i = 1; i < bucket.length; i += 1) if (bucket[i].len < bucket[worst].len) worst = i;
+                    if (next.len > bucket[worst].len) bucket[worst] = next;
+                  }
+                }
+              }
+              const pool = [];
+              buckets.forEach(bucket => pool.push(...bucket));
+              pool.sort((a, b) => {
+                const ai = Number.isInteger(a.value) ? 0 : 1;
+                const bi = Number.isInteger(b.value) ? 0 : 1;
+                if (ai !== bi) return ai - bi;
+                if (b.len !== a.len) return b.len - a.len;
+                return Math.abs(a.value) - Math.abs(b.value);
+              });
+              beam = pool.slice(0, opts.beamWidth);
+            }
+            if (!best) return null;
+            const path = [];
+            for (let node = best.node; node; node = node.prev) path.push(node.pos);
+            path.reverse();
+            return { path, value: best.value, zeros: zerosOf(best.value), score: best.score };
+          };
+
+          // 제거하면 남은 타일이 분단되는 칸(관절점)
+          const articulation = (graph, removed, alive) => {
+            const cut = new Set();
+            if (alive.length < 3) return cut;
+            const disc = new Map();
+            const low = new Map();
+            let timer = 0;
+            const root = alive[0];
+            disc.set(root, timer); low.set(root, timer); timer += 1;
+            const stack = [{ u: root, parent: -1, index: 0, children: 0 }];
+            while (stack.length) {
+              const frame = stack[stack.length - 1];
+              const neighbours = graph[frame.u].filter(v => !removed[v]);
+              if (frame.index < neighbours.length) {
+                const v = neighbours[frame.index];
+                frame.index += 1;
+                if (v === frame.parent) continue;
+                if (disc.has(v)) low.set(frame.u, Math.min(low.get(frame.u), disc.get(v)));
+                else {
+                  disc.set(v, timer); low.set(v, timer); timer += 1;
+                  frame.children += 1;
+                  stack.push({ u: v, parent: frame.u, index: 0, children: 0 });
+                }
+              } else {
+                stack.pop();
+                const parent = stack[stack.length - 1];
+                if (parent) {
+                  low.set(parent.u, Math.min(low.get(parent.u), low.get(frame.u)));
+                  if (parent.parent !== -1 && low.get(frame.u) >= disc.get(parent.u)) cut.add(parent.u);
+                }
+              }
+            }
+            const rootChildren = graph[root].filter(v => !removed[v] && disc.get(v) === 1).length;
+            if (rootChildren > 1) cut.add(root);
+            return cut;
+          };
+
+          const longestPath = (graph, removed, alive, beamWidth) => {
+            if (!alive.length) return [];
+            const words = Math.ceil(graph.length / 32);
+            const hasBit = (mask, i) => (mask[i >> 5] & (1 << (i & 31))) !== 0;
+            const setBit = (mask, i) => { const copy = mask.slice(); copy[i >> 5] |= (1 << (i & 31)); return copy; };
+            let beam = alive.map(start => {
+              const mask = new Uint32Array(words);
+              mask[start >> 5] |= (1 << (start & 31));
+              return { pos: start, mask, len: 1, prev: null };
+            });
+            let best = beam[0];
+            while (beam.length) {
+              const next = [];
+              for (const state of beam) {
+                for (const to of graph[state.pos]) {
+                  if (removed[to] || hasBit(state.mask, to)) continue;
+                  next.push({ pos: to, mask: setBit(state.mask, to), len: state.len + 1, prev: state });
+                }
+              }
+              if (!next.length) break;
+              next.sort((a, b) => b.len - a.len);
+              beam = next.slice(0, beamWidth);
+              if (beam[0].len > best.len) best = beam[0];
+            }
+            const out = [];
+            for (let node = best; node; node = node.prev) out.push(node.pos);
+            return out.reverse();
+          };
+
+          // --- 전체 계획 수립 ---
+          // 콤보 사이에 '다시 하기'로 경로를 비우므로 매 라운드 시작 타일을 새로 고를 수 있다.
+          // (게임의 '다시 하기'는 경로만 비우고 콤보 기록과 제거된 타일은 그대로 둔다.
+          //  샘플 화면도 재생 쪽에서 같은 방식으로 맞춰 두었다.)
+          // 시작 타일은 제거되므로, 보드가 쪼개지지 않도록 관절점을 피해 가장자리부터 소모한다.
+          const planGame = (tiles, graph, opts) => {
+            const removed = tiles.map(tile => tile.removed);
+            const rounds = [];
+            let sum = 0;
+            for (let round = 0; round < tiles.length; round += 1) {
+              const alive = [];
+              for (let i = 0; i < tiles.length; i += 1) if (!removed[i]) alive.push(i);
+              if (alive.length < 2) break;
+              const cut = articulation(graph, removed, alive);
+              const degree = i => graph[i].filter(x => !removed[x]).length;
+              const ranked = alive.slice().sort((a, b) => {
+                const ca = cut.has(a) ? 1 : 0;
+                const cb = cut.has(b) ? 1 : 0;
+                if (ca !== cb) return ca - cb;
+                const pa = tiles[a].op === '×' || tiles[a].op === '÷' ? 1 : 0;
+                const pb = tiles[b].op === '×' || tiles[b].op === '÷' ? 1 : 0;
+                if (pa !== pb) return pa - pb;
+                return degree(a) - degree(b);
+              });
+              let bestRound = null;
+              for (const start of ranked.slice(0, opts.startCandidates)) {
+                const found = findPath(tiles, graph, removed, start, opts);
+                if (found && (!bestRound || found.score > bestRound.score)) bestRound = found;
+              }
+              if (!bestRound) {
+                for (const start of alive) {
+                  const found = findPath(tiles, graph, removed, start, opts);
+                  if (found && (!bestRound || found.score > bestRound.score)) bestRound = found;
+                }
+              }
+              if (!bestRound) break;
+              rounds.push(bestRound);
+              sum += bestRound.score;
+              removed[bestRound.path[0]] = true;
+            }
+            const aliveEnd = [];
+            for (let i = 0; i < tiles.length; i += 1) if (!removed[i]) aliveEnd.push(i);
+            const tail = longestPath(graph, removed, aliveEnd, 300);
+            return { rounds, tail, sum, penalty: aliveEnd.length - tail.length };
+          };
+
+          // 강지후 샘플은 콤보를 선언하면 남는 마지막 타일이 곧 다음 콤보의 시작 타일이 된다.
+          // (샘플의 '다시 하기'는 경로와 함께 제거 기록까지 되살리는 "무르기"라서, 새 게임처럼
+          //  경로만 비우는 용도로 쓸 수 없다.) 첫 콤보만 시작 타일을 고르고 이후는 한 줄 사슬이다.
+          const planSample = (tiles, graph, opts) => {
+            const removed = tiles.map(tile => tile.removed);
+            const rounds = [];
+            let sum = 0;
+            let startFrom = null;
+            for (let round = 0; round < tiles.length; round += 1) {
+              const alive = [];
+              for (let i = 0; i < tiles.length; i += 1) if (!removed[i]) alive.push(i);
+              if (alive.length < 2) break;
+              let bestRound = null;
+              if (startFrom === null) {
+                const cut = articulation(graph, removed, alive);
+                const degree = i => graph[i].filter(x => !removed[x]).length;
+                const ranked = alive.slice().sort((a, b) => {
+                  const ca = cut.has(a) ? 1 : 0;
+                  const cb = cut.has(b) ? 1 : 0;
+                  if (ca !== cb) return ca - cb;
+                  return degree(a) - degree(b);
+                });
+                for (const start of ranked.slice(0, opts.startCandidates)) {
+                  const found = findPath(tiles, graph, removed, start, opts);
+                  if (found && (!bestRound || found.score > bestRound.score)) bestRound = found;
+                }
+              } else if (!removed[startFrom]) {
+                bestRound = findPath(tiles, graph, removed, startFrom, opts);
+              }
+              if (!bestRound) break;
+              rounds.push(bestRound);
+              sum += bestRound.score;
+              removed[bestRound.path[0]] = true;
+              startFrom = bestRound.path[bestRound.path.length - 1];
+            }
+            // 마지막 콤보 뒤에도 경로는 끝 타일에 남아 있다. 거기서 이어 남은 타일을 훑어 감점을 줄인다.
+            const tail = startFrom !== null && !removed[startFrom]
+              ? longestPath(graph, removed, [startFrom], 400)
+              : [];
+            return { rounds, tail, sum };
+          };
+
+          // --- 계획 재생 ---
+          const resetPath = async () => {
+            const button = [...document.querySelectorAll('button.retry-button')].find(item => item.textContent.trim() === '다시 하기');
+            const props = reactProps(button);
+            if (props && props.onClick) props.onClick();
+            else if (button) button.click();
+            return waitFor(() => pathCount() === 0, 600);
+          };
+          const clickNode = async (tiles, node, expected) => {
+            const slot = slots()[tiles[node].cellIndex];
+            const button = slot && slot.querySelector('.hex-tile');
+            if (!button) return false;
+            button.click();
+            return waitFor(() => pathCount() === expected, 600);
+          };
+          const declare = async () => {
+            const button = [...document.querySelectorAll('button.combo-button')].find(item => !item.classList.contains('retry-button') && item.textContent.trim() === '콤보 완성 선언');
+            if (!button) return false;
+            const before = comboCount();
+            button.click();
+            return waitFor(() => comboCount() > before, 900);
+          };
+          // 샘플 화면에는 콤보 로그가 없어서 점수 카드의 [N콤보] 배지로 진행을 확인한다
+          const sampleComboBadge = () => Number((document.querySelector('.score-card span') || {}).textContent?.match(/\d+/) || [-1]);
+          const sampleSelectedCount = () => document.querySelectorAll('.sample-hex-tile.selected').length;
+          const clickSampleNode = async (tiles, node, expected) => {
+            const slot = sampleSlots()[tiles[node].cellIndex];
+            const button = slot && slot.querySelector('.sample-hex-tile');
+            if (!button) return false;
+            button.click();
+            return waitFor(() => sampleSelectedCount() === expected, 600);
+          };
+          const declareSample = async () => {
+            const button = [...document.querySelectorAll('.sample-head-actions .combo-button')]
+              .find(item => !item.classList.contains('retry-button') && item.textContent.trim() === '콤보 완성 선언');
+            if (!button) return false;
+            const before = sampleComboBadge();
+            button.click();
+            return waitFor(() => sampleComboBadge() > before, 900);
+          };
+
+          const solve = async (status, options = {}) => {
+            if (document.querySelector('.tray-stack .tray-tile')) { status.textContent = '먼저 타일 배치를 완료하세요.'; return; }
+            const board = readBoard();
+            if (board.tiles.length < 2) { status.textContent = '배치된 타일이 없습니다.'; return; }
+            if (options.ai) aiSession = true;
+            status.textContent = options.ai ? 'AI가 경로를 계산 중…' : '경로 계산 중…';
+            await sleep(20);
+            const opts = { beamWidth: 700, maxDepth: 75, startCandidates: 6, perValue: 2 };
+            const t0 = performance.now();
+            const plan = planGame(board.tiles, board.graph, opts);
+            const planned = plan.rounds.length;
+            status.textContent = options.ai
+              ? `AI가 ${planned}콤보 경로를 찾았습니다 · 재생 중…`
+              : `계획 완료 · ${planned}콤보 예상 (${Math.round(performance.now() - t0)}ms) · 재생 중…`;
+            await sleep(20);
+
+            // 재생 중에는 게임이 콤보마다 걸어두는 자동 제출을 전부 막는다.
+            // 어떤 경로로 호출되든 이 함수가 끝나면 반드시 해제된다(아래 finally).
+            suppressSubmit = true;
+            let done = 0;
+            let failed = 0;
+            try {
+            for (let i = 0; i < plan.rounds.length; i += 1) {
+              const round = plan.rounds[i];
+              if (!(await resetPath())) { failed += 1; break; }
+              let ok = true;
+              for (let step = 0; step < round.path.length; step += 1) {
+                if (!(await clickNode(board.tiles, round.path[step], step + 1))) { ok = false; break; }
+              }
+              if (!ok) { failed += 1; break; }
+              if (!(await declare())) { failed += 1; break; }
+              done += 1;
+              if (done % 3 === 0 || i === plan.rounds.length - 1) {
+                status.textContent = `${options.ai ? 'AI 플레이 중' : '자동 솔버 진행 중'} · ${done}/${planned}콤보`;
+                await sleep(0);
+              }
+            }
+            // 남은 타일을 경로에 담아 미사용 감점을 줄인다
+            if (plan.tail.length > 1) {
+              await resetPath();
+              for (let step = 0; step < plan.tail.length; step += 1) {
+                if (!(await clickNode(board.tiles, plan.tail[step], step + 1))) break;
+              }
+            }
+            await sleep(60);
+            const parts = getScoreParts();
+            const shown = parts ? `${(parts.comboPoints * parts.combos).toLocaleString('ko-KR')}점` : '';
+            let submitted = false;
+            if (done === 0) {
+              // 이번 실행에서 새로 만든 콤보가 없으면(예: 이미 다 푼 보드에서 다시 누른 경우)
+              // 화면에 남아 있는 이전 점수를 중복 기록하지 않는다.
+              submitted = false;
+            } else if (options.ai) {
+              // AI 기록은 사람 리더보드가 아닌 전용 테이블로만 나간다.
+              // submitAiScore는 nativeFetch를 쓰므로 suppressSubmit의 영향을 받지 않는다.
+              submitted = await submitAiScore();
+              if (submitted) renderAiBoard();
+            } else {
+              suppressSubmit = false;
+              submitted = await submitFinalScore();
+            }
+            const label = options.ai ? 'AI 플레이 완료' : '자동 솔버 완료';
+            status.textContent = `${label} · ${done}콤보${failed ? ' · 중단됨' : ''} · ${shown}${submitted ? ' · 기록 저장됨' : ''}`;
+            return { done, failed, score: parts ? parts.comboPoints * parts.combos : 0 };
+            } finally {
+              // AI 판이면 aiSession 이 계속 막아주므로 여기서는 풀어도 안전하다
+              suppressSubmit = false;
+            }
+          };
+
+          // 새 게임 → 자동 배치 → 솔버까지 한 번에 돌린다.
+          // ai:true 면 시작부터 끝까지 사람 리더보드 제출을 막고 AI 테이블에만 기록한다.
+          const runFullPlay = async (status, options = {}) => {
+            const fresh = buttonByText('새 게임');
+            if (fresh) { fresh.click(); await waitFor(() => !!document.querySelector('.tray-stack .tray-tile'), 1500); }
+            // '새 게임' 클릭이 aiSession 을 해제하므로 그 뒤에 다시 켠다
+            if (options.ai) aiSession = true;
+            await placeAll(status);
+            return solve(status, options);
+          };
+
+          // 강지후 샘플 풀이. 새 게임과 동일하게 콤보마다 경로를 비우고 시작 타일을 새로 고른다.
+          //
+          // 다만 샘플의 '다시 하기'는 제거된 타일까지 되살리기 때문에, 그대로 두면 같은 타일을
+          // 시작 타일로 무한히 재사용할 수 있어 새 게임보다 유리해진다. 그래서 게임이 되살리더라도
+          // 솔버가 소모한 타일을 자체적으로 기억하고 다시 쓰지 않는다(= 규칙은 새 게임과 같게 유지).
+          //
+          // 고정 배치라 매번 같은 결과가 나오고 새 게임과 조건도 다르므로 어느 리더보드에도 남기지 않는다.
+          const runSamplePlay = async status => {
+            // 이전 실행이 남긴 콤보·제거 상태 위에 겹쳐 쌓이지 않도록 깨끗한 샘플에서 시작한다.
+            // ('강지후 샘플' 클릭은 이 페이지의 캡처 리스너가 새 게임 → 샘플 재진입으로 처리한다)
+            if (sampleComboBadge() > 0) {
+              const reopen = buttonByText('강지후 샘플') || buttonByText('샘플 닫기');
+              if (reopen) {
+                reopen.click();
+                await waitFor(() => sampleComboBadge() === 0, 1500);
+                if (!document.querySelector('.sample-card')) {
+                  const open = buttonByText('강지후 샘플');
+                  if (open) { open.click(); await waitFor(() => !!document.querySelector('.sample-card'), 1500); }
+                }
+              }
+            }
+            aiSession = true;
+            const board = readSampleBoard();
+            if (board.tiles.length < 2) { status.textContent = '샘플 보드를 찾지 못했습니다.'; return; }
+            status.textContent = 'AI가 샘플 경로를 계산 중…';
+            await sleep(20);
+            const opts = { beamWidth: 700, maxDepth: 88, startCandidates: 6, perValue: 2 };
+            const plan = planSample(board.tiles, board.graph, opts);
+            const planned = plan.rounds.length;
+            if (!planned) { status.textContent = '샘플에서 만들 수 있는 콤보를 찾지 못했습니다.'; return; }
+            status.textContent = `AI가 ${planned}콤보 경로를 찾았습니다 · 재생 중…`;
+            await sleep(20);
+            let done = 0;
+            let failed = false;
+            for (let i = 0; i < plan.rounds.length; i += 1) {
+              const path = plan.rounds[i].path;
+              // 첫 콤보가 아니면 직전 콤보의 마지막 타일이 이미 경로에 남아 있으므로 그 칸은 건너뛴다
+              const from = i === 0 ? 0 : 1;
+              let ok = true;
+              for (let step = from; step < path.length; step += 1) {
+                if (!(await clickSampleNode(board.tiles, path[step], step + 1))) { ok = false; break; }
+              }
+              if (!ok || !(await declareSample())) { failed = true; break; }
+              done += 1;
+              if (done % 3 === 0 || i === plan.rounds.length - 1) {
+                status.textContent = `AI 샘플 풀이 중 · ${done}/${planned}콤보`;
+                await sleep(0);
+              }
+            }
+            // 마지막 콤보 뒤 남은 타일을 이어 훑어 미사용 감점을 줄인다.
+            // tail[0]은 이미 경로에 남아 있는 끝 타일이므로 그 다음 칸부터 누른다.
+            if (done && !failed && plan.tail.length > 1) {
+              for (let step = 1; step < plan.tail.length; step += 1) {
+                if (!(await clickSampleNode(board.tiles, plan.tail[step], step + 1))) break;
+              }
+            }
+            await sleep(60);
+            const parts = getScoreParts();
+            const shown = parts ? `${(parts.comboPoints * parts.combos).toLocaleString('ko-KR')}점` : '';
+            status.textContent = `AI 샘플 풀이 완료 · ${done}콤보${failed ? ' · 중단됨' : ''} · ${shown} · 기록 미등록`;
+            return { done, failed };
+          };
+
+          const mountDevControls = () => {
+            if (document.getElementById('formula-solver-controls')) return;
+            const head = document.querySelector('.topbar');
+            if (!head) return;
+            const controls = document.createElement('div');
+            controls.id = 'formula-solver-controls';
+            controls.innerHTML = '<button type="button" data-solver-place>자동 배치</button><button type="button" data-solver-run>솔버 실행</button><button type="button" data-solver-auto>자동 플레이</button><span data-solver-status>개발용 자동 플레이</span>';
+            head.append(controls);
+            const status = controls.querySelector('[data-solver-status]');
+            const lock = async task => {
+              const all = [...controls.querySelectorAll('button')];
+              all.forEach(item => { item.disabled = true; });
+              try { await task(); } catch (error) { status.textContent = `오류: ${error && error.message}`; }
+              all.forEach(item => { item.disabled = false; });
+            };
+            // 개발용 버튼도 결국 AI가 푸는 것이므로 사람 리더보드가 아니라 AI 테이블에 기록한다.
+            // 사람 리더보드는 손으로 플레이했을 때만 갱신된다.
+            controls.querySelector('[data-solver-place]').onclick = () => lock(() => placeAll(status));
+            controls.querySelector('[data-solver-run]').onclick = () => lock(() => solve(status, { ai: true }));
+            controls.querySelector('[data-solver-auto]').onclick = () => lock(() => runFullPlay(status, { ai: true }));
+          };
+
+          // 모바일에서는 상단 상태줄과 보드를 동시에 볼 수 없다(보드가 뷰포트보다 아래에 있고
+          // 세로로 길다). 그래서 관전 시작 시 보드로 스크롤하고, 진행 상황은 화면 하단에
+          // 고정된 HUD로 따로 띄운다.
+          const focusBoard = () => {
+            const board = document.querySelector('.hex-board') || document.querySelector('.sample-hex-board') || document.querySelector('.board-card');
+            if (board && board.scrollIntoView) board.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          };
+          let hudTimer = null;
+          const showHud = () => {
+            let hud = document.getElementById('formula-ai-hud');
+            if (!hud) {
+              hud = document.createElement('div');
+              hud.id = 'formula-ai-hud';
+              hud.innerHTML = '<span data-hud-text></span><button type="button" data-hud-close aria-label="닫기">✕</button>';
+              document.body.append(hud);
+              hud.querySelector('[data-hud-close]').onclick = () => hud.remove();
+            }
+            window.clearTimeout(hudTimer);
+            hud.hidden = false;
+            return hud.querySelector('[data-hud-text]');
+          };
+          const hideHudLater = () => {
+            const hud = document.getElementById('formula-ai-hud');
+            if (!hud) return;
+            window.clearTimeout(hudTimer);
+            hudTimer = window.setTimeout(() => hud.remove(), 8000);
+          };
+          // 여러 요소에 같은 상태 문구를 동시에 반영하기 위한 얇은 대리 객체
+          const statusSink = (...targets) => ({
+            set textContent(value) { targets.forEach(target => { if (target) target.textContent = value; }); },
+            get textContent() { return (targets[0] && targets[0].textContent) || ''; }
+          });
+
+          const mountAiTab = () => {
+            if (document.getElementById('formula-ai-show')) return;
+            const head = document.querySelector('.topbar');
+            if (!head) return;
+            const wrap = document.createElement('div');
+            wrap.id = 'formula-ai-show';
+            wrap.innerHTML = '<button type="button" class="reset" data-ai-run>AI 플레이 구경</button><span data-ai-status></span>';
+            const anchor = document.getElementById('formula-solver-controls');
+            if (anchor) head.insertBefore(wrap, anchor); else head.append(wrap);
+            const button = wrap.querySelector('[data-ai-run]');
+            const status = wrap.querySelector('[data-ai-status]');
+            button.onclick = async () => {
+              // 강지후 샘플 화면에서는 그 고정 배치를 푼다
+              const sample = !!document.querySelector('.sample-card');
+              button.disabled = true;
+              button.classList.add('active');
+              const hudText = showHud();
+              const sink = statusSink(status, hudText);
+              sink.textContent = sample ? 'AI가 샘플을 살펴보는 중…' : 'AI가 새 판을 준비하고 있습니다…';
+              focusBoard();
+              try {
+                if (sample) await runSamplePlay(sink);
+                else await runFullPlay(sink, { ai: true });
+              } catch (error) {
+                sink.textContent = `오류: ${error && error.message}`;
+              }
+              button.disabled = false;
+              button.classList.remove('active');
+              hideHudLater();
+            };
+          };
+          return { mountDevControls, mountAiTab };
+        })();
+        let adminSolverDecision = null;
+        const mountFormulaSolver = () => {
+          if (adminSolverDecision === false || adminSolverDecision === true) {
+            if (adminSolverDecision === true) formulaSolver.mountDevControls();
+            return;
+          }
+          // 로컬 개발 환경에서는 관리자 인증 없이 개발용 컨트롤을 띄운다
+          if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+            adminSolverDecision = true;
+            formulaSolver.mountDevControls();
+            return;
+          }
+          const password = window.sessionStorage.getItem('bloodGameXAdminPw');
+          if (!password) { adminSolverDecision = false; return; }
+          adminSolverDecision = fetch('https://paktzmofotvwfdxcpmzv.supabase.co/rest/v1/rpc/admin_check_password', {
+            method: 'POST',
+            headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ p_password: password })
+          }).then(response => response.ok ? response.json() : false).then(valid => {
+            adminSolverDecision = valid === true;
+            if (adminSolverDecision) formulaSolver.mountDevControls();
+            return adminSolverDecision;
+          }).catch(() => { adminSolverDecision = false; return false; });
+        };
+        // ---- 모바일 터치 드래그 폴리필 ----
+        // 게임 본체가 타일 배치를 네이티브 HTML5 Drag&Drop(onDragStart/onDrop)으로만 구현해서
+        // 터치 브라우저(iOS Safari, Android Chrome)에서는 dragstart/drop 이벤트가 전혀 발화하지
+        // 않는다. 터치 제스처를 감지해 같은 리액트 핸들러를 대신 호출해 대체한다.
+        (() => {
+          const reactPropsOf = element => {
+            if (!element) return null;
+            const propsKey = Object.keys(element).find(name => name.startsWith('__reactProps'));
+            return propsKey ? element[propsKey] : null;
+          };
+          let dragging = null;
+          const makeGhost = el => {
+            const rect = el.getBoundingClientRect();
+            const ghost = el.cloneNode(true);
+            ghost.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;margin:0;pointer-events:none;z-index:9999;opacity:.85;transform:scale(1.06);transition:none;`;
+            document.body.append(ghost);
+            return ghost;
+          };
+          const moveGhost = (ghost, x, y) => {
+            const rect = ghost.getBoundingClientRect();
+            ghost.style.left = `${x - rect.width / 2}px`;
+            ghost.style.top = `${y - rect.height / 2}px`;
+          };
+          document.addEventListener('touchstart', event => {
+            if (dragging) return;
+            const tile = event.target.closest('.tray-tile');
+            if (!tile) return;
+            const props = reactPropsOf(tile);
+            if (!props || !props.onDragStart) return;
+            const touch = event.touches[0];
+            event.preventDefault();
+            props.onDragStart();
+            dragging = { el: tile, ghost: makeGhost(tile) };
+            moveGhost(dragging.ghost, touch.clientX, touch.clientY);
+          }, { passive: false });
+          document.addEventListener('touchmove', event => {
+            if (!dragging) return;
+            event.preventDefault();
+            const touch = event.touches[0];
+            moveGhost(dragging.ghost, touch.clientX, touch.clientY);
+          }, { passive: false });
+          const endDrag = event => {
+            if (!dragging) return;
+            const { el, ghost } = dragging;
+            const touch = event.changedTouches && event.changedTouches[0];
+            event.preventDefault();
+            ghost.remove();
+            let dropped = false;
+            if (touch) {
+              const target = document.elementFromPoint(touch.clientX, touch.clientY);
+              const slot = target && target.closest('.hex-board .hex-slot');
+              const dropProps = slot && reactPropsOf(slot);
+              if (dropProps && dropProps.onDrop) { dropProps.onDrop({ preventDefault() {} }); dropped = true; }
+            }
+            if (!dropped) {
+              const endProps = reactPropsOf(el);
+              if (endProps && endProps.onDragEnd) endProps.onDragEnd();
+            }
+            dragging = null;
+          };
+          document.addEventListener('touchend', endDrag, { passive: false });
+          document.addEventListener('touchcancel', endDrag, { passive: false });
+          const style = document.createElement('style');
+          style.textContent = '.tray-tile{touch-action:none}';
+          document.head.append(style);
+        })();
+        let modeSwitchBypass = false;
+        document.addEventListener('click', event => {
+          if (modeSwitchBypass) return;
+          const button = event.target.closest('button');
+          const label = button?.textContent.trim();
+          if (label !== '강지후 샘플' && label !== '샘플 닫기') return;
+          event.preventDefault();
+          event.stopPropagation();
+          const newGame = [...document.querySelectorAll('button')].find(item => item.textContent.trim() === '새 게임');
+          modeSwitchBypass = true;
+          newGame?.click();
+          modeSwitchBypass = false;
+          if (label === '강지후 샘플') setTimeout(() => {
+            const sample = [...document.querySelectorAll('button')].find(item => item.textContent.trim() === '강지후 샘플');
+            modeSwitchBypass = true;
+            sample?.click();
+            modeSwitchBypass = false;
+          }, 0);
+        }, true);
+        let replayResetBypass = false;
+        document.addEventListener('click', async event => {
+          const button = event.target.closest('button.retry-button');
+          if (replayResetBypass || !button || button.textContent.trim() !== '다시 하기') return;
+          event.preventDefault();
+          event.stopPropagation();
+          const restart = [...document.querySelectorAll('button')].find(item => item.textContent.trim() === '새 게임');
+          if (button.closest('.sample-card')) {
+            restart?.click();
+            setTimeout(() => [...document.querySelectorAll('button')].find(item => item.textContent.trim() === '강지후 샘플')?.click(), 0);
+          } else {
+            let remaining = 0;
+            const readComboCount = () => Number(document.querySelector('.combo-log .log-head b')?.textContent.match(/\d+/)?.[0] || 0);
+            while ((remaining = readComboCount()) > 0) {
+              const undo = [...document.querySelectorAll('button.retry-button')].find(item => item.textContent.trim() === '되돌리기');
+              if (!undo) break;
+              replayResetBypass = true;
+              undo.click();
+              replayResetBypass = false;
+              await new Promise(resolve => setTimeout(resolve, 25));
+            }
+            replayResetBypass = true;
+            button.click();
+            replayResetBypass = false;
+          }
+        }, true);
+        const style = document.createElement('style');
+        style.textContent = '#formula-my-rank{color:#e2b653;font-size:10px;font-weight:800;margin-left:auto;margin-right:8px}.formula-source{font-style:normal;color:#e2b653;font-size:10px;font-weight:800;white-space:nowrap}.formula-counts{color:#8992a0;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#formula-solver-controls{display:flex;align-items:center;gap:6px;margin-left:8px;flex-wrap:wrap}#formula-solver-controls button{border:1px solid #70c7b5;border-radius:7px;background:#16252a;color:#b9fff2;padding:5px 8px;font:inherit;font-size:10px;font-weight:800;cursor:pointer}#formula-solver-controls span{color:#8992a0;font-size:10px}#formula-ai-show{display:flex;align-items:center;gap:8px;flex-wrap:wrap}#formula-ai-show [data-ai-run]{white-space:nowrap}#formula-ai-show [data-ai-run].active{opacity:.75;cursor:progress}#formula-ai-show [data-ai-status]{color:#70c7b5;font-size:11px;font-weight:700}#formula-ai-panel{margin-top:10px;padding:12px;border-top:1px solid rgba(255,255,255,.08);color:#eef3f4;font-size:12px}#formula-ai-panel p{color:#70c7b5;margin:8px 0}#formula-ai-panel .ai-row{display:grid;grid-template-columns:auto 1fr auto;gap:4px 8px;align-items:center;padding:7px 0;border-top:1px solid rgba(255,255,255,.06)}#formula-ai-panel .ai-row b{color:#e2b653;font-size:11px}#formula-ai-panel .ai-row span{color:#aab4bd;font-size:11px}#formula-ai-panel .ai-row em{font-style:normal;color:#b9fff2;font-size:12px;font-weight:800;white-space:nowrap}#formula-ai-panel .ai-row small{grid-column:1/-1;color:#8992a0;font-size:9px}#formula-ai-hud{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;z-index:60;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 24px);padding:10px 12px;border:1px solid #5fb8b073;border-radius:12px;background:#0f1a1fF0;box-shadow:0 6px 20px rgba(0,0,0,.45);backdrop-filter:blur(6px)}#formula-ai-hud [data-hud-text]{color:#b9fff2;font-size:12px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#formula-ai-hud [data-hud-close]{flex:none;border:0;border-radius:6px;background:transparent;color:#8992a0;font-size:12px;line-height:1;padding:4px 6px;cursor:pointer}#formula-ai-hud [data-hud-close]:hover{color:#eef3f4}@media (prefers-reduced-motion:reduce){#formula-ai-hud{backdrop-filter:none}}#formula-live-combo{border-bottom:1px solid var(--border);padding:18px 0}#formula-live-combo>div{color:#ddd8cc;margin-top:8px;font-size:16px;line-height:1.5;word-break:break-word}#formula-live-combo>strong{color:var(--accent-hover);margin-top:8px;font-size:18px;display:block}#formula-live-combo .muted{color:var(--text-dim);font-size:12px}#formula-sample-calc{border:1px solid var(--border);background:var(--panel-light);border-radius:14px;margin-top:14px;padding:12px 14px;color:var(--text)}#formula-sample-calc>div{color:#ddd8cc;margin-top:8px;font-size:16px;line-height:1.5;word-break:break-word}#formula-sample-calc>strong{color:var(--accent-hover);margin-top:8px;font-size:18px;display:block}.intro>.score-card{flex:1}@media (max-width:480px){#formula-ai-show{width:auto;order:0}#formula-ai-show [data-ai-run]{width:auto}#formula-ai-show [data-ai-status]{display:none}.topbar .reset[data-short]{font-size:0;padding:8px 9px}.topbar .reset[data-short]::after{content:attr(data-short);font-size:11px;font-weight:600;line-height:1.2}#formula-ai-panel .ai-row{grid-template-columns:auto 1fr;row-gap:2px}#formula-ai-panel .ai-row em{grid-column:2;justify-self:end}}.score-card .total-score-line.is-raw-total{display:none}.score-card .formula-final-score{display:block;color:var(--accent-hover);background:#5fb8b01f;border:1px solid #5fb8b073;border-radius:9px;margin-top:8px;padding:8px 10px;font-size:13px;font-weight:800}';
+        document.head.append(style);
+        new MutationObserver(mount).observe(document.documentElement, { childList: true, subtree: true });
+        setTimeout(mount, 0);
+        new MutationObserver(mountFormulaSolver).observe(document.documentElement, { childList: true, subtree: true });
+        setTimeout(mountFormulaSolver, 0);
+        // AI 관전 탭은 관리자 여부와 무관하게 모두에게 노출한다
+        const mountAiShowTab = () => formulaSolver.mountAiTab();
+        new MutationObserver(mountAiShowTab).observe(document.documentElement, { childList: true, subtree: true });
+        setTimeout(mountAiShowTab, 0);
+      })();
+    </script>
+    <script type="module" crossorigin src="./assets/formula-combo/formula-combo-BP32ypKH.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/formula-combo/formula-combo-5l9dnKUj.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

@@ -568,10 +568,29 @@
     flex-direction: column;
     gap: 3px;
   }
+  .game-info .name-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
   .game-info .name {
     font-size: 16.5px;
     font-weight: 700;
     letter-spacing: -0.01em;
+  }
+  .game-new-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #e05b5b, #c93b3b);
+    color: #ffffff;
+    font-size: 9.5px;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    padding: 2px 6px;
+    border-radius: 6px;
+    line-height: 1;
+    box-shadow: 0 2px 6px rgba(224, 91, 91, 0.4);
   }
   .game-info .desc {
     font-size: 12.5px;
@@ -708,6 +727,7 @@
       href: './card-chess.html',
       target: '_self',
       image: './assets/card-chess-icon.png',
+      isNew: true,
     },
     {
       name: '링 더 벨',
@@ -715,6 +735,14 @@
       href: './ring-the-bell.html',
       target: '_self',
       emoji: '🔔',
+    },
+    {
+      name: '언어의 조각',
+      desc: '한글 자음, 모음 타일을 회전하고 배치하여 정답 단어를 찾는 100단계 퍼즐',
+      href: './wordgame.html',
+      target: '_self',
+      emoji: '🧩',
+      isNew: true,
     },
     {
       name: '수식 콤보',
@@ -795,7 +823,10 @@
     card.innerHTML = `
       ${iconHtml}
       <div class="game-info">
-        <span class="name">${g.name}</span>
+        <div class="name-row">
+          <span class="name">${g.name}</span>
+          ${g.isNew ? '<span class="game-new-badge">NEW</span>' : ''}
+        </div>
         <span class="desc">${g.desc}</span>
       </div>
       <span class="game-arrow">→</span>
@@ -1156,10 +1187,24 @@
     return response.json();
   }
 
+  async function fetchWordgameTop(limit) {
+    const res = await fetch(
+      `${LB_SUPABASE_URL}/rest/v1/card_chess_leaderboard?nickname=like.wordgame:*&select=nickname,rating,wins&order=rating.desc,updated_at.asc&limit=${limit}`,
+      { headers: lbHeaders() }
+    );
+    if (!res.ok) throw new Error('언어의 조각 리더보드 조회 실패');
+    const rows = await res.json();
+    return rows.map(r => ({
+      nickname: (r.nickname || '').replace(/^wordgame:/, ''),
+      score: r.rating || 0,
+      stages: r.wins || 0
+    }));
+  }
+
   const LB_SECTIONS = [
     {
       label: '카드체스',
-      fetch: (limit) => fetchSimpleTop('card_chess_leaderboard', 'nickname,rating,wins,losses', 'rating.desc', limit),
+      fetch: (limit) => fetchSimpleTop('card_chess_leaderboard?nickname=not.like.wordgame*', 'nickname,rating,wins,losses', 'rating.desc', limit),
       format: r => `${r.wins}승 ${r.losses}패 · ${r.rating}점`,
     },
     {
@@ -1201,6 +1246,11 @@
       label: '모자이크 퍼즐',
       fetch: (limit) => fetchSimpleTop('color_connect_leaderboard', 'nickname,score', 'score.desc,created_at.asc', limit),
       format: r => `${r.score}점`,
+    },
+    {
+      label: '언어의 조각',
+      fetch: (limit) => fetchWordgameTop(limit),
+      format: r => `${r.stages}단계 클리어 · ${r.score}점`,
     },
   ];
 

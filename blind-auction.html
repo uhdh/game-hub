@@ -162,8 +162,6 @@
         <div class="artwork-meta" id="artwork-meta"></div>
       </div>
 
-      <div class="log-card" id="log-list"></div>
-
       <div class="players-bar" id="players-bar"></div>
 
       <div class="highest-card">
@@ -181,6 +179,8 @@
         <button type="button" class="btn-primary" id="bid-btn" disabled>입찰</button>
         <button type="button" class="btn-secondary" id="pass-btn" disabled>포기</button>
       </div>
+
+      <div class="log-card" id="log-list"></div>
     </div>
 
     <div id="screen-results" class="screen hidden">
@@ -210,7 +210,7 @@
 
 <div id="modal-reveal" class="modal hidden">
   <div class="modal-box">
-    <div class="reveal-label">물품 22개 가치 총합 (<span id="reveal-unit-label">억원</span>)</div>
+    <div class="reveal-label"><span id="reveal-category-label">미술품</span> · 물품 22개 가치 총합 (<span id="reveal-unit-label">억원</span>)</div>
     <div class="reveal-total" id="reveal-total-value">0</div>
     <div class="reveal-hint">이 중 11개만 경매에 오릅니다.</div>
     <button type="button" class="btn-primary" id="reveal-continue-btn">경매 시작</button>
@@ -283,6 +283,7 @@
       aiProfiles: L.createAiProfiles(),
       pool: null,
       poolTotal: 0,
+      auctionTotal: 0,
       playQueue: [],
       roundIndex: 0,
       startPlayerId: L.PLAYER_ORDER[Math.floor(Math.random() * L.PLAYER_ORDER.length)],
@@ -293,7 +294,7 @@
   }
 
   const CATEGORY_UNIT = { art: "억원", collectible: "억원", coupang: "만원", youtube: "억회", billionaires: "조원" };
-  const CATEGORY_LABELS = { art: "미술품", collectible: "소장품", coupang: "쿠팡 인기상품", youtube: "유튜브 조회수", billionaires: "포브스 억만장자" };
+  const CATEGORY_LABELS = { art: "미술품", collectible: "소장품", coupang: "네이버 쇼핑 인기상품", youtube: "유튜브 조회수", billionaires: "포브스 억만장자" };
   const CATEGORY_KEYS = Object.keys(CATEGORY_LABELS);
   function randomCategory() {
     return CATEGORY_KEYS[Math.floor(Math.random() * CATEGORY_KEYS.length)];
@@ -414,10 +415,12 @@
 
   function beginGame(items, category) {
     resetGame(category);
-    const { pool, poolTotal, playQueue } = L.pickGamePool(items);
+    const { pool, poolTotal, playQueue, auctionTotal } = L.pickGamePool(items);
     state.pool = pool;
     state.poolTotal = poolTotal;
+    state.auctionTotal = auctionTotal;
     state.playQueue = playQueue;
+    document.getElementById("reveal-category-label").textContent = CATEGORY_LABELS[category] || category;
     document.getElementById("reveal-unit-label").textContent = CATEGORY_UNIT[category] || "억원";
     document.getElementById("reveal-total-value").textContent = poolTotal;
     document.getElementById("modal-reveal").classList.remove("hidden");
@@ -631,14 +634,14 @@
 
   async function fetchLeaderboard() {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/${LEADERBOARD_TABLE}?select=id,nickname,score,category,acquired,pool_total,created_at&order=score.desc,created_at.asc&limit=10`,
+      `${SUPABASE_URL}/rest/v1/${LEADERBOARD_TABLE}?select=id,nickname,score,category,acquired,pool_total,auction_total,created_at&order=score.desc,created_at.asc&limit=10`,
       { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
     );
     if (!res.ok) throw new Error("리더보드 조회 실패");
     return res.json();
   }
 
-  async function submitScore(score, nickname, category, acquired, poolTotal) {
+  async function submitScore(score, nickname, category, acquired, poolTotal, auctionTotal) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${LEADERBOARD_TABLE}`, {
       method: "POST",
       headers: {
@@ -647,7 +650,7 @@
         "Content-Type": "application/json",
         Prefer: "return=representation",
       },
-      body: JSON.stringify({ score, nickname, category, acquired, pool_total: poolTotal }),
+      body: JSON.stringify({ score, nickname, category, acquired, pool_total: poolTotal, auction_total: auctionTotal }),
     });
     if (!res.ok) throw new Error("리더보드 등록 실패");
     return res.json();
@@ -658,7 +661,10 @@
       .map((row, i) => {
         const unit = CATEGORY_UNIT[row.category] || "억원";
         const label = CATEGORY_LABELS[row.category];
-        const breakdown = label ? `${label}, ${row.score}%(${row.acquired}${unit}/${row.pool_total}${unit})` : `${row.score}%`;
+        const hasAuctionDetails = label && row.acquired != null && row.auction_total != null;
+        const breakdown = hasAuctionDetails
+          ? `${label}, ${row.score}% (${row.acquired}${unit} / ${row.auction_total}${unit})`
+          : `${row.score}%`;
         return `<div class="leaderboard-row"><span class="lb-rank">${i + 1}</span><span class="lb-nickname">${row.nickname || "익명"}</span><span class="lb-score">${breakdown}</span></div>`;
       })
       .join("");
@@ -668,18 +674,17 @@
     document.getElementById("leaderboard-list").innerHTML = buildLeaderboardHtml(rows);
   }
 
-  // 물품 22개(총 poolTotal) 중 내가 낙찰받은 금액이 몇 %인지를 리더보드 점수로 쓴다
-  // (예: 1000억 중 400억 획득 -> 40). 절대 금액 대신 비율로 남겨야 매 게임 물품
-  // 풀이 달라져도(추첨되는 22개가 매번 다름) 기록끼리 공정하게 비교된다.
-  function winPercent(userTotal, poolTotal) {
-    if (!poolTotal) return 0;
-    return Math.round((userTotal / poolTotal) * 100);
+  // 실제 경매에 오른 11개 물품의 총가치 중 내가 낙찰받은 금액이 몇 %인지
+  // 리더보드 점수로 쓴다.
+  function winPercent(userTotal, auctionTotal) {
+    if (!auctionTotal) return 0;
+    return Math.round((userTotal / auctionTotal) * 100);
   }
 
-  async function registerScore(nickname, pct, category, acquired, poolTotal) {
+  async function registerScore(nickname, pct, category, acquired, poolTotal, auctionTotal) {
     const statusEl = document.getElementById("rank-register-status");
     try {
-      await submitScore(pct, nickname, category, acquired, poolTotal);
+      await submitScore(pct, nickname, category, acquired, poolTotal, auctionTotal);
       const rows = await fetchLeaderboard();
       renderLeaderboard(rows);
       statusEl.textContent = `"${nickname}" 이름으로 ${pct}% 등록 완료`;
@@ -703,13 +708,13 @@
     });
 
     const userEntry = ranking.find((r) => r.id === "user");
-    const pct = winPercent(userEntry.total, state.poolTotal);
-    document.getElementById("results-pct").textContent = `획득 가치 비율 ${pct}% (${userEntry.total}${unit} / ${state.poolTotal}${unit})`;
+    const pct = winPercent(userEntry.total, state.auctionTotal);
+    document.getElementById("results-pct").textContent = `획득 가치 비율 ${pct}% (${userEntry.total}${unit} / ${state.auctionTotal}${unit})`;
     const storedNickname = getOrCreateStoredNickname(NICKNAME_KEY);
 
     // 게임이 끝나면 자동으로 한 번만 리더보드에 등록한다. 재등록 버튼은 중복 등록을
     // 유발해 제거했다.
-    await registerScore(storedNickname, pct, state.category, userEntry.total, state.poolTotal);
+    await registerScore(storedNickname, pct, state.category, userEntry.total, state.poolTotal, state.auctionTotal);
   }
 
   document.getElementById("restart-btn").addEventListener("click", () => {

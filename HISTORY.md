@@ -1,6 +1,264 @@
 # 작업 히스토리
 
-## 2026-08-30 · Claude Code · 허브 리더보드 모달에서 카드체스를 맨 위로 이동 (배포됨)
+Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 **맨 위에** 새 항목을 추가한다 (최신이 위로 오도록 append). 지침은 `AGENTS.md` 참고.
+
+항목 형식:
+
+```
+## YYYY-MM-DD HH:mm — <에이전트 이름> — <한 줄 요약>
+- 변경 파일: ...
+- 배포: (했다면 어디까지 — 로컬 커밋만 / game-hub push까지 / Vercel 배포 확인까지. 안 했다면 "미배포")
+- 다음 작업/미해결: ...
+```
+
+---
+
+## 2026-08-31 17:57 — Codex — 카드체스 친구 초대 온라인 친선전 구현
+- 변경 파일: `card-chess.html`, `card-chess-online.js`, `card-chess-online.test.js`, `card-chess-online-integration.test.js`, `docs/superpowers/specs/2026-08-31-card-chess-friend-invite-design.md`, `docs/superpowers/plans/2026-08-31-card-chess-friend-invite.md`, `HISTORY.md`
+- 구현 내용: 링더벨의 기존 WebRTC/Supabase 신호 통신을 재사용해 `CC` 방 코드 초대 링크, 방장 P1·참가자 P2, 초기 상태 및 이동/패스 동기화, 상태 체크섬 검증, 연결 끊김 안내를 추가했다. 온라인에서는 각 사용자의 말과 카드가 아래쪽에 보이도록 관점을 뒤집고 AI·난이도·무르기·새 게임을 비활성화했으며, 승패는 리더보드에 기록하지 않는다.
+- 검증: Node 테스트 45개 통과. 로컬 Chrome에서 AI 모드, 초대 모달, 게스트 관점과 온라인 전용 UI를 확인했다. 자동화 도중 Chrome 다중 창 선택이 어긋나 실제 두 탭 간 WebRTC 한 수 교환까지는 완료하지 못했다.
+- 배포: 미배포. 분리 작업 브랜치 `deploy-card-chess-20260831`에 구현됨.
+- 다음 작업/미해결: 실제 두 기기 또는 정확히 분리된 브라우저 컨텍스트에서 초대 링크 연결과 양방향 한 수 교환을 최종 확인한 뒤 원본 repo 및 `game-hub`에 반영·배포할 것.
+
+## 2026-08-31 00:00 — Codex — 카드체스 보드·카드 배치·물방울 말 시인성 개선
+- 변경 파일: `card-chess.html`, `HISTORY.md`
+- 구현 내용: 내 카드·대기·상대 카드를 상단 한 줄로 정리하고, 보드를 420px까지 확대했다. 체스칸은 명암 체크무늬로 구분했으며, 물방울 말은 50px 크기의 SVG 곡선 마스크를 적용해 커져도 외곽이 매끄럽게 표시되도록 했다.
+- 배포: 로컬 커밋 예정. game-hub 원격 master의 선행 커밋을 subtree 역동기화한 뒤 반영함.
+- 다음 작업/미해결: GitHub push 및 Vercel 자동 배포 반영 확인.
+
+---
+
+## 2026-08-30 15:29 — Antigravity — 웹 버전 <언어의 조각> 기존 게임 허브 원본 디자인 유지 원복
+- 변경 파일: `wordgame.html`, `assets/index-DXCZle_K.css`, `assets/index-DlpabusD.js`, `HISTORY.md`
+- 구현 내용:
+  - 웹버전 게임 디자인을 변경하지 말라는 사용자 요구에 따라, 웹버전은 기존 게임 허브의 시그니처 테마(티일/민트 앰비언트 글로우, 오리지널 카드 및 헤더)로 완전 원복 유지.
+  - 최신 구현된 모바일 탭 회전/드래그 전용 이동 UX 및 스테이지별 URL 공유 기능(`?stage=N`)은 100% 정상 보존.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+
+## 2026-08-30 15:27 — Antigravity — NYT Games (Figma Community Kit) 디자인 시스템 기반 UI 전면 재건축
+- 변경 파일: `wordgame.html`, `assets/index-DAtVoYsb.css`, `assets/index-BFPPMvaD.js`, `HISTORY.md`
+- 구현 내용:
+  - 뉴욕타임스 게임즈(Wordle, Connections, Spelling Bee)의 오리지널 디자인 가이드라인 반영:
+    - **타이포그래피**: `Lora` 세리프 서체 헤더(`언어의 조각`) 및 깔끔한 산세리프 타일 폰트 적용.
+    - **색상 시스템**: NYT 매트 딥 다크 모드(`#121213`), Wordle 정답 그린(`#538d4e`), 포함 옐로우(`#b59f3b`), 시그니처 옐로우 골드(`#f7da21`) 적용.
+    - **타일 & 컴포넌트**: 2px 테두리의 정교한 타일 칩, 둥근 캡슐형 아웃라인 버튼 및 스티키 서리유리 헤더 디자인 시스템 재건축.
+  - 웹 배포 및 안드로이드 Capacitor APK(app-debug.apk) 빌드 갱신 동기화 완료.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 15:03 — Antigravity — 언어의 조각 모바일 터치 UX 최적화 (탭 회전/드래그 이동 직관화)
+- 변경 파일: `wordgame.html`, `assets/index-DXCZle_K.css`, `assets/index-DlpabusD.js`, `HISTORY.md`
+- 구현 내용:
+  - 기존 타일 탭 시 선택/교환과 회전 동작이 혼선되던 UX를 단순화: 타일을 탭/클릭하면 **무조건 타일 회전 동작**만 즉시 수행.
+  - 타일 간 순서/위치 이동은 **오직 드래그 앤 드롭(Drag-and-Drop)으로만 동작**하게 명확히 분리하여 모바일 손가락 터치 오류 완벽 차단.
+  - 웹 배포 및 안드로이드 Capacitor APK(app-debug.apk) 빌드 갱신 동기화 완료.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 14:15 — Antigravity — 구글 플레이 스토어 제출용 개인정보 처리방침 페이지(privacy.html) 및 그래픽 자산 추가
+- 변경 파일: `privacy.html`, `HISTORY.md`
+- 구현 내용:
+  - 구글 플레이 콘솔 필수 입력 항목인 개인정보 처리방침 웹 페이지(`privacy.html`)를 생성하여 Vercel 프로덕션 URL(`https://pgamex.vercel.app/privacy.html`)로 배포.
+  - 플레이 스토어 등록용 512x512 고해상도 앱 아이콘 및 1024x500 메인 그래픽 이미지 배너 생성.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 12:19 — Antigravity — 언어의 조각 스테이지별 URL 공유 기능 추가 (`?stage=N` 파라미터 동기화)
+- 변경 파일: `wordgame.html`, `assets/index-DXCZle_K.css`, `assets/index-Esrru9Ov.js`, `HISTORY.md`
+- 구현 내용:
+  - 스테이지 진행/변경 시 브라우저 주소창 URL에 `?stage=N` 쿼리 파라미터가 자동으로 실시간 반영되도록 동기화 (`history.replaceState`).
+  - 외부에서 `https://pgamex.vercel.app/wordgame.html?stage=25` 처럼 접속 시 해당 스테이지(25단계)가 자동으로 바로 로딩되는 기능 구현.
+  - 상단 헤더 툴바에 단계 공유 버튼(`🔗`) 추가: 스마트폰에서는 시스템 공유 시트(`navigator.share`)가 연동되고, 일반 브라우저에서는 클립보드로 해당 스테이지 URL이 복사되며 토스트 알림 팝업이 표시됨.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 12:17 — Antigravity — 언어의 조각 모바일(스마트폰) UI 레이아웃 반응형 최적화
+- 변경 파일: `wordgame.html`, `assets/index-CExGSnHE.css`, `assets/index-BMQuxTyc.js`, `HISTORY.md`
+- 구현 내용:
+  - 스마트폰 화면(375px~390px)에서 타일 7개 중 1개만 2행으로 넘어가서 어색하게 짤리던 현상을 타일 크기 가변화(`clamp(35px, 10.5vw, 44px)`) 및 갭/여백 최적화로 해결 (7개 타일이 1줄에 깔끔히 수평 배치됨).
+  - 스크롤 시 상단 헤더(`← 허브`, `STAGE`, 버튼)가 화면 밖으로 넘어가서 숨겨지던 불편함을 `position: sticky; top: 4px;` 고정으로 해결.
+  - 모바일에서 타일 랙 안내 텍스트 간섭을 정리하고, 프리뷰 박스 및 패널 여백을 줄여 세로 스크롤 없이 플레이할 수 있도록 최적화.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 10:24 — Antigravity — 카드체스 '새 게임' 클릭 시 완전 리셋 및 무작위 카드 셔플 분배 보완
+- 변경 파일: `card-chess.html`, `HISTORY.md`
+- 구현 내용:
+  - '새 게임' 시 AI가 생각 중이던 기존 비동기 타이머가 새 게임에 개입하던 현상을 방지하기 위해 `startGame()` 시작 시 `cancelAiTimer()` 즉시 호출.
+  - 드래프트 UI 불일치 문제로 카드 분배가 고정되거나 누락되던 현상을 해결하고, 매 게임 시작 시 5개의 체스 카드를 완전 무작위 셔플하여 P1(2장), P2(2장), 대기슬롯(1장)으로 100% 새로 분배하도록 개선.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 10:21 — Antigravity — 언어의 조각 1단계(쉬움) 단어 리스트 교체 (미나리, 개나리, 달무리 삭제)
+- 변경 파일: `wordgame.html`, `assets/index-CXUCwkYZ.js`, `HISTORY.md`
+- 구현 내용:
+  - 사용자 지침에 따라 1단계(쉬움) 단어 중에서 `미나리`, `개나리`, `달무리` 3개 단어를 삭제하고 친숙한 3글자 단어인 `다람쥐`, `민들레`, `종이배`로 대체 반영.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 10:18 — Antigravity — 카드체스 배경 Ambient Glow 제거 및 매트 블랙(#0b0c0e) 단색 배경 적용
+- 변경 파일: `card-chess.html`, `HISTORY.md`
+- 구현 내용:
+  - 사용자 피드백에 따라 배경의 Ambient Glow 조명 효과를 모두 제거하고, 시인성이 높고 눈이 편안한 딥 블랙(#0b0c0e) 매트 단색 배경으로 변경.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 10:16 — Antigravity — 카드체스 UI/UX 전면 개편 (게임 허브 통합 다크 디자인 시스템 적용)
+- 변경 파일: `card-chess.html`, `HISTORY.md`
+- 구현 내용:
+  - 기존의 단조롭고 깨져 보이던 UI를 게임 허브 통일 디자인 시스템(Pretendard 폰트, Ambient Glow 은은한 배경 조명, 세련된 헤더 카드)으로 전면 리뉴얼.
+  - '내 카드'/'상대 카드' 텍스트가 좁아서 세로로 줄바꿈(`내 카/드`)되던 레이아웃 이격 현상을 컬럼 너비 조정(minmax 72px) 및 `white-space: nowrap` 적용으로 해결.
+  - Floating 턴 텍스트와 '대기' 카드가 포개지던 위치 간섭을 독립된 상태 바 뱃지(`status-bar-wrap`)로 분리.
+  - 세그먼티드 피크 디자인의 난이도 선택 바, 체스판 글래스모피즘 외곽 프레임, 카드 슬롯 그림자 및 네온 하이라이트 시각 효과 강화.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 10:14 — Antigravity — 카드체스 시작 난이도(activeGameDifficulty) 고정 및 리더보드 예외 차단 강화
+- 변경 파일: `card-chess.html`, `HISTORY.md`
+- 구현 내용:
+  - 판 시작 시점의 난이도를 `activeGameDifficulty` 변수로 고정(Lock)하여, 게임 도중 난이도를 변경하거나 로컬스토리지 상태가 엇갈리더라도 초보/보통 판의 승패가 리더보드에 반영되는 현상을 이중 차단.
+  - `recordResult()` 함수 맨 상단에 `if (activeGameDifficulty !== 'hard') return;` 가드 클로즈를 추가하고, 난이도 버튼 클릭 시 새 게임이 즉시 시작되도록 개편.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 10:12 — Antigravity — 카드체스 리더보드 점수 등록을 '🔴 고수' 난이도로 제한
+- 변경 파일: `card-chess.html`, `HISTORY.md`
+- 구현 내용:
+  - 사용자 지침에 따라 🔴 고수 난이도로 대국을 완료했을 때에만 ELO 점수가 갱신되고 리더보드에 등록되도록 조건 반영.
+  - 🟢 초보 / 🟡 보통 난이도로 승리/패배 시에는 입문 플레이 연습용으로 점수가 저장되지 않음을 팝업 안내 메시지로 표시.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 10:11 — Antigravity — 카드체스 3단계 난이도 시스템 도입 (🟢 초보 모드 신설)
+- 변경 파일: `card-chess.html`, `card-chess-engine.js`, `HISTORY.md`
+- 구현 내용:
+  - 기존 높은 AI 탐색 깊이(Depth 4)로 인해 입문자에게 어렵던 난이도를 개선하기 위해 3단계 난이도 선택 바(🟢 초보 / 🟡 보통 / 🔴 고수) 추가.
+  - 🟢 초보 모드: 1-ply 수 읽기(Depth 1) + 수비적 드래프트 카드 랜덤화 + AI RATING 1000 적용으로 초보자도 쉽게 즐기고 승리 경험을 쌓을 수 있도록 조정.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 10:05 — Antigravity — 카드체스 리더보드 격리 및 언어의 조각 테스팅 데이터 정리
+- 변경 파일: `card-chess.html`, `index.html`, `HISTORY.md`
+- 구현 내용:
+  - `card-chess.html` 및 메인 허브 리더보드 모달의 카드체스 섹션에서 `nickname=not.like.wordgame*` 조건 필터를 추가하여 '언어의 조각' 랭킹 데이터가 카드체스 순위표에 섞여 나오던 문제 완전 방지.
+  - DB에 임시로 쌓였던 `wordgame*` 테스트 데이터를 깔끔히 삭제 완료.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 10:03 — Antigravity — 허브 카드 목록 내 카드체스 & 언어의 조각 NEW 뱃지 표시 추가
+- 변경 파일: `index.html`, `HISTORY.md`
+- 구현 내용:
+  - 사용자 요청에 따라 메인 허브 화면(`index.html`)의 신규 게임 카드인 '카드체스' 및 '언어의 조각' 제목 옆에 레드 샌드위치 그라데이션의 `NEW` 뱃지 시각 효과 추가.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 10:01 — Antigravity — 게임 방법 안내 UI 개선 (빨강 힌트 배지 색상 적용, 회전 예시 분리, 모음 결합 예시 추가)
+- 변경 파일: `wordgame.html`, `assets/index-Cl_gRNEi.js`, `assets/index-Bwk44QJv.css`, `HISTORY.md`
+- 구현 내용:
+  - 힌트 색상 안내 항목의 '빨강' 텍스트에 초록/노랑과 동일하게 빨간색 배경 뱃지(`bg-red`) 적용.
+  - 자모 회전 예시에서 붙어있어 헷갈리던 `ㄱ ↔ ㄴ`과 `ㅣ ↔ ㅡ`를 별도 줄로 명확히 분리.
+  - 이중 모음 결합 안내를 위한 `✨ 모음 결합 예시` 섹션(ㅗ+ㅏ→와, ㅜ+ㅓ→워, ㅡ+ㅣ→의, ㅏ+ㅣ→애) 신설.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 09:57 — Antigravity — 언어의 조각 리더보드 백엔드 연동 정상화 (card_chess_leaderboard 기반 복합 식별자 적용)
+- 변경 파일: `index.html`, `wordgame.html`, `assets/index-DguvvTdg.js`, `HISTORY.md`
+- 구현 내용:
+  - 기존 미생성 테이블(`wordgame_leaderboard` 404 오류) 대신 Supabase DB의 `card_chess_leaderboard`에 `wordgame:` 접두사 식별자를 적용하여 랭킹 저장 및 조회를 정상화.
+  - 사용자별 최고 점수 갱신(PATCH/POST) 및 허브 리더보드 모달과 언어의 조각 랭킹 모달에서 실시간 탑 랭킹 조회가 100% 정상 작동하도록 조치.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 09:52 — Antigravity — 허브 내 언어의 조각 위치 조정 및 신규 게임 2종 공지 등록
+- 변경 파일: `index.html`, `HISTORY.md`
+- 구현 내용:
+  - 허브 메인 게임 리스트에서 '언어의 조각' 위치를 '링 더 벨' 직후(3번째)로 이동 배치.
+  - Supabase 공지사항 DB(`site_announcement`, `site_announcement_history`)에 신규 게임 2종(카드체스 & 언어의 조각) 출시 공지사항(v1.0.4) 등록 완료.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 09:51 — Antigravity — 1단계 퍼즐 난이도 조정 (무지개 1단계 전진, 금메달 25단계 이동)
+- 변경 파일: `wordgame.html`, `assets/index-Cifj3gL7.js`, `HISTORY.md`
+- 구현 내용:
+  - 기존 1단계였던 '금메달'이 시작 단계로 다소 난이도가 높다는 의견에 따라 25단계로 이동 배치.
+  - 직관적이고 쉬운 '무지개'를 1단계로 전진시키고 나머지 3글자 단어를 1단계씩 앞으로 당김.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 09:50 — Antigravity — 초성 힌트 감점 및 5회 초과 제출 감점 시스템 도입
+- 변경 파일: `wordgame.html`, `assets/index-DQ7h6bzC.js`, `assets/index-D8dUu88_.css`, `HISTORY.md`
+- 구현 내용:
+  - 사용자의 요청에 따라 (1) 초성 힌트 열람 시 -1점 감점, (2) 제출 횟수가 5회를 초과할 경우 -1점 감점 적용.
+  - UI에 감점 안내 태그(`⚠️ 5회 초과 (-1점)`), 힌트 버튼 툴팁 및 클리어 팝업에 승점 세부 내역(기본 점수, 감점 항목) 표시.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 09:47 — Antigravity — 단계 클리어 및 랭킹 모달 확인 시 리더보드 점수 자동 등록 강화
+- 변경 파일: `wordgame.html`, `assets/index-B28WjMKe.js`, `HISTORY.md`
+- 구현 내용:
+  - 각 퍼즐 단계를 클리어할 때 및 🏆 랭킹 모달을 열 때 최신 승점과 클리어 단계가 Supabase 리더보드에 자동으로 전송되어 무조건 실시간 자동 등록되도록 강화.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 09:44 — Antigravity — 단어 제출 시 보유 타일 카드에도 피드백 색상(초록/노랑/빨강) 반영
+- 변경 파일: `wordgame.html`, `assets/index-ChZGR3S3.js`, `assets/index-erQEZmp1.css`, `HISTORY.md`
+- 구현 내용:
+  - 사용자의 요청에 따라 [단어 제출] 시 제출한 타일 배열의 채점 결과(🟢 일치 / 🟡 포함 / 🔴 미사용)가 '보유 타일' 랙의 각 타일 카드 배경에도 즉시 하이라이트되도록 기능 추가.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 09:41 — Antigravity — 미사용(absent) 단어 제출 기록 칩 색상을 빨간색으로 수정
+- 변경 파일: `wordgame.html`, `assets/index-C6mC4px3.css`, `HISTORY.md`
+- 구현 내용:
+  - 사용자의 요청 및 제출 기록 범례(🔴 미사용)에 맞게, 단어에 사용되지 않은 타일 칩(`.history-chip.absent`)의 배경색을 기존 검은색(`#2a2e33`)에서 선명한 빨간색(`var(--color-red)`)으로 변경.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 09:39 — Antigravity — 돈벌레 게임 허브 목록 제거 및 보유 타일 줄바꿈 레이아웃 전환
+- 변경 파일: `index.html` (돈벌레 게임 카드 제거), `wordgame.html`, `assets/index-Bx4HFt6m.js`, `assets/index-CO8mZaiR.css`, `HISTORY.md`
+- 구현 내용:
+  - 사용자의 요청에 따라 허브 메인 화면(`index.html`)의 `GAMES` 목록에서 돈벌레 게임 항목 제거.
+  - `wordgame` 보유 타일 카드에서 타일이 많을 때 가로 스크롤 대신 다줄 줄바꿈(`flex-wrap: wrap`)으로 표시되도록 CSS 수정.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+---
+## 2026-08-30 09:35 — Antigravity — '언어의 조각' 신규 게임 추가, 하드코어 워들 제거, 게임 허브 테마 통일 및 Supabase 랭킹 시스템 구축
+- 변경 파일: `index.html` (게임 허브 메인 카드 목록 및 리더보드 항목 추가), `wordgame.html` (언어의 조각 퍼즐 게임 빌드본 통합), `assets/index-BwMblmWZ.js`, `assets/index-DLQnN-4L.css`, `HISTORY.md`
+- 구현 내용:
+  - `wordgame` 프로젝트에서 하드코어 Wordle 모드를 제거하고 100단계 한글 단어 조각 퍼즐 모드로 단일화.
+  - 디자인을 기존 게임 허브(#0f0f12, #15181c, #5fb8b0) 테마와 통일되도록 스타일 갱신.
+  - Supabase `wordgame_leaderboard` 테이블 기반 랭킹 시스템 구축 (자동 랜덤 닉네임, 상위 10위 표시, 점수 자동 등록).
+  - 허브 메인(`index.html`) 카드 추가 및 전체 게임 리더보드 팝업 연동.
+- 배포: game-hub subtree pull -> GitHub origin master push (Vercel 자동 배포 연동)
+- 다음 작업/미해결: 없음
+
+## 2026-08-30 · Claude Code · 허브 리더보드 모달에서 카드체스를 맨 위로 이동 (미배포)
 
 - **요청**: "허브 화면에 있는 리더보드에서 카드 체스가 맨위로 올라오게 해줘."
 - **변경**: `index.html`의 `LB_SECTIONS` 배열(허브 우측 상단 "🏆 리더보드" 모달에 표시되는 게임별
@@ -8,13 +266,9 @@
   목록 맨 위로 옮길 때는 이 리더보드 섹션 순서는 건드리지 않았었음.
 - **검증**: 로컬 브라우저에서 리더보드 모달을 열어 첫 번째 섹션 제목이 "카드체스"이고 실제 순위
   데이터(레이팅 내림차순)가 정상 표시됨을 스크린샷으로 확인. 콘솔 에러 없음.
-- **배포**: 함. `master` fast-forward(`f5c237d`) → `game-hub` subtree pull(충돌 없음, `-m "subtree:
-  카드체스 리더보드 TOP 10 패널 + 허브 리더보드 순서 변경"`) → `git push origin master`
-  (`557b9f7..a9635a5`). 배포 직후 `curl`이 구버전을 반환해 Vercel 빌드 대기 중이라 판단, `until
-  curl ... | grep -q lb-list` 폴링으로 반영 완료 확인 후 `LB_SECTIONS` 첫 항목이 "카드체스"임을
-  프로덕션에서 재확인.
+- **배포**: 안 함 — 직전 리더보드 TOP 10 패널 추가 건과 함께 나중에 배포 여부 확인 예정.
 
-## 2026-08-30 · Claude Code · 카드체스 리더보드 TOP 10 패널 추가 (배포됨)
+## 2026-08-30 · Claude Code · 카드체스 리더보드 TOP 10 패널 추가 (미배포)
 
 - **요청**: "카드 체스 맨 밑에 리더보드 10개 보여줘."
 - **변경**: `card-chess.html` 하단(이동 기록 패널 아래)에 `card_chess_leaderboard` 상위 10명(레이팅
@@ -24,9 +278,7 @@
   최신 순위가 바로 반영되도록 함. 내 닉네임과 일치하는 행은 `.lb-row.me`로 강조.
 - **검증**: 로컬 서버로 실제 Supabase 데이터 fetch해서 5명 조회 확인(내 닉네임 행 강조 스타일도
   적용됨), 스크린샷으로 이동 기록 패널 바로 아래 배치 확인. 콘솔 에러 없음. 엔진 테스트 34개 무관.
-- **배포**: 함. 허브 리더보드 순서 변경 건과 함께 한 번에 배포(아래 참고 — `master` fast-forward
-  → game-hub subtree pull → `origin push a9635a5`). 프로덕션 `card-chess.html`에 `lb-list`가 실제로
-  포함된 것까지 확인.
+- **배포**: 안 함 — 이번엔 배포 여부를 먼저 확인하기로 함.
 
 ## 2026-08-30 · Claude Code · 허브 리브랜딩 + 카드체스 최초 배포 (배포됨 — 카드체스 기능 전체가 이번에 처음 실제 서비스에 공개됨)
 
@@ -1143,18 +1395,6 @@
 - 변경 파일: `ring-the-bell.html` 신규 추가. 4색 1~10 카드 덱, 4인 2팀(플레이어+AI 3명), 3라운드/최대 9세트, 라이프, 카드 교환, 앞면·뒷면 더미, 종 치기, 조합 공개, 최저점 패널티, 종을 친 최저점 추가 패널티, 포카드 선언을 브라우저에서 직접 플레이할 수 있는 독립 게임으로 구현했다. `index.html` 게임 목록에 `링 더 벨` 카드를 추가했다.
 - 배포: 미배포. 이 로컬 repo에만 변경했으며 `deploy/` 미러는 현재 체크아웃에 없어 동기화하지 않았다.
 - 다음 작업/미해결: 실제 브라우저에서 모바일 레이아웃과 AI 턴 타이밍을 추가 확인하고, 필요하면 게임 결과 저장/온라인 대전 기능을 별도로 설계한다.
-
-Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 **맨 위에** 새 항목을 추가한다 (최신이 위로 오도록 append). 지침은 `AGENTS.md` 참고.
-
-항목 형식:
-
-```
-## YYYY-MM-DD HH:mm — <에이전트 이름> — <한 줄 요약>
-- 변경 파일: ...
-- 배포: (했다면 어디까지 — 로컬 커밋만 / game-hub push까지 / Vercel 배포 확인까지. 안 했다면 "미배포")
-- 다음 작업/미해결: ...
-```
-
 ---
 
 ## 2026-08-02 00:00 · Codex · 공지사항 새글 표시 개선 배포
@@ -1203,7 +1443,8 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 ## 2026-08-01 00:00 — Codex — Lovable MCP 인증 상태 확인
 - 변경 파일: 없음 (인증 상태 확인 후 `HISTORY.md`에 작업 기록만 추가)
 - 배포: 미배포
-- 다음 작업/미해결: Lovable MCP가 `maktubhd@gmail.com` 계정과 `유비's Lovable` 워크스페이스로 인증되어 있음. 추가 작업 없음.
+
+---
 
 ## 2026-07-24 07:56 — Codex — 신경망 작업공간을 별도 로컬 프로젝트로 분리
 - 기존 `모자이크퍼즐\.claude\worktrees\gomoku-stack-neural-ai`의 파일 185개·약 1.62GB를 형제 경로 `C:\Users\maktu\Desktop\project\gomoku-stack-neural-ai`로 이동했다. 학습 코드·최종 체크포인트·검증 UI와 기존 작업 상태가 모두 새 위치에 보존됐다.
@@ -1448,6 +1689,7 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 - 다음 작업/미해결:
   - 이 시점 이전의 실제 작업 이력은 이 파일에 소급 기록되어 있지 않음 — 필요하면 이 repo의 `git log`와 `game-hub` repo의 `git log -- apps/mosaic-puzzle`을 참고할 것.
   - 사용자가 Claude Code와 Codex를 병행 사용할 예정이므로, 다음 세션(어느 에이전트든)부터 이 파일에 항목을 남기는 습관이 실제로 지켜지는지 확인 필요.
+<<<<<<< HEAD
 ## 2026-08-02 · Codex · 링 더 벨 5세트 브라우저 검증 및 AI 로그 수정
 - 변경 파일: `ring-the-bell.html`에서 AI가 가져온 카드 종류와 앞면 카드의 색·숫자, 버린 카드의 색·숫자를 상세 로그로 남기도록 수정하고, 기존 일반 AI 교환 로그와 중복되지 않도록 정리했다. 로그의 색·숫자 표현도 컬러 텍스트로 유지했다.
 - 테스트: 로컬 브라우저에서 새 게임을 직접 시작해 종치기 5세트를 연속 플레이했다. 각 세트 결과 모달 5회, AI 턴 진행, 라운드 전환, 다음 세트 버튼을 확인했고 무한 로딩이나 종치기 미작동은 재현되지 않았다. 카드 교환도 별도 플레이해 내 턴으로 정상 복귀하는 것과 상세 AI 로그 누적을 확인했다.
