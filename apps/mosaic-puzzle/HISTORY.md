@@ -16,8 +16,8 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 ## 2026-08-31 00:00 — Codex — 카드체스 보드·카드 배치·물방울 말 시인성 개선
 - 변경 파일: `card-chess.html`, `HISTORY.md`
 - 구현 내용: 내 카드·대기·상대 카드를 상단 한 줄로 정리하고, 보드를 420px까지 확대했다. 체스칸은 명암 체크무늬로 구분했으며, 물방울 말은 50px 크기의 SVG 곡선 마스크를 적용해 커져도 외곽이 매끄럽게 표시되도록 했다.
-- 배포: 로컬 커밋 예정. game-hub 원격 master의 선행 커밋을 subtree 역동기화한 뒤 반영함.
-- 다음 작업/미해결: GitHub push 및 Vercel 자동 배포 반영 확인.
+- 배포: game-hub `master`를 GitHub에 push하고 Vercel 자동 배포 반영을 확인함 (`card-chess.html`의 420px 보드·SVG 마스크 CSS 응답 확인).
+- 다음 작업/미해결: 없음.
 
 ---
 
