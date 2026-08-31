@@ -200,16 +200,18 @@
   /* Table Layout & Card Slots */
   .table-layout {
     display: grid;
-    grid-template-columns: minmax(72px, 82px) minmax(0, 1fr) minmax(72px, 82px);
+    grid-template-columns: minmax(0, 1fr) 68px minmax(0, 1fr);
     grid-template-rows: auto auto;
-    gap: 12px;
+    gap: 18px 10px;
     align-items: center;
     justify-items: center;
   }
-  .wait-slot-wrap { grid-column: 1 / 4; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-  .hand-left { grid-column: 1; grid-row: 2; display: flex; flex-direction: column; gap: 10px; align-items: center; width: 100%; }
-  .hand-right { grid-column: 3; grid-row: 2; display: flex; flex-direction: column; gap: 10px; align-items: center; width: 100%; }
-  .board-wrap { grid-column: 2; grid-row: 2; min-width: 0; width: 100%; display: flex; justify-content: center; }
+  .wait-slot-wrap { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .hand-left, .hand-right { grid-row: 1; display: grid; grid-template-columns: repeat(2, minmax(0, 68px)); justify-content: center; gap: 4px 8px; min-width: 0; width: 100%; }
+  .hand-left { grid-column: 1; }
+  .hand-right { grid-column: 3; }
+  .hand-left > .card-label-tiny, .hand-right > .card-label-tiny { grid-column: 1 / -1; }
+  .board-wrap { grid-column: 1 / 4; grid-row: 2; min-width: 0; width: 100%; display: flex; justify-content: center; }
 
   .hand-left .card-label-tiny, .hand-right .card-label-tiny {
     white-space: nowrap;
@@ -247,7 +249,7 @@
     grid-template-columns: repeat(5, 1fr);
     grid-template-rows: repeat(5, 1fr);
     gap: 3px;
-    width: min(280px, 100%);
+    width: min(420px, 100%);
     aspect-ratio: 1;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--border);
@@ -256,12 +258,13 @@
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
   }
   .cell {
-    background: var(--panel);
     border-radius: 8px;
     display: flex; align-items: center; justify-content: center;
     position: relative;
     transition: all 0.15s ease;
   }
+  .cell:nth-child(odd) { background: #171b20; }
+  .cell:nth-child(even) { background: #222830; }
   .cell.castle { background: rgba(124,155,255,.14); box-shadow: inset 0 0 0 1.5px rgba(124,155,255,.6); }
   .cell.castle .castle-mark { position: absolute; top: 3px; left: 4px; font-size: 11px; line-height: 1; color: var(--castle); pointer-events: none; opacity: 0.85; }
   .cell.highlight-piece { box-shadow: inset 0 0 0 2px var(--accent); cursor: pointer; background: rgba(95, 184, 176, 0.1); }
@@ -269,8 +272,9 @@
   .cell.last-move-from { border: 2px solid var(--gold); }
   .cell.last-move-to { border: 2px solid var(--gold); background: rgba(255,209,102,.2); }
   .piece {
-    width: 26px; height: 26px;
-    clip-path: path('M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z');
+    width: 50px; height: 50px;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z'/%3E%3C/svg%3E") center / contain no-repeat;
     filter: drop-shadow(0 2px 4px rgba(0,0,0,.6));
     transition: transform 0.2s ease;
   }
