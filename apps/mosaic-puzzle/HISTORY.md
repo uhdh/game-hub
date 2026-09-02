@@ -13,6 +13,21 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 
 ---
 
+## 2026-09-03 00:00 — Claude Code — 언어의 조각 모바일 타일 드래그 시 페이지 스크롤 충돌 수정
+- 변경 파일: `E:\project\wordgame\index.css` (별도 소스 프로젝트), `wordgame.html`, `assets/index-DHdOxRm2.js`, `assets/index-ViQx5VN0.css`
+- 원인: `.draggable-tile-card`에 `touch-action` 지정이 없고 `touchmove` 리스너가 `{ passive: true }`라, 타일을 위/아래로 드래그하면 브라우저가 이를 페이지 스크롤 제스처로 해석해 타일 재배치와 충돌했다 (`.tiles-track`이 `flex-wrap: wrap`이라 타일이 여러 줄로 나뉘어 상하 드래그가 자주 필요함).
+- 구현 내용: `E:\project\wordgame\index.css`의 `.draggable-tile-card`에 `touch-action: none` 한 줄 추가 → 타일 위에서 시작한 터치는 브라우저 팬/스크롤 제스처로 넘어가지 않고 온전히 드래그 재배치 로직으로만 처리됨. JS(`app.js`) 변경 없음. `npm run build`로 재빌드 후 새 해시 파일(`index-DHdOxRm2.js`, `index-ViQx5VN0.css`)을 이 저장소 `assets/`에 복사하고 `wordgame.html`의 `<script>`/`<link>` 참조를 갱신했다. 기존 해시 파일(`index-DlpabusD.js`, `index-DXCZle_K.css`)은 정리하지 않고 남겨둠(참조하는 곳 없어 무해).
+- 검증: `E:\project\wordgame`에서 `npm run build` 성공. 로컬 정적 서버로 `wordgame.html`을 열어 새 CSS(`touch-action:none` 포함)가 정상 서빙되고 콘솔 에러 없음을 확인. 실제 모바일 기기에서 상하 드래그 시 스크롤이 더 이상 끼어들지 않는지는 미확인(브라우저 자동화 도구가 터치 제스처 에뮬레이션을 지원하지 않음).
+- 배포: 미배포 (로컬 파일 변경만, 커밋도 안 함 — 사용자 요청 시 진행).
+- 다음 작업/미해결: 실기기(모바일)에서 타일 상하 드래그 재배치가 스크롤 없이 매끄러운지 최종 확인 필요. 확인되면 커밋 후 `game-hub` subtree 반영 → GitHub push → Vercel 배포까지 진행할 것. `E:\project\wordgame\android`/Capacitor 빌드도 이번 CSS 변경을 반영하려면 별도로 `npm run cap:build` 필요(웹 배포와 무관하게 안내만 함, 실행 안 함).
+
+## 2026-08-31 18:55 — Codex — 대기실 리더보드에서 언어의 조각을 카드체스 바로 아래로 이동
+- 변경 파일: `index.html`, `index-leaderboard-order.test.js`, `HISTORY.md`
+- 구현 내용: 대기실 `LB_SECTIONS` 순서를 카드체스 → 언어의 조각 → 수식 콤보 순으로 변경했다. 데이터 조회 및 표시 형식은 그대로 유지했다.
+- 검증: `node index-leaderboard-order.test.js` 1개 통과, `git diff --check` 통과.
+- 배포: 미배포.
+- 다음 작업/미해결: 배포가 필요하면 `game-hub` subtree 반영 후 GitHub push 및 Vercel 확인.
+
 ## 2026-08-31 17:57 — Codex — 카드체스 친구 초대 온라인 친선전 구현
 - 변경 파일: `card-chess.html`, `card-chess-online.js`, `card-chess-online.test.js`, `card-chess-online-integration.test.js`, `card-chess-layout.test.js`, `docs/superpowers/specs/2026-08-31-card-chess-friend-invite-design.md`, `docs/superpowers/plans/2026-08-31-card-chess-friend-invite.md`, `HISTORY.md`
 - 구현 내용: 링더벨의 기존 WebRTC/Supabase 신호 통신을 재사용해 `CC` 방 코드 초대 링크, 방장 P1·참가자 P2, 초기 상태 및 이동/패스 동기화, 상태 체크섬 검증, 연결 끊김 안내를 추가했다. 온라인에서는 각 사용자의 말과 카드가 아래쪽에 보이도록 관점을 뒤집고 AI·난이도·무르기·새 게임을 비활성화했으며, 승패는 리더보드에 기록하지 않는다.
