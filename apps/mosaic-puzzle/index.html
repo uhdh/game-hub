@@ -607,6 +607,44 @@
     color: #8992a0;
   }
 
+  .promo-desc {
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: #c3c9d1;
+    margin: 0 0 18px;
+  }
+  .promo-cta {
+    display: block;
+    text-align: center;
+    background: #5fb8b0;
+    color: #0f0f12;
+    font-weight: 800;
+    font-size: 14.5px;
+    padding: 13px;
+    border-radius: 12px;
+    text-decoration: none;
+    margin-bottom: 14px;
+  }
+  .promo-cta:hover { background: #7fcac3; color: #0f0f12; }
+  .promo-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .promo-btn {
+    flex: 1;
+    text-align: center;
+    background: #15181c;
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 10px;
+    padding: 10px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #a9b0bb;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .promo-btn:hover { border-color: rgba(95, 184, 176, .4); color: #e7ebee; }
+
   .more-soon {
     display: flex;
     align-items: center;
@@ -716,6 +754,29 @@
       <button type="button" id="lb-close" class="ann-close" aria-label="닫기">✕</button>
     </div>
     <div class="ann-body" id="lb-body"></div>
+  </div>
+</div>
+
+<div id="promo-overlay" class="ann-overlay">
+  <div class="ann-box">
+    <div class="ann-head">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <img src="./assets/playstore-icon.png" alt="" style="width:44px;height:44px;border-radius:12px;flex:0 0 auto;">
+        <div>
+          <span class="ann-head-title">(축)안드로이드 앱 출시 임박!</span>
+          <span class="ann-meta">단어조각 앱 베타 테스터 모집합니다</span>
+        </div>
+      </div>
+      <button type="button" id="promo-close-x" class="ann-close" aria-label="닫기">✕</button>
+    </div>
+    <div class="ann-body">
+      <p class="promo-desc">드디어 안드로이드 앱으로 출시합니다. 새로운 앱 출시를 위해서 베타 테스터가 되어주세요!</p>
+      <a href="./wordgame-beta.html" target="_blank" rel="noopener" class="promo-cta">자세히 보기 →</a>
+      <div class="promo-actions">
+        <button type="button" id="promo-dismiss" class="promo-btn">다시 안보기</button>
+        <button type="button" id="promo-close" class="promo-btn">닫기</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1303,6 +1364,28 @@
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && lbOverlay.classList.contains('show')) closeLeaderboard();
   });
+
+  // ---- 단어조각 베타 테스터 모집 공지 ----
+  const PROMO_DISMISS_KEY = 'gamehub_promo_wordgame_beta_dismissed_v1';
+  const promoOverlay = document.getElementById('promo-overlay');
+  const closePromo = () => promoOverlay.classList.remove('show');
+
+  document.getElementById('promo-close').addEventListener('click', closePromo);
+  document.getElementById('promo-close-x').addEventListener('click', closePromo);
+  document.getElementById('promo-dismiss').addEventListener('click', () => {
+    localStorage.setItem(PROMO_DISMISS_KEY, '1');
+    closePromo();
+  });
+  promoOverlay.addEventListener('click', (e) => {
+    if (e.target === promoOverlay) closePromo();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && promoOverlay.classList.contains('show')) closePromo();
+  });
+
+  if (localStorage.getItem(PROMO_DISMISS_KEY) !== '1') {
+    promoOverlay.classList.add('show');
+  }
 </script>
 </body>
 </html>
