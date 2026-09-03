@@ -1,5 +1,13 @@
 # 작업 히스토리
 
+## 2026-09-04 08:33 — Claude Code — 안드로이드 앱 베타 테스터 모집 공지 모달 배포
+- 변경 파일: `index.html`(공지 모달 마크업/스타일/스크립트 추가), `wordgame-beta.html`(신규, `E:\project\wordgame\beta.html` 내용을 이 저장소로 이식), `assets/playstore-icon.png`(신규), `assets/wordgame-beta/*.png`(신규, 앱 아이콘 + 스크린샷 4장)
+- 구현 내용: 허브 첫 화면 로드 시 자동으로 뜨는 공지 모달 추가. 제목 "(축)안드로이드 앱 출시 임박!", 헤더 아이콘은 플레이스토어 로고, 본문은 "드디어 안드로이드 앱으로 출시합니다..." 문구. "자세히 보기" 버튼은 `./wordgame-beta.html`(베타 테스터 신청 안내 페이지)로 연결. "닫기"(이번 세션만 닫힘)와 "다시 안보기"(`localStorage` 플래그로 영구 숨김) 버튼 제공. 기존 `.ann-overlay`/`.ann-box` 스타일 재사용.
+  - 원래 CTA 링크가 `file:///E:/project/wordgame/beta.html`(로컬 전용 경로)였는데, 배포 사이트에서는 방문자 브라우저에 그 파일이 없어 동작하지 않는 문제를 배포 직전에 발견 — `beta.html`과 `store-assets`(아이콘 1장 + 스크린샷 4장, 총 ~537KB)를 이 저장소로 복사하고 이미지 경로를 `./assets/wordgame-beta/...`로 바꿔 상대 경로로 배포되도록 수정. 복사한 이미지는 원본과 바이트 단위(`cmp`) 일치 확인.
+- 검증: 로컬에서 `file://`로 `index.html` 열어 모달 자동 표시, 아이콘/문구, "자세히 보기"→`wordgame-beta.html` 이동, "다시 안보기"/"닫기"/바깥클릭/Esc 동작을 직접 확인. 별도 자동화 테스트는 없음(정적 모달이라 기존 테스트 스위트와 무관).
+- 배포: 이 저장소 커밋 `d83be3c` → `game-hub`에서 사전 `git fetch origin`으로 원격과 일치 확인 후 `git subtree pull --prefix=apps/mosaic-puzzle mosaic master` → `origin/master`에 커밋 `76199b7`까지 push. Vercel 프로덕션에서 `https://pgamex.vercel.app/wordgame-beta.html`, `https://pgamex.vercel.app/assets/playstore-icon.png` 모두 HTTP 200 확인.
+- 다음 작업/미해결: `E:\project\wordgame`의 `beta.html`/`store-assets`는 여전히 그 저장소에 미커밋 상태(untracked)로 남아 있음 — 원본 wordgame 프로젝트 쪽 커밋 여부는 별도 판단 필요. 베타 테스터 모집이 끝나면 공지 모달을 내리거나 문구를 갱신할 것.
+
 ## 2026-09-03 11:43 — Codex — 수도권 지하철역 단계 프로덕션 배포
 - 변경 파일: `HISTORY.md` (배포 대상 코드는 직전 로컬 커밋 `f032991`, 원본 wordgame 커밋 `936fd13`)
 - 배포: `game-hub`에서 사전 `git fetch origin` 후 로컬/원격이 일치함을 확인하고 subtree pull, `origin/master`에 커밋 `4302004`까지 push. Vercel 프로덕션 `https://pgamex.vercel.app/wordgame.html` HTTP 200 및 새 `index-DMMFMsMm.js` 로드를 확인했다.
