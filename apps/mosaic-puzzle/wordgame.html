@@ -4,15 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>언어의 조각 - 한글 단어 추리 퍼즐</title>
-  <meta name="description" content="한글 자음, 모음 타일을 회전하고 배치하여 정답 단어를 찾는 100단계 퍼즐 게임 <언어의 조각>">
+  <meta name="description" content="한글 자음, 모음 타일을 회전하고 배치하여 정답 단어를 찾는 200단계(기본 100 + 지하철역 100) 퍼즐 게임 <언어의 조각>">
   <meta name="theme-color" content="#0f0f12">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800;900&family=Outfit:wght@600;700;800;900&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="./assets/index-DHdOxRm2.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-ViQx5VN0.css">
+  <script type="module" crossorigin src="./assets/index-CtWVv8rd.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-xP6nJvvz.css">
 </head>
 <body>
   <div id="app" class="game-container">
@@ -32,6 +32,7 @@
 
       <div class="header-toolbar">
         <div class="header-stage-badge" id="roundBadge">
+          <span class="set-pill hidden" id="setPill">지하철역</span>
           <span class="stage-prefix">STAGE</span>
           <span class="stage-current" id="roundNumber">1</span>
           <span class="stage-total">/100</span>
@@ -50,7 +51,7 @@
           <button id="btnLeaderboard" class="icon-btn" title="전체 랭킹" aria-label="랭킹">
             🏆
           </button>
-          <button id="btnStageSelect" class="icon-btn" title="단계 선택 (1~100)" aria-label="단계 선택">
+          <button id="btnStageSelect" class="icon-btn" title="단계 선택 (기본/지하철역)" aria-label="단계 선택">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
           </button>
           <button id="btnRules" class="icon-btn" title="게임 규칙 안내" aria-label="규칙">
@@ -222,23 +223,27 @@
       </div>
     </div>
 
-    <!-- 2. Stage Select Modal (1 ~ 100) -->
+    <!-- 2. Stage Select Modal -->
     <div class="modal-overlay hidden" id="stageSelectModal">
       <div class="modal-card modal-large">
         <div class="modal-header">
-          <h2 class="modal-title">🗺️ 단계 선택 (총 100단계)</h2>
+          <h2 class="modal-title" id="stageSelectTitle">🗺️ 단계 선택 (총 100단계)</h2>
           <button class="modal-close-btn" id="btnCloseStageSelect" aria-label="닫기">×</button>
         </div>
         <div class="modal-body">
+          <div class="stage-set-tabs">
+            <button class="tab-btn active" data-set="basic">기본</button>
+            <button class="tab-btn" data-set="subway">지하철역</button>
+          </div>
           <div class="stage-filter-tabs">
             <button class="tab-btn active" data-level="all">전체</button>
             <button class="tab-btn" data-level="쉬움">쉬움 (3글자)</button>
             <button class="tab-btn" data-level="보통">보통 (4글자)</button>
             <button class="tab-btn" data-level="어려움">어려움 (5글자)</button>
-            <button class="tab-btn" data-level="최고난도">최고난도 (6~7글자)</button>
+            <button class="tab-btn" data-level="최고난도">최고난도</button>
           </div>
           <div class="stages-grid" id="stagesGrid">
-            <!-- Dynamically populated 100 stage cards -->
+            <!-- Dynamically populated stage cards -->
           </div>
         </div>
       </div>
@@ -270,8 +275,8 @@
     <div class="modal-overlay hidden" id="gameOverModal">
       <div class="modal-card celebration-card">
         <div class="celebration-icon" id="gameOverIcon">🏆</div>
-        <h2 class="modal-title" id="gameOverTitle">100단계 완전 정복!</h2>
-        <p class="celebration-subtitle" id="gameOverDesc">축하합니다! 100개의 모든 단어 퍼즐을 성공적으로 클리어하셨습니다.</p>
+        <h2 class="modal-title" id="gameOverTitle">200단계 완전 정복!</h2>
+        <p class="celebration-subtitle" id="gameOverDesc">축하합니다! 기본 100단계와 지하철역 100단계, 200개의 모든 단어 퍼즐을 성공적으로 클리어하셨습니다.</p>
         <div class="final-score-box">
           <div class="score-row">
             <span>총 획득 승점</span>

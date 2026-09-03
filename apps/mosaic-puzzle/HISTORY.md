@@ -13,13 +13,29 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 
 ---
 
+## 2026-09-03 09:57 — Claude Code — 언어의 조각 지하철역 테마 100단계(101~200) 추가 + 허브 리더보드 순서 변경
+- 변경 파일: `E:\project\wordgame\index.css`, `index.html`, `src/js/app.js`, `src/js/stages.js` (별도 소스 프로젝트, 커밋 `cec353c`), 이 저장소의 `index.html`, `index-leaderboard-order.test.js`
+- 구현 내용(지하철역 세트): 실제 수도권/부산 전철역 이름(역 접미사 제외) 100개를 위키백과에서 노선별로 조사해 음절수 기준 4단계(쉬움 35/보통 33/어려움 17/최고난도 15)로 curate, `stages.js`의 `STAGES_100`을 200개(기본 100 + 지하철역 100)로 확장. 상단 배지는 세트별 로컬 번호(1~100)로 표시하고 지하철역 플레이 중일 때만 "지하철역" 라벨 추가. 단계선택 모달에 "기본/지하철역" 세트탭 신설. `?stage=N` 공유 URL 상한을 하드코딩 100 → `STAGES_100.length`(동적)로 변경. 기존 인덱스 기반 저장/클리어 로직은 그대로 재사용 — 기존 플레이어 진행(0~99) 영향 없음. brainstorming 스킬로 Bounded 분류 후 사용자와 3라운드 설계 확인(노출 방식/번호 표기/역 접미사 여부) 거쳐 구현.
+- 구현 내용(리더보드): 허브 대기실 리더보드 `LB_SECTIONS` 순서를 언어의 조각 → 카드체스 → 수식콤보 순으로 변경(언어의 조각 최상단). 기존 `index-leaderboard-order.test.js`가 "카드체스 바로 아래" 배치를 검증하던 걸 "첫 번째 항목" 검증으로 갱신(정규식도 LB_SECTIONS 블록 기준으로 앵커링하도록 수정 — 이전 정규식이 무관한 `label: '+6'` 같은 다른 객체에 걸리는 버그가 있었음).
+- 검증: `node --test *.test.js` 113개 전체 통과. `E:\project\wordgame`에서 `npm run build` 성공, 로컬 정적 서버 + Chrome으로 `?stage=101`(지하철역 1단계), `?stage=200`(지하철역 100단계, 최고난도 "동대문역사문화공원" 9글자/27타일), 단계선택 모달의 기본/지하철역 탭 전환, 카드 클릭 시 실제 이동(JS로 DOM 상태 직접 검증 — 브라우저 스크린샷 좌표계가 실제 CSS px와 안 맞는 툴 이슈가 있어 `find`+ref 클릭 또는 `element.click()` 직접 호출로 우회) 확인.
+- 배포: `E:\project\wordgame`는 로컬 커밋만(`cec353c`, `origin/main`에 push 안 함 — 직전 항목 정리 커밋 포함 총 10개 커밋 밀려있음). 이 저장소는 로컬 커밋 예정, `game-hub` subtree 반영 및 Vercel 배포는 아직 안 함(사용자 확인 후 진행).
+- 다음 작업/미해결: (1) 배포 원하면 `wordgame`은 `npm run build` → 이 저장소 `assets/`에 새 해시 파일 복사 + `wordgame.html` 참조 갱신 → 커밋 → `game-hub` subtree pull → GitHub push → Vercel 확인 순서. (2) `E:\project\wordgame` 로컬 `main`을 `origin/main`에 push할지 사용자 확인 필요. (3) 직전 항목에서 발견한 `gameState.js`의 저장 상태 재사용 시 내용 미검증 버그는 여전히 미수정.
+
 ## 2026-09-03 00:00 — Claude Code — 언어의 조각 모바일 타일 드래그 시 페이지 스크롤 충돌 수정
 - 변경 파일: `E:\project\wordgame\index.css` (별도 소스 프로젝트), `wordgame.html`, `assets/index-DHdOxRm2.js`, `assets/index-ViQx5VN0.css`
 - 원인: `.draggable-tile-card`에 `touch-action` 지정이 없고 `touchmove` 리스너가 `{ passive: true }`라, 타일을 위/아래로 드래그하면 브라우저가 이를 페이지 스크롤 제스처로 해석해 타일 재배치와 충돌했다 (`.tiles-track`이 `flex-wrap: wrap`이라 타일이 여러 줄로 나뉘어 상하 드래그가 자주 필요함).
 - 구현 내용: `E:\project\wordgame\index.css`의 `.draggable-tile-card`에 `touch-action: none` 한 줄 추가 → 타일 위에서 시작한 터치는 브라우저 팬/스크롤 제스처로 넘어가지 않고 온전히 드래그 재배치 로직으로만 처리됨. JS(`app.js`) 변경 없음. `npm run build`로 재빌드 후 새 해시 파일(`index-DHdOxRm2.js`, `index-ViQx5VN0.css`)을 이 저장소 `assets/`에 복사하고 `wordgame.html`의 `<script>`/`<link>` 참조를 갱신했다. 기존 해시 파일(`index-DlpabusD.js`, `index-DXCZle_K.css`)은 정리하지 않고 남겨둠(참조하는 곳 없어 무해).
 - 검증: `E:\project\wordgame`에서 `npm run build` 성공. 로컬 정적 서버로 `wordgame.html`을 열어 새 CSS(`touch-action:none` 포함)가 정상 서빙되고 콘솔 에러 없음을 확인. 실제 모바일 기기에서 상하 드래그 시 스크롤이 더 이상 끼어들지 않는지는 미확인(브라우저 자동화 도구가 터치 제스처 에뮬레이션을 지원하지 않음).
-- 배포: 미배포 (로컬 파일 변경만, 커밋도 안 함 — 사용자 요청 시 진행).
-- 다음 작업/미해결: 실기기(모바일)에서 타일 상하 드래그 재배치가 스크롤 없이 매끄러운지 최종 확인 필요. 확인되면 커밋 후 `game-hub` subtree 반영 → GitHub push → Vercel 배포까지 진행할 것. `E:\project\wordgame\android`/Capacitor 빌드도 이번 CSS 변경을 반영하려면 별도로 `npm run cap:build` 필요(웹 배포와 무관하게 안내만 함, 실행 안 함).
+- 배포: 로컬 커밋(`b6ee506`) → `game-hub` subtree pull → GitHub `origin/master` push(`a489a79`) → Vercel `pgamex.vercel.app/wordgame.html` 자동 배포 확인 완료.
+- 다음 작업/미해결: 실기기(모바일)에서 타일 상하 드래그 재배치가 스크롤 없이 매끄러운지 최종 확인 필요. `E:\project\wordgame\android`/Capacitor 빌드도 이번 CSS 변경을 반영하려면 별도로 `npm run cap:build` 필요(안 함). **중요**: 이 빌드에 `E:\project\wordgame`에 미커밋 상태로 남아있던 무관한 변경사항(단어 교체 2건, 파싱 로직 수정 1건)이 의도치 않게 같이 딸려가 배포됨 — 아래 항목 참고.
+
+## 2026-09-03 09:35 — Claude Code — (배포 사고) 언어의 조각 74단계 진행 중 플레이어 타일이 풀 수 없는 상태로 깨짐 — 원인 규명 및 정리
+- 변경 파일: `E:\project\wordgame\src\js\stages.js`, `E:\project\wordgame\src\js\hangulEngine.js` (별도 소스 프로젝트, 커밋만 함 — 내용 자체는 이미 배포돼 있던 것)
+- 무슨 일: 사용자가 스테이지74 플레이 중 캡처한 스크린샷을 보고 분석 요청. 진행 중이던 타일 중 `ㅊ,ㅂ,ㅌ`가 새 정답("달맞이공원")에 존재하지 않는 글자라 회전으로도 절대 맞출 수 없는 상태였음.
+- 원인: 바로 위 항목의 터치 UX 수정을 빌드/배포할 때, `E:\project\wordgame` 작업 폴더에 이미 **미커밋 상태로** 들어있던 무관한 변경(74단계 정답을 "달맞이꽃밭"→"달맞이공원"으로 교체, 다른 1단계도 "안개꽃"→"물안개"로 교체, `hangulEngine.js` 파싱 로직 수정 1건 — 전부 이번 세션 내가 만든 게 아니라 이전부터 있던 미완성 작업)이 `npm run build` 시 통째로 같이 번들링되어 그대로 배포돼버렸다. 이 사용자는 74단계를 예전 정답("달맞이꽃밭") 기준으로 이미 진행 중이었는데, `gameState.loadPuzzle()`이 저장된 진행 상태(`savedStageState.activeTiles`)를 재사용할 때 **타일 개수만 검사하고 내용(문자 구성)은 검증하지 않는 버그**가 있어서, 배포로 정답이 바뀐 뒤에도 옛 타일을 새 정답에 대해 그대로 채점하게 됨 → 풀 수 없는 판이 됨.
+- 조치: 사용자에게 "초기화" 버튼으로 즉시 우회 가능함을 안내(정답이 바뀐 스테이지는 `resetTiles()`가 `currentPuzzle.tiles`에서 새로 채우므로 정상 타일로 복구됨). 사용자 승인을 받아 `E:\project\wordgame`에 미커밋 변경사항 + 오늘 CSS 수정을 함께 커밋(`97374fb`, 로컬 `main`, 아직 `origin/main`에 push 안 함, 9개 커밋 앞서 있음)해서 git 이력을 실제 배포 상태와 맞췄다.
+- 배포: 이번 항목 자체는 재배포 불필요(내용은 이미 라이브에 있음, git 이력만 정리). `wordgame` 저장소는 push 안 함.
+- 다음 작업/미해결: (1) `E:\project\wordgame`의 로컬 `main`을 `origin/main`에 push할지 사용자 확인 필요(9개 커밋 밀려있음, 이번 커밋 포함해서 전부 검토 후 push 권장). (2) `gameState.js`의 `loadPuzzle()` 저장 상태 재사용 로직이 길이만 검사하고 내용을 검증하지 않는 근본 버그는 아직 미수정 — 앞으로 또 단어 목록을 바꾸면 진행 중이던 플레이어가 다시 이런 식으로 막힐 수 있음(재현 조건: 특정 스테이지를 플레이 중인 상태에서 그 스테이지의 정답 단어가 배포로 바뀌는 경우). 원한다면 저장된 타일의 문자 멀티셋이 새 target에서 도달 가능한지 검증해서 불일치 시 자동으로 리셋하는 가드를 추가할 것.
 
 ## 2026-08-31 18:55 — Codex — 대기실 리더보드에서 언어의 조각을 카드체스 바로 아래로 이동
 - 변경 파일: `index.html`, `index-leaderboard-order.test.js`, `HISTORY.md`

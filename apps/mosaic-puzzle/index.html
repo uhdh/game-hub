@@ -1203,14 +1203,14 @@
 
   const LB_SECTIONS = [
     {
-      label: '카드체스',
-      fetch: (limit) => fetchSimpleTop('card_chess_leaderboard?nickname=not.like.wordgame*', 'nickname,rating,wins,losses', 'rating.desc', limit),
-      format: r => `${r.wins}승 ${r.losses}패 · ${r.rating}점`,
-    },
-    {
       label: '언어의 조각',
       fetch: (limit) => fetchWordgameTop(limit),
       format: r => `${r.stages}단계 클리어 · ${r.score}점`,
+    },
+    {
+      label: '카드체스',
+      fetch: (limit) => fetchSimpleTop('card_chess_leaderboard?nickname=not.like.wordgame*', 'nickname,rating,wins,losses', 'rating.desc', limit),
+      format: r => `${r.wins}승 ${r.losses}패 · ${r.rating}점`,
     },
     {
       label: '수식 콤보',
