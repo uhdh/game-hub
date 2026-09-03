@@ -13,6 +13,16 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 
 ---
 
+## 2026-09-03 10:15 — Claude Code — 지하철역 세트탭 레이아웃 버그 수정 + 기본/지하철역 전환 버튼 + 허브 게임 목록/공지사항 정리
+- 변경 파일: `E:\project\wordgame\index.css`, `index.html`, `src/js/app.js` (별도 소스, 커밋 `7b89cd5`, 추가 커밋 예정), 이 저장소의 `index.html`, `wordgame.html`, `assets/`
+- 버그 수정: 사용자가 실제 배포본에서 단계선택 모달의 "기본/지하철역" 세트탭과 난이도탭 글자가 겹쳐 안 보인다고 제보. 원인은 `.stage-set-tabs`/`.stage-filter-tabs`에 준 `overflow-x:auto`가 flex item의 자동 최소높이 규칙을 꺼버려서, 모달 body가 100개 카드 그리드와 공간을 다툴 때 이 두 줄만 높이 4px로 짜부라지고 버튼 텍스트가 밖으로 삐져나와 겹쳐 보인 것. `flex-shrink: 0`을 추가해 해결. 배포 전 Chrome으로 실측(getBoundingClientRect) 검증 완료.
+- 신규: 상단 배지의 세트 라벨을 항상 보이는 흰색 pill 버튼("기본"/"지하철역")으로 바꾸고, 클릭하면 같은 로컬 단계 번호로 반대 세트로 바로 전환되도록 구현(`STAGE_SETS` export 추가, `gameState.loadStage`로 이동). 사용자가 스크린샷으로 원하는 모양을 보여주고 요청.
+- 허브 변경: `index.html`의 `GAMES` 배열에서 언어의 조각을 맨 위로 이동하고 설명을 "200단계(기본 100 + 지하철역 100)"으로 갱신, 카드체스의 `isNew: true` 배지를 제거(언어의 조각으로 NEW 이관). 리더보드 순서는 직전 항목에서 이미 변경됨.
+- 공지사항: Supabase `site_announcement_history`에 새 항목(id 25, "언어의 조각 지하철역 100단계 추가 · 모바일 터치 개선") 추가, `site_announcement.version`을 1.0.4 → 1.0.5로 올려 안 읽음 표시가 뜨도록 함.
+- 검증: `node --test *.test.js` 113개 통과. 로컬 정적 서버 + Chrome으로 세트탭 레이아웃(겹침 없음, 실측), 세트 전환 버튼 왕복 동작, 콘솔 에러 없음 확인.
+- 배포: 진행 중 — 이 커밋 이후 `game-hub` subtree pull → GitHub push → Vercel 확인까지 이어감.
+- 다음 작업/미해결: 없음(이번 배치 작업은 이 커밋으로 마무리).
+
 ## 2026-09-03 09:57 — Claude Code — 언어의 조각 지하철역 테마 100단계(101~200) 추가 + 허브 리더보드 순서 변경
 - 변경 파일: `E:\project\wordgame\index.css`, `index.html`, `src/js/app.js`, `src/js/stages.js` (별도 소스 프로젝트, 커밋 `cec353c`), 이 저장소의 `index.html`, `index-leaderboard-order.test.js`
 - 구현 내용(지하철역 세트): 실제 수도권/부산 전철역 이름(역 접미사 제외) 100개를 위키백과에서 노선별로 조사해 음절수 기준 4단계(쉬움 35/보통 33/어려움 17/최고난도 15)로 curate, `stages.js`의 `STAGES_100`을 200개(기본 100 + 지하철역 100)로 확장. 상단 배지는 세트별 로컬 번호(1~100)로 표시하고 지하철역 플레이 중일 때만 "지하철역" 라벨 추가. 단계선택 모달에 "기본/지하철역" 세트탭 신설. `?stage=N` 공유 URL 상한을 하드코딩 100 → `STAGES_100.length`(동적)로 변경. 기존 인덱스 기반 저장/클리어 로직은 그대로 재사용 — 기존 플레이어 진행(0~99) 영향 없음. brainstorming 스킬로 Bounded 분류 후 사용자와 3라운드 설계 확인(노출 방식/번호 표기/역 접미사 여부) 거쳐 구현.
