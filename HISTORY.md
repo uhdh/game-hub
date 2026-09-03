@@ -13,6 +13,13 @@ Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 
 
 ---
 
+## 2026-09-03 10:25 — Claude Code — 세트 전환 확인 모달 + 기본/지하철역 진행 단계 독립 기억
+- 변경 파일: `E:\project\wordgame\index.css`, `index.html`, `src/js/app.js`, `src/js/gameState.js` (별도 소스, 커밋 `de4e354`), 이 저장소의 `wordgame.html`, `assets/`
+- 구현 내용: 세트 전환 pill을 눌러도 즉시 이동하지 않고 확인 모달을 띄우도록 변경("기본 4단계 → 지하철역 1단계로 이동합니다" 형식 문구). `gameState.lastStageBySet`에 세트별 마지막 플레이 단계를 따로 기억해서(localStorage에도 영속화) 전환 시 그 세트에서 하던 단계로 이어지고(첫 방문이면 1단계), 되돌아오면 원래 있던 단계가 유지된다. `loadStage()` 호출 시마다 해당 세트의 lastStage를 갱신하도록 함.
+- 검증: `node --test *.test.js` 113개 통과. 로컬 정적 서버 + Chrome으로 기본4→지하철역1(첫 방문)→기본으로 복귀 시 4단계 유지, 취소 버튼 동작, localStorage `lastStageBySet` 값 직접 확인. 콘솔 에러 없음.
+- 배포: `game-hub` subtree pull → GitHub push → Vercel 확인까지 이 커밋 직후 진행.
+- 다음 작업/미해결: 없음.
+
 ## 2026-09-03 10:15 — Claude Code — 지하철역 세트탭 레이아웃 버그 수정 + 기본/지하철역 전환 버튼 + 허브 게임 목록/공지사항 정리
 - 변경 파일: `E:\project\wordgame\index.css`, `index.html`, `src/js/app.js` (별도 소스, 커밋 `7b89cd5`, 추가 커밋 예정), 이 저장소의 `index.html`, `wordgame.html`, `assets/`
 - 버그 수정: 사용자가 실제 배포본에서 단계선택 모달의 "기본/지하철역" 세트탭과 난이도탭 글자가 겹쳐 안 보인다고 제보. 원인은 `.stage-set-tabs`/`.stage-filter-tabs`에 준 `overflow-x:auto`가 flex item의 자동 최소높이 규칙을 꺼버려서, 모달 body가 100개 카드 그리드와 공간을 다툴 때 이 두 줄만 높이 4px로 짜부라지고 버튼 텍스트가 밖으로 삐져나와 겹쳐 보인 것. `flex-shrink: 0`을 추가해 해결. 배포 전 Chrome으로 실측(getBoundingClientRect) 검증 완료.
