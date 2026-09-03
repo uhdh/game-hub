@@ -1,5 +1,25 @@
 # 작업 히스토리
 
+## 2026-09-03 11:43 — Codex — 수도권 지하철역 단계 프로덕션 배포
+- 변경 파일: `HISTORY.md` (배포 대상 코드는 직전 로컬 커밋 `f032991`, 원본 wordgame 커밋 `936fd13`)
+- 배포: `game-hub`에서 사전 `git fetch origin` 후 로컬/원격이 일치함을 확인하고 subtree pull, `origin/master`에 커밋 `4302004`까지 push. Vercel 프로덕션 `https://pgamex.vercel.app/wordgame.html` HTTP 200 및 새 `index-DMMFMsMm.js` 로드를 확인했다.
+- 검증: 프로덕션 JS에서 `강남`, `마포`, `서울지방병무청` 포함 및 부산 항목 `다대포해수욕장` 미포함을 확인했다. 로컬 빌드 성공 및 테스트 113개 통과 상태.
+- 다음 작업/미해결: 없음. `E:\project\wordgame`의 `origin/main` push는 배포 필수 조건이 아니며 기존부터 로컬 브랜치가 원격보다 앞서 있어 수행하지 않았다.
+
+## 2026-09-03 11:40 — Codex — 언어의 조각 지하철역 세트를 수도권 전용으로 정리
+- 변경 파일: `E:\project\wordgame\src\js\stages.js`, `E:\project\wordgame\index.html`, `wordgame.html`, `assets/index-DMMFMsMm.js`
+- 구현 내용: 지하철역 세트의 부산 항목 `다대포해수욕장`을 수도권 역 `서울지방병무청`으로 교체하고 데이터 설명도 수도권 전철역 전용으로 수정했다. 쉬움 35단계 중 29단계를 수도권 2글자 역명으로 구성했으며 나머지 6개도 수도권 3글자 역명이다. 전체 100단계와 저장 인덱스 구조는 유지했다.
+- 검증: `npm run build` 성공, 지하철역 100개·2글자 역명 29개·부산 항목 제거를 모듈 검사로 확인, `node --test *.test.js` 113개 전체 통과.
+- 배포: 미배포. 빌드 산출물만 로컬 저장소에 반영함.
+- 다음 작업/미해결: 필요하면 두 로컬 저장소를 커밋한 뒤 `game-hub` subtree 흐름으로 배포.
+
+## 2026-09-03 11:35 — Codex — 언어의 조각 지하철역 2글자 단계 추가
+- 변경 파일: `E:\project\wordgame\src\js\stages.js`, `E:\project\wordgame\index.html`, `wordgame.html`, `assets/index-Bp7ChRQz.js`
+- 구현 내용: 지하철역 쉬움 단계의 첫 9개를 실제 2글자 역명(강남, 잠실, 시청, 종각, 신촌, 이대, 합정, 망원, 공덕)으로 구성하고 단계 선택 필터 문구를 `쉬움 (2~3글자)`로 변경했다. 세트 크기는 기존 100단계를 유지해 저장된 단계 인덱스와 전체 200단계 구조에는 영향이 없다.
+- 검증: `E:\project\wordgame`에서 `npm run build` 성공. 모듈 검사로 지하철역 100단계와 2글자 역명 9개를 확인했고, 이 저장소에서 `node --test *.test.js` 113개 전체 통과.
+- 배포: 미배포. 빌드 산출물만 로컬 저장소에 반영함.
+- 다음 작업/미해결: 필요하면 원본 저장소와 이 저장소를 커밋한 뒤 `game-hub` subtree 흐름으로 배포.
+
 Claude Code, Codex 등 어떤 에이전트로 작업하든 세션을 마칠 때 **맨 위에** 새 항목을 추가한다 (최신이 위로 오도록 append). 지침은 `AGENTS.md` 참고.
 
 항목 형식:
