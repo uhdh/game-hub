@@ -5,7 +5,7 @@
 - 소스(`E:\project\wordgame`)도 `index.html`/`index.css`/`privacy.html`/`src/js/*.js`에서 동일하게 치환했으나 미커밋. 주의: 그 저장소 `index.html`/`index.css`에는 이번 작업과 무관한 미커밋 디자인 변경(theme-color, 폰트 등)이 이미 있어서, `npm run build` 결과(dist)를 그대로 복사하면 배포본과 디자인이 달라진다. 그래서 dist를 쓰지 않고 이 저장소의 배포용 번들을 직접 치환했다. 번들 파일명을 새 해시로 바꾼 것은 Vercel의 해시 파일 캐시 때문.
 - 추가 변경(사용자가 "모두" 요청): 소스 저장소 `E:\project\wordgame`의 안드로이드 앱 이름(`capacitor.config.json`, `android/app/src/main/assets/capacitor.config.json`, `android/app/src/main/res/values/strings.xml`)도 "단어조각"으로 변경(미커밋, APK는 재빌드 안 함). Supabase `site_announcement_history` id 24·25의 title/bullets 문구도 UPDATE로 치환. `android-native/`에는 옛 이름 없음. 이전 HISTORY 항목과 옛 미참조 번들(`assets/index-*.js`)은 그대로.
 - 검증: `node --test *.test.js` 113개 통과, 이 저장소 html/test에 "언어의 조각" 잔존 없음.
-- 배포: 이 저장소 커밋 → `game-hub` subtree pull → push (결과는 아래 후속 확인 참고).
+- 배포: 이 저장소 커밋 → `game-hub` subtree pull → push 까지 완료. 이 저장소 커밋 `91960dc` → `game-hub` 사전 fetch로 원격 일치 확인 후 subtree pull, `origin/master` `764fa3a` push. Vercel 프로덕션에서 `wordgame.html`(title 단어조각, 옛 이름 0건), `assets/index-Wd682ba1a.js` HTTP 200, 허브 `/`에 옛 이름 0건 확인.
 - 다음 작업/미해결: 안드로이드 앱 이름은 다음 APK/AAB 빌드 때 반영됨. 소스 저장소 변경은 다른 미커밋 변경과 섞여 있어 커밋 여부 별도 판단.
 
 ## 2026-09-04 08:33 — Claude Code — 안드로이드 앱 베타 테스터 모집 공지 모달 배포
