@@ -1,5 +1,13 @@
 # 작업 히스토리
 
+## 2026-09-26 15:15 — Claude Code — 게임 이름 "언어의 조각" → "단어조각" 변경
+- 변경 파일(이 저장소): `wordgame.html`(title/description/h1/랭킹 모달 제목), `index.html`(허브 카드 이름, 리더보드 라벨/에러 문구), `privacy.html`("언어의 조각 (Fragments of Language)" → "단어조각"), `index-leaderboard-order.test.js`(기대값), `assets/index-Wd682ba1a.js`(신규 — 기존 `index-DMMFMsMm.js`에서 공유 문구 `<언어의 조각> STAGE n`만 치환한 복사본, `wordgame.html`이 이 파일을 참조)
+- 소스(`E:\project\wordgame`)도 `index.html`/`index.css`/`privacy.html`/`src/js/*.js`에서 동일하게 치환했으나 미커밋. 주의: 그 저장소 `index.html`/`index.css`에는 이번 작업과 무관한 미커밋 디자인 변경(theme-color, 폰트 등)이 이미 있어서, `npm run build` 결과(dist)를 그대로 복사하면 배포본과 디자인이 달라진다. 그래서 dist를 쓰지 않고 이 저장소의 배포용 번들을 직접 치환했다. 번들 파일명을 새 해시로 바꾼 것은 Vercel의 해시 파일 캐시 때문.
+- 추가 변경(사용자가 "모두" 요청): 소스 저장소 `E:\project\wordgame`의 안드로이드 앱 이름(`capacitor.config.json`, `android/app/src/main/assets/capacitor.config.json`, `android/app/src/main/res/values/strings.xml`)도 "단어조각"으로 변경(미커밋, APK는 재빌드 안 함). Supabase `site_announcement_history` id 24·25의 title/bullets 문구도 UPDATE로 치환. `android-native/`에는 옛 이름 없음. 이전 HISTORY 항목과 옛 미참조 번들(`assets/index-*.js`)은 그대로.
+- 검증: `node --test *.test.js` 113개 통과, 이 저장소 html/test에 "언어의 조각" 잔존 없음.
+- 배포: 이 저장소 커밋 → `game-hub` subtree pull → push (결과는 아래 후속 확인 참고).
+- 다음 작업/미해결: 안드로이드 앱 이름은 다음 APK/AAB 빌드 때 반영됨. 소스 저장소 변경은 다른 미커밋 변경과 섞여 있어 커밋 여부 별도 판단.
+
 ## 2026-09-04 08:33 — Claude Code — 안드로이드 앱 베타 테스터 모집 공지 모달 배포
 - 변경 파일: `index.html`(공지 모달 마크업/스타일/스크립트 추가), `wordgame-beta.html`(신규, `E:\project\wordgame\beta.html` 내용을 이 저장소로 이식), `assets/playstore-icon.png`(신규), `assets/wordgame-beta/*.png`(신규, 앱 아이콘 + 스크린샷 4장)
 - 구현 내용: 허브 첫 화면 로드 시 자동으로 뜨는 공지 모달 추가. 제목 "(축)안드로이드 앱 출시 임박!", 헤더 아이콘은 플레이스토어 로고, 본문은 "드디어 안드로이드 앱으로 출시합니다..." 문구. "자세히 보기" 버튼은 `./wordgame-beta.html`(베타 테스터 신청 안내 페이지)로 연결. "닫기"(이번 세션만 닫힘)와 "다시 안보기"(`localStorage` 플래그로 영구 숨김) 버튼 제공. 기존 `.ann-overlay`/`.ann-box` 스타일 재사용.
