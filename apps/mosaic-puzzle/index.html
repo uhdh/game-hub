@@ -783,7 +783,7 @@
 <script>
   const GAMES = [
     {
-      name: '언어의 조각',
+      name: '단어조각',
       desc: '한글 자음, 모음 타일을 회전하고 배치하여 정답 단어를 찾는 200단계(기본 100 + 지하철역 100) 퍼즐',
       href: './wordgame.html',
       target: '_self',
@@ -1252,7 +1252,7 @@
       `${LB_SUPABASE_URL}/rest/v1/card_chess_leaderboard?nickname=like.wordgame:*&select=nickname,rating,wins&order=rating.desc,updated_at.asc&limit=${limit}`,
       { headers: lbHeaders() }
     );
-    if (!res.ok) throw new Error('언어의 조각 리더보드 조회 실패');
+    if (!res.ok) throw new Error('단어조각 리더보드 조회 실패');
     const rows = await res.json();
     return rows.map(r => ({
       nickname: (r.nickname || '').replace(/^wordgame:/, ''),
@@ -1263,7 +1263,7 @@
 
   const LB_SECTIONS = [
     {
-      label: '언어의 조각',
+      label: '단어조각',
       fetch: (limit) => fetchWordgameTop(limit),
       format: r => `${r.stages}단계 클리어 · ${r.score}점`,
     },
