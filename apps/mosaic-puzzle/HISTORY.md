@@ -1,5 +1,17 @@
 # 작업 히스토리
 
+## 2026-10-06 — Codex — 정식 출시 공지 소개 문구 보강
+- 변경 파일: `index.html`. 제목을 "단어조각 게임 앱 정식 출시!"로 변경하고 Google Play 안내, 자모 조각을 회전·이동해 단어를 완성하는 게임 소개, 웹보다 풍성한 앱 추가 콘텐츠와 다양한 퍼즐, 짧은 여유에 즐기는 플레이 소개를 세 문단으로 추가. 스토어 링크와 공지 숨김 키 유지.
+- 검증: `git diff --check` 통과, 배포 후 실제 HTML에서 새 문구와 스토어 링크 확인 예정.
+- 배포: 이전 배포 요청의 후속 수정으로 game-hub 원격 일치 확인 후 subtree 동기화 및 push 진행.
+- 다음 작업/미해결: 프로덕션 반영 확인.
+
+## 2026-10-06 — Codex — 단어조각 정식 출시 공지 프로덕션 배포
+- 변경 파일: `HISTORY.md`에 배포 결과 기록. 배포 대상은 직전 공지 수정 커밋 `8611dcb`의 `index.html`과 작업 이력.
+- 배포: `game-hub`에서 `git fetch origin` 후 master와 origin/master 차이 0/0 확인, `git subtree pull --prefix=apps/mosaic-puzzle mosaic master`로 동기화하고 `2a004f7`을 origin/master에 push. Vercel 자동 배포 완료.
+- 검증: `https://pgamex.vercel.app/` HTTP 200, 정식 출시 공지 저장 키와 Google Play URL 포함, 기존 베타 공지 저장 키 제거를 실제 응답에서 확인.
+- 다음 작업/미해결: 없음. 이 배포 결과 기록은 로컬 이력에만 추가하며 별도 사이트 배포는 하지 않음.
+
 ## 2026-10-06 — Codex — 단어조각 정식 출시 공지로 갱신
 - 변경 파일: `index.html`. 베타 테스터 모집 모달 제목을 "단어조각 정식 출시!", 보조 문구를 "Google Play에서 만나보세요", 본문을 "'단어조각'에 대해 알아보세요"로 변경. CTA는 "Google Play에서 보기 →"이며 `https://play.google.com/store/apps/details?id=com.gamehub.wordgame`을 새 탭으로 연다.
 - 기존 베타 공지 숨김 설정과 구분하도록 localStorage 키를 `gamehub_promo_wordgame_release_dismissed_v1`로 변경하여 베타 공지를 숨겼던 방문자에게도 새 공지를 표시한다. 기존 닫기/다시 안보기 동작은 유지.
