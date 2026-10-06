@@ -1,5 +1,12 @@
 # 작업 히스토리
 
+## 2026-10-06 — Codex — 단어조각 정식 출시 공지로 갱신
+- 변경 파일: `index.html`. 베타 테스터 모집 모달 제목을 "단어조각 정식 출시!", 보조 문구를 "Google Play에서 만나보세요", 본문을 "'단어조각'에 대해 알아보세요"로 변경. CTA는 "Google Play에서 보기 →"이며 `https://play.google.com/store/apps/details?id=com.gamehub.wordgame`을 새 탭으로 연다.
+- 기존 베타 공지 숨김 설정과 구분하도록 localStorage 키를 `gamehub_promo_wordgame_release_dismissed_v1`로 변경하여 베타 공지를 숨겼던 방문자에게도 새 공지를 표시한다. 기존 닫기/다시 안보기 동작은 유지.
+- 검증: Node assert로 출시 제목/본문/스토어 URL/새 저장 키 및 옛 저장 키 제거 확인, `git diff --check` 통과. `deploy/index.html`은 현재 저장소에 없음.
+- 배포: 미배포, 커밋하지 않음.
+- 다음 작업/미해결: 실제 사이트 반영 시 이 저장소 커밋 후 game-hub 사전 fetch 및 subtree 동기화/push 필요.
+
 ## 2026-09-26 15:15 — Claude Code — 게임 이름 "언어의 조각" → "단어조각" 변경
 - 변경 파일(이 저장소): `wordgame.html`(title/description/h1/랭킹 모달 제목), `index.html`(허브 카드 이름, 리더보드 라벨/에러 문구), `privacy.html`("언어의 조각 (Fragments of Language)" → "단어조각"), `index-leaderboard-order.test.js`(기대값), `assets/index-Wd682ba1a.js`(신규 — 기존 `index-DMMFMsMm.js`에서 공유 문구 `<언어의 조각> STAGE n`만 치환한 복사본, `wordgame.html`이 이 파일을 참조)
 - 소스(`E:\project\wordgame`)도 `index.html`/`index.css`/`privacy.html`/`src/js/*.js`에서 동일하게 치환했으나 미커밋. 주의: 그 저장소 `index.html`/`index.css`에는 이번 작업과 무관한 미커밋 디자인 변경(theme-color, 폰트 등)이 이미 있어서, `npm run build` 결과(dist)를 그대로 복사하면 배포본과 디자인이 달라진다. 그래서 dist를 쓰지 않고 이 저장소의 배포용 번들을 직접 치환했다. 번들 파일명을 새 해시로 바꾼 것은 Vercel의 해시 파일 캐시 때문.
