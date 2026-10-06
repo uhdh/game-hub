@@ -1,5 +1,11 @@
 # 작업 히스토리
 
+## 2026-10-06 — Codex — 유튜브 채널 링크 수정 및 Google Play 아이콘 추가
+- 변경 파일: `index.html`. 헤더 유튜브 링크를 `https://www.youtube.com/channel/UCA9j_M6n83LPkRhuk2_QK-Q`로 교체. 옆에 기존 `assets/playstore-icon.png`를 재사용한 Google Play 아이콘을 추가하고 단어조각 앱 스토어 URL로 연결. 기존 icon-btn 스타일, 새 탭/noopener, 접근성 라벨 적용.
+- 검증: `git diff --check`, 헤더 내 새 채널 주소/스토어 아이콘 링크 및 이미지 파일 존재 확인. deploy 디렉터리는 없음.
+- 배포: game-hub 사전 fetch 결과 원격 일치 확인, 커밋/subtree 동기화/push 후 프로덕션 확인 진행.
+- 다음 작업/미해결: 프로덕션 반영 확인.
+
 ## 2026-10-06 — Codex — 공지사항에도 단어조각 앱 정식 출시 안내 등록
 - 변경: Supabase `site_announcement_history`에 id 26, 날짜 `2026-10-06`, 제목 "단어조각 게임 앱 Google Play 정식 출시!" 등록. 자모 회전·이동 퍼즐 소개, 웹보다 풍성한 앱 추가 콘텐츠와 다양한 퍼즐, 짧은 여유에 즐기는 플레이 소개, 클릭 가능한 Google Play 링크를 bullets 4개로 추가.
 - `site_announcement` id 1의 version을 `1.0.5`에서 `1.0.6`으로 갱신하고 deploy_date를 `2026-10-06`으로 변경. 기존 NEW 배지/공지 알림 표시 방식으로 새 공지를 알린다.
